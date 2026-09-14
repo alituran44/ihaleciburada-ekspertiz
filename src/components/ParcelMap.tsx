@@ -355,7 +355,7 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
             <div style="font-family: sans-serif; padding: 2px;">
               <strong style="color: #0F172A; font-size: 11px;">${po.name}</strong>
               <div style="color: ${po.color}; font-weight: 800; font-size: 12px; margin-top: 2px;">${po.price.toLocaleString("tr-TR")} ₺/m²</div>
-              <div style="color: #64748B; font-size: 9px;">Endeksa Bölgesel Isı Değeri</div>
+              <div style="color: #64748B; font-size: 9px;">İhaleci Burada Emsal Değerleme Skalası</div>
             </div>
           `);
         });
@@ -578,25 +578,23 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
           </div>
         )}
 
-        {/* Endeksa Üst Ekmek Kırıntısı (Breadcrumb Overlay) */}
+        {/* İhaleci Burada Üst Ekmek Kırıntısı (Breadcrumb Overlay) */}
         {isEndeksaSplitView && (
           <div className="absolute top-3 left-3 z-[400] bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-xl shadow-md border border-slate-200 flex items-center gap-1.5 text-xs font-semibold text-slate-700">
-            <span className="text-slate-500">Dünya</span>
-            <span className="text-slate-300">&gt;</span>
             <span className="text-slate-500">Türkiye</span>
             <span className="text-slate-300">&gt;</span>
             <span className="text-slate-700">{city}</span>
             <span className="text-slate-300">&gt;</span>
-            <span className="text-rose-600 font-bold">{district}</span>
+            <span className="text-amber-600 font-bold">{district}</span>
           </div>
         )}
 
-        {/* Endeksa Lejant Çubuğu (Isı Haritası Skalası) */}
+        {/* İhaleci Burada Lejant Çubuğu (Isı Haritası Skalası) */}
         {isEndeksaSplitView ? (
           <div className="absolute bottom-4 left-3 z-[400] bg-white/95 backdrop-blur-md px-3.5 py-2 rounded-xl shadow-lg border border-slate-200 text-slate-800">
             <div className="text-[10px] font-extrabold text-slate-800 mb-1 flex items-center justify-between">
-              <span>{category === "arsa" ? "Arsa" : "Konut"} m² Birim Fiyatı</span>
-              <span className="text-[9px] font-normal text-slate-400">Bölgesel Isı</span>
+              <span>{category === "arsa" ? "Arsa" : "Konut"} m² Değer Skalası</span>
+              <span className="text-[9px] font-normal text-slate-400">Bölgesel Emsal Isı</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-[10px] font-mono font-bold text-slate-600">

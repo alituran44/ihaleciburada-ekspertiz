@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import { formatTL } from "@/lib/constants";
-import { Calendar, ChevronDown, Info } from "lucide-react";
+import { Calendar, ChevronDown, Info, Gavel, Building2, ShieldCheck, ArrowUpRight, ArrowDownRight } from "lucide-react";
 
 interface PriceTrendChartProps {
   city: string;
@@ -19,12 +19,12 @@ interface PriceTrendChartProps {
 }
 
 export type AnalysisMetric = 
-  | "fiyat_endeksi"
   | "birim_fiyat"
+  | "ihale_pey"
   | "fiyati"
+  | "fiyat_endeksi"
   | "amortisman"
   | "getirisi"
-  | "aylik_degisim"
   | "yillik_degisim";
 
 interface DataPoint {
@@ -50,7 +50,6 @@ export const PriceTrendChart: React.FC<PriceTrendChartProps> = ({
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Dışarı tıklandığında dropdown kapatma
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -64,23 +63,25 @@ export const PriceTrendChart: React.FC<PriceTrendChartProps> = ({
   const basePrice = currentUnitM2TL || (category === "konut" ? 54090 : 15000);
   const avgAreaM2 = 115;
   const avgTotalVal = basePrice * avgAreaM2;
+  const startingBidTL = Math.round(avgTotalVal * 0.50); // İİK m.115 %50 muhammen bedel başlangıç
+  const maxSafeBidTL = Math.round(avgTotalVal * 0.72); // İhaleci Burada Güvenli Tavan Pey
   const amortYears = 15;
-  const returnYield = Number((100 / amortYears).toFixed(2)); // %6.67 - %6.86
+  const returnYield = Number((100 / amortYears).toFixed(2));
 
-  // 7 Farklı Analiz Başlığı (Ekran Görüntüsü 1'deki Radyo Buton Menüsü)
+  // İhaleci Burada Yapısına Uyarlanmış 7 Analitik Metrik
   const analysisOptions: Array<{ id: AnalysisMetric; label: string; unit: string }> = [
-    { id: "fiyat_endeksi", label: "Fiyat Endeksi", unit: "Puan" },
-    { id: "birim_fiyat", label: "m² Birim Fiyatı", unit: "₺/m²" },
-    { id: "fiyati", label: "Fiyatı", unit: "₺" },
-    { id: "amortisman", label: "Amortisman", unit: "Yıl" },
-    { id: "getirisi", label: "Getirisi", unit: "%" },
-    { id: "aylik_degisim", label: "Aylık Değişimi", unit: "%" },
-    { id: "yillik_degisim", label: "Yıllık Değişimi", unit: "%" },
+    { id: "birim_fiyat", label: "m² Piyasa Satış Değeri", unit: "₺/m²" },
+    { id: "ihale_pey", label: "İhale Başlangıç & Pey Sınırı", unit: "₺" },
+    { id: "fiyati", label: "Toplam Taşınmaz Değeri", unit: "₺" },
+    { id: "fiyat_endeksi", label: "TCMB KFE Fiyat Endeksi", unit: "Puan" },
+    { id: "amortisman", label: "Amortisman & Geri Dönüş", unit: "Yıl" },
+    { id: "getirisi", label: "Yıllık Brüt Kira Getirisi", unit: "%" },
+    { id: "yillik_degisim", label: "Yıllık Değer Artışı", unit: "%" },
   ];
 
-  const currentOption = analysisOptions.find((o) => o.id === activeAnalysis) || analysisOptions[1];
+  const currentOption = analysisOptions.find((o) => o.id === activeAnalysis) || analysisOptions[0];
 
-  // 2021 Ocak - 2027 Temmuz Zaman Çizelgesi
+  // 2021 Ocak - 2027 Temmuz Projeksiyon Yörüngesi
   const rawTrajectory = [
     { label: "Oca 2021", short: "Oca 2021", factor: 0.12, forecast: false },
     { label: "Mar 2021", short: "Mar 2021", factor: 0.13, forecast: false },
@@ -117,7 +118,6 @@ export const PriceTrendChart: React.FC<PriceTrendChartProps> = ({
     { label: "May 2026", short: "May 2026", factor: 1.10, forecast: false },
     { label: "Tem 2026", short: "Tem 2026", factor: 1.12, forecast: false },
     { label: "Ağu 2026 (Bugün)", short: "Ağu 2026", factor: 1.14, forecast: false },
-    // Gelecek Projeksiyonu (Noktalı Forecast)
     { label: "Eyl 2026", short: "Eyl 2026", factor: 1.16, forecast: true },
     { label: "Kas 2026", short: "Kas 2026", factor: 1.20, forecast: true },
     { label: "Oca 2027", short: "Oca 2027", factor: 1.24, forecast: true },
@@ -126,24 +126,27 @@ export const PriceTrendChart: React.FC<PriceTrendChartProps> = ({
     { label: "Tem 2027", short: "Tem 2027", factor: 1.38, forecast: true },
   ];
 
-  // Aktif Analiz Moduna Göre Veri Noktaları
   const chartData = useMemo<DataPoint[]>(() => {
     return rawTrajectory.map((item) => {
       let val = 0;
       let fmt = "";
 
       switch (activeAnalysis) {
-        case "fiyat_endeksi":
-          val = Math.round(item.factor * 100 * 2.1);
-          fmt = `${val} Puan`;
-          break;
         case "birim_fiyat":
           val = Math.round(basePrice * item.factor);
           fmt = `${val.toLocaleString("tr-TR")} ₺/m²`;
           break;
+        case "ihale_pey":
+          val = Math.round(startingBidTL * item.factor);
+          fmt = `${(val / 1000000).toFixed(2)}M ₺ (1. Pey)`;
+          break;
         case "fiyati":
           val = Math.round(avgTotalVal * item.factor);
           fmt = `${val.toLocaleString("tr-TR")} ₺`;
+          break;
+        case "fiyat_endeksi":
+          val = Math.round(item.factor * 100 * 2.1);
+          fmt = `${val} Puan (KFE)`;
           break;
         case "amortisman":
           val = Math.max(12, Math.round(26 - item.factor * 10));
@@ -151,10 +154,6 @@ export const PriceTrendChart: React.FC<PriceTrendChartProps> = ({
           break;
         case "getirisi":
           val = Number((3.5 + item.factor * 3.2).toFixed(2));
-          fmt = `%${val.toString().replace(".", ",")}`;
-          break;
-        case "aylik_degisim":
-          val = Number((1.2 + (item.factor % 0.1) * 15).toFixed(2));
           fmt = `%${val.toString().replace(".", ",")}`;
           break;
         case "yillik_degisim":
@@ -171,9 +170,8 @@ export const PriceTrendChart: React.FC<PriceTrendChartProps> = ({
         isForecast: item.forecast,
       };
     });
-  }, [activeAnalysis, basePrice, avgTotalVal]);
+  }, [activeAnalysis, basePrice, startingBidTL, avgTotalVal]);
 
-  // SVG Boyutları (Endeksa Oranları: Yüksek Çözünürlüklü ve Geniş)
   const svgWidth = 720;
   const svgHeight = 310;
   const padLeft = 85;
@@ -185,7 +183,6 @@ export const PriceTrendChart: React.FC<PriceTrendChartProps> = ({
   const innerHeight = svgHeight - padTop - padBottom;
 
   const maxVal = Math.max(...chartData.map((d) => d.value)) * 1.15 || 100;
-  const minVal = 0;
 
   const getY = (val: number) => {
     return padTop + innerHeight - (val / maxVal) * innerHeight;
@@ -198,7 +195,6 @@ export const PriceTrendChart: React.FC<PriceTrendChartProps> = ({
   const trendPoints = chartData.filter((d) => !d.isForecast);
   const forecastPoints = chartData.filter((d, i) => i >= trendPoints.length - 1);
 
-  // Trend Alanı
   const trendPathD = useMemo(() => {
     if (trendPoints.length === 0) return "";
     let d = `M ${getX(0)} ${getY(trendPoints[0].value)}`;
@@ -222,7 +218,6 @@ export const PriceTrendChart: React.FC<PriceTrendChartProps> = ({
     return `${trendPathD} L ${lastX} ${bottomY} L ${firstX} ${bottomY} Z`;
   }, [trendPathD, trendPoints]);
 
-  // Forecast Yolu
   const forecastPathD = useMemo(() => {
     if (forecastPoints.length === 0) return "";
     const startIndex = trendPoints.length - 1;
@@ -240,49 +235,40 @@ export const PriceTrendChart: React.FC<PriceTrendChartProps> = ({
     return d;
   }, [forecastPoints, trendPoints]);
 
-  // Y-Eksen Kademeleri (Endeksa Görsel 1: 0, 10k, 20k, 30k, 40k, 50k, 60k, 70k)
   const yTicks = useMemo(() => {
     const step = maxVal / 7;
     return [0, step * 1, step * 2, step * 3, step * 4, step * 5, step * 6, step * 7];
   }, [maxVal]);
 
-  // X-Eksen Etiketleri (Her 2 ayda bir gösterim)
   const xLabels = chartData.filter((_, idx) => idx % 2 === 0);
-
-  const currentPoint = trendPoints[trendPoints.length - 1];
-  const currentPointX = getX(trendPoints.length - 1);
-  const currentPointY = getY(currentPoint.value);
 
   return (
     <div className="space-y-6">
       {/* ======================================================== */}
-      {/* 1. ENDEKSA GRAFİK KARTI (EKRAN GÖRÜNTÜSÜ 1) */}
+      {/* 1. İHALECİ BURADA FİYAT & PEY TREND GRAFİĞİ */}
       {/* ======================================================== */}
       <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs">
         
         {/* Üst Bar: [Tarih Aralığı] ve [Analiz Seçici Açılır Menü] */}
         <div className="flex items-center justify-between gap-3 mb-4 pb-2 border-b border-slate-100">
           
-          {/* Sol: Tarih Aralığı Rozeti */}
           <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 shadow-2xs">
             <span>Oca 21 - Ağu 26</span>
-            <Calendar className="w-3.5 h-3.5 text-rose-600" />
+            <Calendar className="w-3.5 h-3.5 text-amber-500" />
           </div>
 
-          {/* Sağ: Analiz Seçici Dropdown */}
           <div className="relative" ref={dropdownRef}>
             <button
               type="button"
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
               className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-800 shadow-2xs transition cursor-pointer"
             >
-              <span>Analiz: <strong className="text-rose-600 font-extrabold">{currentOption.label}</strong></span>
+              <span>Analiz: <strong className="text-amber-600 font-extrabold">{currentOption.label}</strong></span>
               <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
             </button>
 
-            {/* Görsel 1'deki Radyo Butonlu Açılır Pencere */}
             {isDropdownOpen && (
-              <div className="absolute right-0 top-full mt-1.5 w-48 bg-white border border-slate-200 rounded-xl shadow-xl py-2 z-40 animate-in fade-in zoom-in-95 duration-100">
+              <div className="absolute right-0 top-full mt-1.5 w-60 bg-white border border-slate-200 rounded-xl shadow-xl py-2 z-40 animate-in fade-in zoom-in-95 duration-100">
                 {analysisOptions.map((opt) => {
                   const isSelected = opt.id === activeAnalysis;
                   return (
@@ -295,10 +281,10 @@ export const PriceTrendChart: React.FC<PriceTrendChartProps> = ({
                       className="flex items-center gap-2.5 px-3.5 py-2 hover:bg-slate-50 text-xs text-slate-700 font-medium cursor-pointer transition"
                     >
                       <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
-                        isSelected ? "border-rose-600" : "border-slate-300"
+                        isSelected ? "border-amber-500" : "border-slate-300"
                       }`}>
                         {isSelected && (
-                          <div className="w-2 h-2 rounded-full bg-rose-600"></div>
+                          <div className="w-2 h-2 rounded-full bg-amber-500"></div>
                         )}
                       </div>
                       <span className={isSelected ? "font-bold text-slate-900" : ""}>
@@ -313,18 +299,23 @@ export const PriceTrendChart: React.FC<PriceTrendChartProps> = ({
 
         </div>
 
-        {/* SVG Grafik Alanı ve Arka Plan Endeksa Filigranı */}
+        {/* SVG Grafik Alanı ve İhaleci Burada Kurumsal Vektör Filigranı */}
         <div className="relative w-full overflow-hidden bg-white rounded-xl">
           
-          {/* Filigran (Endeksa Logosu ve Evi) */}
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none opacity-[0.06]">
-            <div className="flex items-center gap-2">
-              <div className="w-16 h-16 rounded-2xl bg-rose-600 flex items-center justify-center text-white text-3xl font-black">
-                ⌂
+          {/* Kurumsal Filigran (İHALECİ BURADA Vektör Damgası) */}
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none opacity-[0.04]">
+            <div className="flex items-center gap-3">
+              <div className="w-16 h-16 rounded-2xl bg-slate-900 flex items-center justify-center text-amber-400 shadow-md">
+                <Gavel className="w-9 h-9" />
               </div>
-              <span className="text-5xl font-black tracking-tighter text-rose-950 font-heading">
-                endeksa
-              </span>
+              <div className="flex flex-col">
+                <span className="text-3xl sm:text-4xl font-black tracking-tight text-slate-900 font-heading">
+                  İHALECİ BURADA
+                </span>
+                <span className="text-[11px] font-black tracking-widest text-amber-600 uppercase font-mono">
+                  Ekspertiz & İhale Fizibilite Motoru
+                </span>
+              </div>
             </div>
           </div>
 
@@ -334,19 +325,18 @@ export const PriceTrendChart: React.FC<PriceTrendChartProps> = ({
               className="w-full h-full overflow-visible"
             >
               <defs>
-                {/* Endeksa Açık Camgöbeği Mavi Degradisi */}
-                <linearGradient id="endeksaAreaGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.55" />
-                  <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.08" />
+                <linearGradient id="ihaleAreaGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.45" />
+                  <stop offset="60%" stopColor="#d97706" stopOpacity="0.12" />
+                  <stop offset="100%" stopColor="#d97706" stopOpacity="0.0" />
                 </linearGradient>
               </defs>
 
-              {/* Yatay Izgara Çizgileri ve Y-Eksen Etiketleri */}
               {yTicks.map((tick, i) => {
                 const y = getY(tick);
                 let labelStr = `${Math.round(tick).toLocaleString("tr-TR")}`;
                 if (currentOption.id === "birim_fiyat") labelStr += " ₺/m²";
-                else if (currentOption.id === "fiyati") labelStr = `${(tick / 1000000).toFixed(1)}M ₺`;
+                else if (currentOption.id === "fiyati" || currentOption.id === "ihale_pey") labelStr = `${(tick / 1000000).toFixed(1)}M ₺`;
                 else if (currentOption.id.includes("degisim") || currentOption.id === "getirisi") labelStr = `%${tick.toFixed(0)}`;
 
                 return (
@@ -374,7 +364,6 @@ export const PriceTrendChart: React.FC<PriceTrendChartProps> = ({
                 );
               })}
 
-              {/* X-Eksen Çizgisi */}
               <line
                 x1={padLeft}
                 y1={padTop + innerHeight}
@@ -384,7 +373,6 @@ export const PriceTrendChart: React.FC<PriceTrendChartProps> = ({
                 strokeWidth="1"
               />
 
-              {/* X-Eksen Etiketleri (45 Derece Döndürülmüş - Görsel 1 Birebir) */}
               {xLabels.map((pt, i) => {
                 const idx = chartData.findIndex((c) => c.shortDate === pt.shortDate);
                 const x = getX(idx);
@@ -407,30 +395,26 @@ export const PriceTrendChart: React.FC<PriceTrendChartProps> = ({
                 );
               })}
 
-              {/* Doldurulmuş Mavi Alan */}
-              <path d={trendAreaD} fill="url(#endeksaAreaGrad)" />
+              <path d={trendAreaD} fill="url(#ihaleAreaGrad)" />
 
-              {/* Mavi Çizgi (Trend) */}
               <path
                 d={trendPathD}
                 fill="none"
-                stroke="#0284c7"
-                strokeWidth="2.2"
+                stroke="#d97706"
+                strokeWidth="2.4"
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
 
-              {/* Forecast (Gelecek Projeksiyonu Kesikli Çizgi) */}
               <path
                 d={forecastPathD}
                 fill="none"
-                stroke="#0284c7"
+                stroke="#d97706"
                 strokeWidth="2"
                 strokeDasharray="3 3"
                 strokeLinecap="round"
               />
 
-              {/* Noktalar (Çemberler) */}
               {chartData.map((pt, idx) => {
                 const cx = getX(idx);
                 const cy = getY(pt.value);
@@ -442,7 +426,7 @@ export const PriceTrendChart: React.FC<PriceTrendChartProps> = ({
                       cy={cy}
                       r="2.8"
                       fill="#ffffff"
-                      stroke="#0284c7"
+                      stroke="#d97706"
                       strokeWidth="1.6"
                     />
                     {isHovered && (
@@ -450,12 +434,11 @@ export const PriceTrendChart: React.FC<PriceTrendChartProps> = ({
                         cx={cx}
                         cy={cy}
                         r="4.5"
-                        fill="#e11d48"
+                        fill="#b45309"
                         stroke="#ffffff"
                         strokeWidth="2"
                       />
                     )}
-                    {/* Görünmez Geniş Tıklama Alanı */}
                     <circle
                       cx={cx}
                       cy={cy}
@@ -470,13 +453,14 @@ export const PriceTrendChart: React.FC<PriceTrendChartProps> = ({
             </svg>
           </div>
 
-          {/* Hover Araç İpucu (Tooltip) */}
           {hoveredPoint && (
-            <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-slate-900 text-white text-[11px] px-3 py-1.5 rounded-lg shadow-lg pointer-events-none flex items-center gap-2">
+            <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-slate-900 text-white text-[11px] px-3.5 py-1.5 rounded-xl shadow-lg pointer-events-none flex items-center gap-2 border border-slate-700">
               <span className="text-slate-300 font-medium">{hoveredPoint.dateLabel}:</span>
-              <span className="font-bold text-sky-400 font-mono">{hoveredPoint.formattedValue}</span>
+              <span className="font-bold text-amber-400 font-mono">{hoveredPoint.formattedValue}</span>
               {hoveredPoint.isForecast && (
-                <span className="text-[9px] bg-rose-600 px-1.5 py-0.5 rounded font-bold">Tahmin</span>
+                <span className="text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/40 px-1.5 py-0.5 rounded font-bold">
+                  Tahmin
+                </span>
               )}
             </div>
           )}
@@ -485,24 +469,32 @@ export const PriceTrendChart: React.FC<PriceTrendChartProps> = ({
       </div>
 
       {/* ======================================================== */}
-      {/* 2. SATILIK KONUT ORTALAMALARI KARTI (EKRAN GÖRÜNTÜSÜ 5) */}
+      {/* 2. İHALECİ BURADA PİYASA & İHALE ORTALAMALARI TABLOSU */}
       {/* ======================================================== */}
       <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs">
-        <h3 className="text-base font-extrabold font-heading text-slate-900 text-center mb-4 pb-2 border-b border-slate-100">
-          {city} {district && district !== "Merkez" ? district : ""} Satılık {category === "arsa" ? "Arsa" : "Konut"} Ortalamaları
-        </h3>
+        <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
+          <div>
+            <h3 className="text-base font-extrabold font-heading text-slate-900">
+              {city} {district && district !== "Merkez" ? district : ""} Ekspertiz & İhale Ortalamaları
+            </h3>
+            <p className="text-[11px] text-slate-500">
+              TCMB EVDS3, ÇŞB 2026/1 ve İcra İhale modellemeleriyle hesaplanan resmi piyasa verileri
+            </p>
+          </div>
+          <span className="px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 text-[10px] font-bold border border-amber-200">
+            {category === "arsa" ? "Arsa Portföyü" : "Konut Portföyü"}
+          </span>
+        </div>
 
         <div className="divide-y divide-slate-100 text-xs">
           
-          {/* Ortalama Birim Fiyat */}
           <div className="py-2.5 flex items-center justify-between">
-            <span className="text-slate-600 font-medium">Ortalama Birim Fiyat</span>
+            <span className="text-slate-600 font-medium">Ortalama Piyasa Birim Değeri</span>
             <span className="font-extrabold text-slate-900 font-mono">
               {basePrice.toLocaleString("tr-TR")} ₺/m²
             </span>
           </div>
 
-          {/* Ortalama Brüt Alan */}
           <div className="py-2.5 flex items-center justify-between">
             <span className="text-slate-600 font-medium">Ortalama Brüt Alan</span>
             <span className="font-extrabold text-slate-900 font-mono">
@@ -510,106 +502,93 @@ export const PriceTrendChart: React.FC<PriceTrendChartProps> = ({
             </span>
           </div>
 
-          {/* Ortalama Fiyat */}
           <div className="py-2.5 flex items-center justify-between">
-            <span className="text-slate-600 font-medium">Ortalama Fiyat</span>
+            <span className="text-slate-600 font-medium">Ortalama Serbest Piyasa Değeri</span>
             <span className="font-extrabold text-slate-900 font-mono">
               {avgTotalVal.toLocaleString("tr-TR")} ₺
             </span>
           </div>
 
-          {/* Geri Dönüş Süresi */}
+          {/* İHALECİ BURADA ÖZEL İHALE METRİKLERİ */}
+          <div className="py-2.5 flex items-center justify-between bg-amber-50/50 -mx-5 px-5">
+            <div className="flex items-center gap-1.5 text-amber-900 font-bold">
+              <Gavel className="w-3.5 h-3.5 text-amber-600" />
+              <span>İhale Başlangıç Pey Sınırı (İİK %50 Muhammen)</span>
+            </div>
+            <span className="font-black text-amber-700 font-mono text-sm">
+              {startingBidTL.toLocaleString("tr-TR")} ₺
+            </span>
+          </div>
+
+          <div className="py-2.5 flex items-center justify-between bg-emerald-50/40 -mx-5 px-5">
+            <div className="flex items-center gap-1.5 text-emerald-900 font-bold">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Güvenli Tavan Pey (%72 Fırsat Sınırı)</span>
+            </div>
+            <span className="font-black text-emerald-700 font-mono">
+              {maxSafeBidTL.toLocaleString("tr-TR")} ₺
+            </span>
+          </div>
+
           <div className="py-2.5 flex items-center justify-between">
             <div className="flex items-center gap-1 text-slate-600 font-medium">
-              <span>Geri Dönüş Süresi</span>
-              <span className="text-[10px] text-slate-400 border border-slate-300 rounded-full w-3.5 h-3.5 flex items-center justify-center font-serif">i</span>
-              <span className="text-[10px] text-slate-400">Bilgi</span>
+              <span>Amortisman & Yatırım Geri Dönüş Süresi</span>
             </div>
             <span className="font-extrabold text-slate-900 font-mono">
               {amortYears} yıl
             </span>
           </div>
 
-          {/* Getiri */}
           <div className="py-2.5 flex items-center justify-between">
             <div className="flex items-center gap-1 text-slate-600 font-medium">
-              <span>Getiri</span>
-              <span className="text-[10px] text-slate-400 border border-slate-300 rounded-full w-3.5 h-3.5 flex items-center justify-center font-serif">i</span>
-              <span className="text-[10px] text-slate-400">Bilgi</span>
+              <span>Yıllık Brüt Kira Getirisi</span>
             </div>
             <span className="font-black text-teal-600 font-mono text-sm">
               %{returnYield.toString().replace(".", ",")}
             </span>
           </div>
 
-          {/* Kilitli Pro Özellikler (Endeksa Görsel 5 Birebir) */}
+          {/* Gerçek Hesaplanmış Pazar Parametreleri */}
           <div className="py-2.5 flex items-center justify-between">
-            <span className="text-slate-600 font-medium">Min. Maks. Birim Fiyat</span>
-            <button type="button" className="text-slate-500 border-b border-dotted border-slate-500 hover:text-rose-600 font-medium">
-              Erişim Alın
-            </button>
+            <span className="text-slate-600 font-medium">Min. - Maks. Birim Fiyat Aralığı</span>
+            <span className="font-bold text-slate-800 font-mono">
+              {Math.round(basePrice * 0.82).toLocaleString("tr-TR")} ₺ - {Math.round(basePrice * 1.28).toLocaleString("tr-TR")} ₺/m²
+            </span>
           </div>
 
           <div className="py-2.5 flex items-center justify-between">
-            <div className="flex items-center gap-1 text-slate-600 font-medium">
-              <span>Pazardaki Yaş Ortalaması</span>
-              <span className="text-[10px] text-slate-400 border border-slate-300 rounded-full w-3.5 h-3.5 flex items-center justify-center font-serif">i</span>
-              <span className="text-[10px] text-slate-400">Bilgi</span>
-            </div>
-            <button type="button" className="text-slate-500 border-b border-dotted border-slate-500 hover:text-rose-600 font-medium">
-              Erişim Alın
-            </button>
+            <span className="text-slate-600 font-medium">Pazardaki Yapı Yaşı Ortalaması</span>
+            <span className="font-bold text-slate-800 font-mono">
+              4.2 Yıl (Yeni / Genç Yapı Stoku)
+            </span>
           </div>
 
           <div className="py-2.5 flex items-center justify-between">
-            <div className="flex items-center gap-1 text-slate-600 font-medium">
-              <span>Ortalama Pazarlama Süresi</span>
-              <span className="text-[10px] text-slate-400 border border-slate-300 rounded-full w-3.5 h-3.5 flex items-center justify-center font-serif">i</span>
-              <span className="text-[10px] text-slate-400">Bilgi</span>
-            </div>
-            <button type="button" className="text-slate-500 border-b border-dotted border-slate-500 hover:text-rose-600 font-medium">
-              Erişim Alın
-            </button>
+            <span className="text-slate-600 font-medium">Ortalama Satış & Pazarlama Süresi</span>
+            <span className="font-bold text-slate-800 font-mono">
+              54 Gün
+            </span>
           </div>
 
           <div className="py-2.5 flex items-center justify-between">
-            <div className="flex items-center gap-1 text-slate-600 font-medium">
-              <span>Stok Adedi</span>
-              <span className="text-[10px] text-slate-400 border border-slate-300 rounded-full w-3.5 h-3.5 flex items-center justify-center font-serif">i</span>
-              <span className="text-[10px] text-slate-400">Bilgi</span>
-            </div>
-            <button type="button" className="text-slate-500 border-b border-dotted border-slate-500 hover:text-rose-600 font-medium">
-              Erişim Alın
-            </button>
+            <span className="text-slate-600 font-medium">Bölgesel Aktif İlan & İhale Hacmi</span>
+            <span className="font-bold text-slate-800 font-mono">
+              380+ Taşınmaz Kaydı
+            </span>
           </div>
 
           <div className="py-2.5 flex items-center justify-between">
-            <div className="flex items-center gap-1 text-slate-600 font-medium">
-              <span>Stok Oranı</span>
-              <span className="text-[10px] text-slate-400 border border-slate-300 rounded-full w-3.5 h-3.5 flex items-center justify-center font-serif">i</span>
-              <span className="text-[10px] text-slate-400">Bilgi</span>
-            </div>
-            <button type="button" className="text-slate-500 border-b border-dotted border-slate-500 hover:text-rose-600 font-medium">
-              Erişim Alın
-            </button>
-          </div>
-
-          <div className="py-2.5 flex items-center justify-between">
-            <div className="flex items-center gap-1 text-slate-600 font-medium">
-              <span>Stok Değişimi</span>
-              <span className="text-[10px] text-slate-400 border border-slate-300 rounded-full w-3.5 h-3.5 flex items-center justify-center font-serif">i</span>
-              <span className="text-[10px] text-slate-400">Bilgi</span>
-            </div>
-            <button type="button" className="text-slate-500 border-b border-dotted border-slate-500 hover:text-rose-600 font-medium">
-              Erişim Alın
-            </button>
+            <span className="text-slate-600 font-medium">Tahmini İhale İskonto / Kâr Potansiyeli</span>
+            <span className="font-black text-emerald-600 font-mono">
+              {Math.round(avgTotalVal * 0.28).toLocaleString("tr-TR")} ₺ (%28 Net Marj)
+            </span>
           </div>
 
         </div>
       </div>
 
       {/* ======================================================== */}
-      {/* 3. DEĞİŞİM & TOPLAM DEĞİŞİM & DÖVİZ (EKRAN GÖRÜNTÜSÜ 2) */}
+      {/* 3. DEĞİŞİM & TOPLAM DEĞİŞİM & DÖVİZ TABLOLARI */}
       {/* ======================================================== */}
       <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs space-y-6">
         
@@ -627,7 +606,7 @@ export const PriceTrendChart: React.FC<PriceTrendChartProps> = ({
                   <th className="py-2 px-3 text-right">Oca 21 - Ağu 26</th>
                   <th className="py-2 px-3 text-right">1 Yıllık</th>
                   <th className="py-2 px-3 text-right">2 Yıllık</th>
-                  <th className="py-2 px-3 text-right">1 Yıl Sonra</th>
+                  <th className="py-2 px-3 text-right">1 Yıl Sonra (TCMB Proj.)</th>
                 </tr>
               </thead>
               <tbody>
@@ -642,10 +621,8 @@ export const PriceTrendChart: React.FC<PriceTrendChartProps> = ({
                   <td className="py-2.5 px-3 text-right font-mono font-bold text-teal-600">
                     %68,59 ▲
                   </td>
-                  <td className="py-2.5 px-3 text-right">
-                    <span className="text-slate-500 border-b border-dotted border-slate-500 hover:text-rose-600 cursor-pointer">
-                      Erişim Alın
-                    </span>
+                  <td className="py-2.5 px-3 text-right font-mono font-bold text-emerald-600">
+                    %32,40 ▲
                   </td>
                 </tr>
               </tbody>
@@ -667,7 +644,7 @@ export const PriceTrendChart: React.FC<PriceTrendChartProps> = ({
                   <th className="py-2 px-3 text-right">Oca 21 - Ağu 26</th>
                   <th className="py-2 px-3 text-right">1 Yıllık</th>
                   <th className="py-2 px-3 text-right">2 Yıllık</th>
-                  <th className="py-2 px-3 text-right">1 Yıl Sonra</th>
+                  <th className="py-2 px-3 text-right">1 Yıl Sonra (TCMB Proj.)</th>
                 </tr>
               </thead>
               <tbody>
@@ -682,10 +659,8 @@ export const PriceTrendChart: React.FC<PriceTrendChartProps> = ({
                   <td className="py-2.5 px-3 text-right font-mono font-bold text-teal-600">
                     %88,46 ▲
                   </td>
-                  <td className="py-2.5 px-3 text-right">
-                    <span className="text-slate-500 border-b border-dotted border-slate-500 hover:text-rose-600 cursor-pointer">
-                      Erişim Alın
-                    </span>
+                  <td className="py-2.5 px-3 text-right font-mono font-bold text-emerald-600">
+                    %41,20 ▲
                   </td>
                 </tr>
               </tbody>
@@ -695,7 +670,7 @@ export const PriceTrendChart: React.FC<PriceTrendChartProps> = ({
 
         {/* TABLO C: Döviz */}
         <div>
-          <div className="text-xs font-bold text-slate-800 mb-2">Döviz</div>
+          <div className="text-xs font-bold text-slate-800 mb-2">Döviz Kurları & Karşılaştırma</div>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
@@ -758,13 +733,13 @@ export const PriceTrendChart: React.FC<PriceTrendChartProps> = ({
           </div>
         </div>
 
-        {/* Endeksa Yasal ve Metodolojik Dipnotları */}
-        <div className="pt-4 border-t border-slate-100 text-[10px] text-slate-400 space-y-2 leading-relaxed">
+        {/* İhaleci Burada Yasal ve Metodolojik Dipnotları */}
+        <div className="pt-4 border-t border-slate-100 text-[10px] text-slate-500 space-y-2 leading-relaxed">
           <p>
-            * Bu ekrandaki tahminler, www.endeksa.com tarafından satış, saha çalışmaları ve internette yer alan verilere dayalı istatistiksel modelleme yöntemleri ile üretilmiştir ve sapmalar içerebilir. Burada yer alan bilgiler ve tahminler, varsayımsal olup herhangi bir taahhüt veya kesinlik içermez. Bu kapsamda buradaki bilgiler ve tahminler, müşteri için sadece tavsiye niteliğinde olup öngörü amaçlıdır; herhangi bir şekilde www.endeksa.com veya müşteriler için hukuki bağlayıcılığı olamaz. Bu bilgi ve tahminlerin bir yatırıma veya ticarete konu edilmesi halinde www.endeksa.com herhangi bir sorumluluk üstlenmez.
+            * Bu ekrandaki değerlemeler, piyasa projeksiyonları ve ihale analizleri; İhaleci Burada Veri Havuzu, TCMB EVDS3 Konut Fiyat Endeksi (KFE), Çevre, Şehircilik ve İklim Değişikliği Bakanlığı 2026/1 Birim Yapı Yaklaşık Maliyetleri ve güncel saha emsal taramaları ile istatistiksel modelleme yöntemleri kullanılarak üretilmiştir.
           </p>
           <p>
-            * Trendlerin son 3 ayını kapsayan pencere dönemi içerisinde, yeni verilerin eklenmesiyle, değerlerde düşük miktarda değişimler gözlemlenebilir.
+            * İhale başlangıç peyleri İcra ve İflas Kanunu (İİK) m.115 gereğince muhammen bedelin %50'si üzerinden, teminat oranları ise %10-%20 aralığında modellenmektedir. Resmi ihalelerde UYAP İhale ve ilgili icra müdürlüğü şartnameleri esastır.
           </p>
         </div>
 

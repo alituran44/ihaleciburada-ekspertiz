@@ -291,30 +291,35 @@ export default function Home() {
       <header className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-2xs">
         <div className="flex items-center justify-between px-3 sm:px-6 h-14 sm:h-16 gap-3">
           
-          {/* Sol Kısım: Logo */}
+          {/* Sol Kısım: İhaleci Burada Kurumsal Logo */}
           <div className="flex items-center gap-3">
             <div 
-              className="flex items-center gap-2 cursor-pointer"
+              className="flex items-center gap-2.5 cursor-pointer"
               onClick={() => setActiveTab("endeks")}
             >
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-rose-600 to-pink-500 flex items-center justify-center text-white shadow-sm font-black text-sm">
-                İB
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-slate-950 via-slate-900 to-amber-600 flex items-center justify-center text-amber-400 shadow-sm border border-amber-500/30">
+                <Gavel className="w-5 h-5" />
               </div>
-              <span className="font-black text-lg sm:text-xl font-heading tracking-tight text-slate-900 hidden sm:inline">
-                ihaleciburada<span className="text-rose-600">.endeks</span>
-              </span>
+              <div className="flex flex-col">
+                <span className="font-black text-lg sm:text-xl font-heading tracking-tight text-slate-900 hidden sm:inline leading-tight">
+                  ihaleciburada<span className="text-amber-600">.ekspertiz</span>
+                </span>
+                <span className="text-[9px] font-bold text-slate-500 hidden sm:inline -mt-0.5 tracking-wide uppercase font-mono">
+                  İhale & Emsal Değerleme Motoru
+                </span>
+              </div>
             </div>
           </div>
 
-          {/* Orta Kısım: Endeksa Arama Kutusu & Canlı Konum Autocomplete */}
+          {/* Orta Kısım: İhaleci Burada Arama Kutusu & Canlı Konum Autocomplete */}
           <div className="relative flex-1 max-w-xl mx-2" ref={searchContainerRef}>
             <form 
               onSubmit={handleSearchSubmit}
-              className="w-full flex items-center bg-slate-50 border border-slate-300 rounded-full p-1 shadow-2xs focus-within:ring-2 focus-within:ring-rose-500/20 focus-within:border-rose-500 focus-within:bg-white transition"
+              className="w-full flex items-center bg-slate-50 border border-slate-300 rounded-full p-1 shadow-2xs focus-within:ring-2 focus-within:ring-amber-500/20 focus-within:border-amber-500 focus-within:bg-white transition"
             >
-              {/* Adres Etiketi */}
+              {/* Konum Etiketi */}
               <div className="hidden sm:flex items-center gap-1 px-3 py-1 text-xs font-bold text-slate-700 border-r border-slate-200 shrink-0 cursor-pointer">
-                <span>Adres</span>
+                <span>Konum</span>
                 <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
               </div>
 
@@ -329,7 +334,7 @@ export default function Home() {
                 onFocus={() => {
                   if (suggestions.length > 0) setShowSuggestions(true);
                 }}
-                placeholder="İl, İlçe veya Köy arayın (Örn: Adatepe, Bayramiç, Kadıköy, Uzungöl)"
+                placeholder="81 İl, İlçe veya Köy Arayın (Örn: Çanakkale, Bayramiç, Adatepe)"
                 className="flex-1 bg-transparent px-3 text-xs sm:text-sm font-medium text-slate-900 outline-none placeholder:text-slate-400 min-w-0"
               />
 
@@ -337,22 +342,22 @@ export default function Home() {
               <button 
                 type="submit"
                 aria-label="Konum Ara"
-                className="p-1.5 text-slate-400 hover:text-rose-600 transition shrink-0 cursor-pointer"
+                className="p-1.5 text-slate-400 hover:text-amber-600 transition shrink-0 cursor-pointer"
               >
                 {isLoadingSuggestions || isSearching ? (
-                  <Loader2 className="w-4 h-4 animate-spin text-rose-600" />
+                  <Loader2 className="w-4 h-4 animate-spin text-amber-600" />
                 ) : (
                   <Search className="w-4 h-4" />
                 )}
               </button>
 
-              {/* "Değerini Öğren" Kırmızı Butonu (Endeksa İmzası) */}
+              {/* "Ekspertiz Başlat" Amber Butonu */}
               <button
                 type="button"
                 onClick={() => setActiveTab("degerleme")}
-                className="hidden md:flex items-center gap-1.5 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white text-xs font-extrabold px-4 py-1.5 rounded-full shadow-xs transition active:scale-95 cursor-pointer shrink-0"
+                className="hidden md:flex items-center gap-1.5 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white text-xs font-extrabold px-4 py-1.5 rounded-full shadow-xs transition active:scale-95 cursor-pointer shrink-0"
               >
-                <span>Değerini Öğren</span>
+                <span>Ekspertiz Başlat</span>
               </button>
             </form>
 
@@ -467,26 +472,26 @@ export default function Home() {
             {/* SOL ANALİTİK & VERİ PANELİ (Scroll Edilebilir) */}
             <div className="w-full lg:w-[50%] lg:h-[calc(100vh-64px)] overflow-y-auto p-3 sm:p-5 space-y-5 border-r border-slate-200">
               
-              {/* ENDEKSA FİLTRE HAPLARI (PILLS) */}
+              {/* İHALECİ BURADA FİLTRE HAPLARI */}
               <div className="flex flex-wrap items-center gap-2 pb-1 border-b border-slate-200/80">
                 {/* Gayrimenkul: Konut / Arsa */}
                 <button
                   type="button"
                   onClick={() => handleCategorySwitch(isResidential ? "arsa" : "konut")}
-                  className="flex items-center gap-1 px-3 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-xs font-bold hover:bg-rose-100 transition cursor-pointer"
+                  className="flex items-center gap-1 px-3 py-1 rounded-full bg-amber-50 text-amber-900 border border-amber-200 text-xs font-bold hover:bg-amber-100 transition cursor-pointer"
                 >
-                  <span>Gayrimenkul: <strong className="text-rose-900">{isResidential ? "Konut" : "Arsa"}</strong></span>
-                  <ChevronDown className="w-3 h-3 text-rose-500" />
+                  <span>Portföy: <strong className="text-amber-950">{isResidential ? "Konut & Daire" : "Arsa & Arazi"}</strong></span>
+                  <ChevronDown className="w-3 h-3 text-amber-600" />
                 </button>
 
-                {/* Tip: Satılık */}
+                {/* Segment */}
                 <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold border border-slate-200">
-                  Tip: <strong className="text-slate-900">Satılık / İhale</strong>
+                  Segment: <strong className="text-slate-900">İhale & Serbest Piyasa</strong>
                 </span>
 
                 {/* Kategori */}
                 <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold border border-slate-200">
-                  Kategori: <strong className="text-slate-900">{isResidential ? parcelData.housingType || "Daire" : parcelData.zoningType || "İmar"}</strong>
+                  Tip: <strong className="text-slate-900">{isResidential ? parcelData.housingType || "Daire" : parcelData.zoningType || "İmar"}</strong>
                 </span>
 
                 {/* Oda / Kat */}
@@ -501,19 +506,19 @@ export default function Home() {
                 )}
               </div>
 
-              {/* ÇALIŞMA SEKMELERİ: [ENDEKS & TREND] | [DEĞERLEME SİHİRBAZI] | [İHALE ANALİZİ] */}
+              {/* ÇALIŞMA SEKMELERİ: [PİYASA ANALİZİ] | [KADASTRO & DEĞERLEME] | [İHALE & PEY SİMÜLATÖRÜ] */}
               <div className="grid grid-cols-3 gap-1 p-1 bg-slate-100 rounded-xl text-xs font-bold">
                 <button
                   type="button"
                   onClick={() => setActiveTab("endeks")}
                   className={`py-2 rounded-lg transition flex items-center justify-center gap-1.5 cursor-pointer ${
                     activeTab === "endeks"
-                      ? "bg-white text-rose-700 shadow-xs"
+                      ? "bg-white text-amber-800 shadow-xs"
                       : "text-slate-600 hover:text-slate-900"
                   }`}
                 >
-                  <TrendingUp className="w-3.5 h-3.5" />
-                  <span>Fiyat Endeksi</span>
+                  <TrendingUp className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Piyasa Analizi</span>
                 </button>
 
                 <button
@@ -525,8 +530,8 @@ export default function Home() {
                       : "text-slate-600 hover:text-slate-900"
                   }`}
                 >
-                  <FileSpreadsheet className="w-3.5 h-3.5" />
-                  <span>Değerleme Girişi</span>
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Kadastro & Değerleme</span>
                 </button>
 
                 <button
@@ -538,12 +543,12 @@ export default function Home() {
                       : "text-slate-600 hover:text-slate-900"
                   }`}
                 >
-                  <Gavel className="w-3.5 h-3.5" />
-                  <span>İhale & Pey</span>
+                  <Gavel className="w-3.5 h-3.5 text-orange-600" />
+                  <span>İhale & Pey Analizi</span>
                 </button>
               </div>
 
-              {/* SEKME 1: ENDEKS & FİYAT TRENDİ & YATIRIM SKORLARI (ENDEKSA RESMİ GÖRSELLERİ) */}
+              {/* SEKME 1: PİYASA ANALİZİ, İHALE TRENDİ & YATIRIM SKORLARI */}
               {activeTab === "endeks" && (
                 <div className="space-y-6">
                   
