@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import { formatTL } from "@/lib/constants";
-import { TrendingUp, Calendar, ArrowUpRight, ArrowDownRight, Info } from "lucide-react";
+import { Calendar, ChevronDown, Info } from "lucide-react";
 
 interface PriceTrendChartProps {
   city: string;
@@ -18,10 +18,20 @@ interface PriceTrendChartProps {
   };
 }
 
+export type AnalysisMetric = 
+  | "fiyat_endeksi"
+  | "birim_fiyat"
+  | "fiyati"
+  | "amortisman"
+  | "getirisi"
+  | "aylik_degisim"
+  | "yillik_degisim";
+
 interface DataPoint {
   dateLabel: string;
   shortDate: string;
-  price: number;
+  value: number;
+  formattedValue: string;
   isForecast: boolean;
 }
 
@@ -36,84 +46,167 @@ export const PriceTrendChart: React.FC<PriceTrendChartProps> = ({
   currencyRates,
 }) => {
   const [hoveredPoint, setHoveredPoint] = useState<DataPoint | null>(null);
-  const [activeAnalysis, setActiveAnalysis] = useState<"birim" | "kira" | "amortisman">("birim");
+  const [activeAnalysis, setActiveAnalysis] = useState<AnalysisMetric>("birim_fiyat");
+  const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const basePrice = currentUnitM2TL || (category === "konut" ? 48000 : 15000);
+  // Dışarı tıklandığında dropdown kapatma
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
-  // 2021 Ocak'tan 2027 Temmuz'a kadar aylık/çeyreklik veri serisi üretimi (Endeksa'daki gibi)
+  const basePrice = currentUnitM2TL || (category === "konut" ? 54090 : 15000);
+  const avgAreaM2 = 115;
+  const avgTotalVal = basePrice * avgAreaM2;
+  const amortYears = 15;
+  const returnYield = Number((100 / amortYears).toFixed(2)); // %6.67 - %6.86
+
+  // 7 Farklı Analiz Başlığı (Ekran Görüntüsü 1'deki Radyo Buton Menüsü)
+  const analysisOptions: Array<{ id: AnalysisMetric; label: string; unit: string }> = [
+    { id: "fiyat_endeksi", label: "Fiyat Endeksi", unit: "Puan" },
+    { id: "birim_fiyat", label: "m² Birim Fiyatı", unit: "₺/m²" },
+    { id: "fiyati", label: "Fiyatı", unit: "₺" },
+    { id: "amortisman", label: "Amortisman", unit: "Yıl" },
+    { id: "getirisi", label: "Getirisi", unit: "%" },
+    { id: "aylik_degisim", label: "Aylık Değişimi", unit: "%" },
+    { id: "yillik_degisim", label: "Yıllık Değişimi", unit: "%" },
+  ];
+
+  const currentOption = analysisOptions.find((o) => o.id === activeAnalysis) || analysisOptions[1];
+
+  // 2021 Ocak - 2027 Temmuz Zaman Çizelgesi
+  const rawTrajectory = [
+    { label: "Oca 2021", short: "Oca 2021", factor: 0.12, forecast: false },
+    { label: "Mar 2021", short: "Mar 2021", factor: 0.13, forecast: false },
+    { label: "May 2021", short: "May 2021", factor: 0.14, forecast: false },
+    { label: "Tem 2021", short: "Tem 2021", factor: 0.15, forecast: false },
+    { label: "Eyl 2021", short: "Eyl 2021", factor: 0.17, forecast: false },
+    { label: "Kas 2021", short: "Kas 2021", factor: 0.20, forecast: false },
+    { label: "Oca 2022", short: "Oca 2022", factor: 0.25, forecast: false },
+    { label: "Mar 2022", short: "Mar 2022", factor: 0.30, forecast: false },
+    { label: "May 2022", short: "May 2022", factor: 0.35, forecast: false },
+    { label: "Tem 2022", short: "Tem 2022", factor: 0.41, forecast: false },
+    { label: "Eyl 2022", short: "Eyl 2022", factor: 0.46, forecast: false },
+    { label: "Kas 2022", short: "Kas 2022", factor: 0.51, forecast: false },
+    { label: "Oca 2023", short: "Oca 2023", factor: 0.57, forecast: false },
+    { label: "Mar 2023", short: "Mar 2023", factor: 0.62, forecast: false },
+    { label: "May 2023", short: "May 2023", factor: 0.67, forecast: false },
+    { label: "Tem 2023", short: "Tem 2023", factor: 0.72, forecast: false },
+    { label: "Eyl 2023", short: "Eyl 2023", factor: 0.77, forecast: false },
+    { label: "Kas 2023", short: "Kas 2023", factor: 0.82, forecast: false },
+    { label: "Oca 2024", short: "Oca 2024", factor: 0.86, forecast: false },
+    { label: "Mar 2024", short: "Mar 2024", factor: 0.89, forecast: false },
+    { label: "May 2024", short: "May 2024", factor: 0.91, forecast: false },
+    { label: "Tem 2024", short: "Tem 2024", factor: 0.93, forecast: false },
+    { label: "Eyl 2024", short: "Eyl 2024", factor: 0.95, forecast: false },
+    { label: "Kas 2024", short: "Kas 2024", factor: 0.97, forecast: false },
+    { label: "Oca 2025", short: "Oca 2025", factor: 0.98, forecast: false },
+    { label: "Mar 2025", short: "Mar 2025", factor: 0.99, forecast: false },
+    { label: "May 2025", short: "May 2025", factor: 0.995, forecast: false },
+    { label: "Tem 2025", short: "Tem 2025", factor: 1.00, forecast: false },
+    { label: "Eyl 2025", short: "Eyl 2025", factor: 1.01, forecast: false },
+    { label: "Kas 2025", short: "Kas 2025", factor: 1.03, forecast: false },
+    { label: "Oca 2026", short: "Oca 2026", factor: 1.05, forecast: false },
+    { label: "Mar 2026", short: "Mar 2026", factor: 1.07, forecast: false },
+    { label: "May 2026", short: "May 2026", factor: 1.10, forecast: false },
+    { label: "Tem 2026", short: "Tem 2026", factor: 1.12, forecast: false },
+    { label: "Ağu 2026 (Bugün)", short: "Ağu 2026", factor: 1.14, forecast: false },
+    // Gelecek Projeksiyonu (Noktalı Forecast)
+    { label: "Eyl 2026", short: "Eyl 2026", factor: 1.16, forecast: true },
+    { label: "Kas 2026", short: "Kas 2026", factor: 1.20, forecast: true },
+    { label: "Oca 2027", short: "Oca 2027", factor: 1.24, forecast: true },
+    { label: "Mar 2027", short: "Mar 2027", factor: 1.28, forecast: true },
+    { label: "May 2027", short: "May 2027", factor: 1.33, forecast: true },
+    { label: "Tem 2027", short: "Tem 2027", factor: 1.38, forecast: true },
+  ];
+
+  // Aktif Analiz Moduna Göre Veri Noktaları
   const chartData = useMemo<DataPoint[]>(() => {
-    const points: DataPoint[] = [];
-    
-    // Geçmiş 4 yıl (2021-2025)
-    // 2021'deki fiyat yaklaşık 6-7 kat daha düşüktü (TCMB KFE büyümesine göre)
-    const startFactor = 0.14; // 2021 başı
-    const growthTrajectory = [
-      { label: "Oca 2021", short: "Oca 21", factor: 0.14, forecast: false },
-      { label: "May 2021", short: "May 21", factor: 0.16, forecast: false },
-      { label: "Eyl 2021", short: "Eyl 21", factor: 0.19, forecast: false },
-      { label: "Oca 2022", short: "Oca 22", factor: 0.24, forecast: false },
-      { label: "May 2022", short: "May 22", factor: 0.32, forecast: false },
-      { label: "Eyl 2022", short: "Eyl 22", factor: 0.42, forecast: false },
-      { label: "Oca 2023", short: "Oca 23", factor: 0.52, forecast: false },
-      { label: "May 2023", short: "May 23", factor: 0.61, forecast: false },
-      { label: "Eyl 2023", short: "Eyl 23", factor: 0.69, forecast: false },
-      { label: "Oca 2024", short: "Oca 24", factor: 0.76, forecast: false },
-      { label: "May 2024", short: "May 24", factor: 0.82, forecast: false },
-      { label: "Eyl 2024", short: "Eyl 24", factor: 0.88, forecast: false },
-      { label: "Oca 2025", short: "Oca 25", factor: 0.94, forecast: false },
-      { label: "May 2025", short: "May 25", factor: 0.97, forecast: false },
-      { label: "Ağu 2025", short: "Ağu 25", factor: 0.99, forecast: false },
-      { label: "Oca 2026 (Bugün)", short: "Oca 26", factor: 1.00, forecast: false },
-      // Gelecek Tahmini (Forecast - Noktalı Çizgi)
-      { label: "May 2026", short: "May 26", factor: 1.09, forecast: true },
-      { label: "Eyl 2026", short: "Eyl 26", factor: 1.17, forecast: true },
-      { label: "Oca 2027", short: "Oca 27", factor: 1.25, forecast: true },
-      { label: "May 2027", short: "May 27", factor: 1.32, forecast: true },
-    ];
+    return rawTrajectory.map((item) => {
+      let val = 0;
+      let fmt = "";
 
-    return growthTrajectory.map((item) => ({
-      dateLabel: item.label,
-      shortDate: item.short,
-      price: Math.round(basePrice * item.factor),
-      isForecast: item.forecast,
-    }));
-  }, [basePrice]);
+      switch (activeAnalysis) {
+        case "fiyat_endeksi":
+          val = Math.round(item.factor * 100 * 2.1);
+          fmt = `${val} Puan`;
+          break;
+        case "birim_fiyat":
+          val = Math.round(basePrice * item.factor);
+          fmt = `${val.toLocaleString("tr-TR")} ₺/m²`;
+          break;
+        case "fiyati":
+          val = Math.round(avgTotalVal * item.factor);
+          fmt = `${val.toLocaleString("tr-TR")} ₺`;
+          break;
+        case "amortisman":
+          val = Math.max(12, Math.round(26 - item.factor * 10));
+          fmt = `${val} yıl`;
+          break;
+        case "getirisi":
+          val = Number((3.5 + item.factor * 3.2).toFixed(2));
+          fmt = `%${val.toString().replace(".", ",")}`;
+          break;
+        case "aylik_degisim":
+          val = Number((1.2 + (item.factor % 0.1) * 15).toFixed(2));
+          fmt = `%${val.toString().replace(".", ",")}`;
+          break;
+        case "yillik_degisim":
+          val = Number((18 + item.factor * 35).toFixed(2));
+          fmt = `%${val.toString().replace(".", ",")}`;
+          break;
+      }
 
-  // SVG Çizim Parametreleri
-  const svgWidth = 620;
-  const svgHeight = 250;
-  const padLeft = 65;
-  const padRight = 20;
-  const padTop = 35;
-  const padBottom = 35;
+      return {
+        dateLabel: item.label,
+        shortDate: item.short,
+        value: val,
+        formattedValue: fmt,
+        isForecast: item.forecast,
+      };
+    });
+  }, [activeAnalysis, basePrice, avgTotalVal]);
+
+  // SVG Boyutları (Endeksa Oranları: Yüksek Çözünürlüklü ve Geniş)
+  const svgWidth = 720;
+  const svgHeight = 310;
+  const padLeft = 85;
+  const padRight = 30;
+  const padTop = 30;
+  const padBottom = 65;
 
   const innerWidth = svgWidth - padLeft - padRight;
   const innerHeight = svgHeight - padTop - padBottom;
 
-  const maxPrice = Math.max(...chartData.map((d) => d.price)) * 1.12;
-  const minPrice = 0;
+  const maxVal = Math.max(...chartData.map((d) => d.value)) * 1.15 || 100;
+  const minVal = 0;
 
   const getY = (val: number) => {
-    return padTop + innerHeight - (val / (maxPrice || 1)) * innerHeight;
+    return padTop + innerHeight - (val / maxVal) * innerHeight;
   };
 
   const getX = (index: number) => {
     return padLeft + (index / (chartData.length - 1)) * innerWidth;
   };
 
-  // Geçmiş Trend Noktaları (Forecast Olmayanlar)
   const trendPoints = chartData.filter((d) => !d.isForecast);
-  const forecastPoints = chartData.filter((d, i) => i >= trendPoints.length - 1); // Son trend noktası ile başlar
+  const forecastPoints = chartData.filter((d, i) => i >= trendPoints.length - 1);
 
-  // Trend Alanı Yolu (Dolu Mavi Alan)
+  // Trend Alanı
   const trendPathD = useMemo(() => {
     if (trendPoints.length === 0) return "";
-    let d = `M ${getX(0)} ${getY(trendPoints[0].price)}`;
+    let d = `M ${getX(0)} ${getY(trendPoints[0].value)}`;
     for (let i = 1; i < trendPoints.length; i++) {
       const prevX = getX(i - 1);
-      const prevY = getY(trendPoints[i - 1].price);
+      const prevY = getY(trendPoints[i - 1].value);
       const currX = getX(i);
-      const currY = getY(trendPoints[i].price);
+      const currY = getY(trendPoints[i].value);
       const cpX1 = prevX + (currX - prevX) / 2;
       const cpX2 = cpX1;
       d += ` C ${cpX1} ${prevY}, ${cpX2} ${currY}, ${currX} ${currY}`;
@@ -129,17 +222,17 @@ export const PriceTrendChart: React.FC<PriceTrendChartProps> = ({
     return `${trendPathD} L ${lastX} ${bottomY} L ${firstX} ${bottomY} Z`;
   }, [trendPathD, trendPoints]);
 
-  // Forecast Yolu (Noktalı Çizgi)
+  // Forecast Yolu
   const forecastPathD = useMemo(() => {
     if (forecastPoints.length === 0) return "";
     const startIndex = trendPoints.length - 1;
-    let d = `M ${getX(startIndex)} ${getY(forecastPoints[0].price)}`;
+    let d = `M ${getX(startIndex)} ${getY(forecastPoints[0].value)}`;
     for (let i = 1; i < forecastPoints.length; i++) {
       const idx = startIndex + i;
       const prevX = getX(idx - 1);
-      const prevY = getY(forecastPoints[i - 1].price);
+      const prevY = getY(forecastPoints[i - 1].value);
       const currX = getX(idx);
-      const currY = getY(forecastPoints[i].price);
+      const currY = getY(forecastPoints[i].value);
       const cpX1 = prevX + (currX - prevX) / 2;
       const cpX2 = cpX1;
       d += ` C ${cpX1} ${prevY}, ${cpX2} ${currY}, ${currX} ${currY}`;
@@ -147,352 +240,534 @@ export const PriceTrendChart: React.FC<PriceTrendChartProps> = ({
     return d;
   }, [forecastPoints, trendPoints]);
 
-  // Y-Eksen Kademeleri
-  const yTicks = [0, maxPrice * 0.25, maxPrice * 0.5, maxPrice * 0.75, maxPrice];
+  // Y-Eksen Kademeleri (Endeksa Görsel 1: 0, 10k, 20k, 30k, 40k, 50k, 60k, 70k)
+  const yTicks = useMemo(() => {
+    const step = maxVal / 7;
+    return [0, step * 1, step * 2, step * 3, step * 4, step * 5, step * 6, step * 7];
+  }, [maxVal]);
 
-  // X-Eksen Etiketleri (Her 3 noktada bir)
-  const xTicks = chartData.filter((_, idx) => idx % 3 === 0);
+  // X-Eksen Etiketleri (Her 2 ayda bir gösterim)
+  const xLabels = chartData.filter((_, idx) => idx % 2 === 0);
 
-  // Güncel nokta
   const currentPoint = trendPoints[trendPoints.length - 1];
   const currentPointX = getX(trendPoints.length - 1);
-  const currentPointY = getY(currentPoint.price);
+  const currentPointY = getY(currentPoint.value);
 
   return (
-    <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-xs space-y-4">
-      {/* BAŞLIK & FİLTRE ÇUBUĞU (ENDEKSA TARZI) */}
-      <div>
-        <div className="flex flex-wrap items-center justify-between gap-3 pb-2 border-b border-slate-100">
-          <div>
-            <h3 className="text-base sm:text-lg font-black font-heading text-slate-900 tracking-tight">
-              Türkiye {city} {district} {neighborhood ? `${neighborhood} ` : ""}Satılık {category === "arsa" ? "Arsa" : "Konut"} m² Birim Fiyatları
-            </h3>
-            <p className="text-xs text-slate-500">
-              TCMB Konut Fiyat Endeksi (KFE) ve çevresel ilan veri havuzu projeksiyonu
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 font-bold text-xs">
-              <Calendar className="w-3.5 h-3.5 text-slate-500" />
-              <span>Oca 21 - May 27</span>
-            </div>
-
-            <select
-              value={activeAnalysis}
-              onChange={(e) => setActiveAnalysis(e.target.value as any)}
-              className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500/20"
-            >
-              <option value="birim">Analiz: Birim Fiyatı</option>
-              <option value="kira">Analiz: m² Kira Değeri</option>
-              <option value="amortisman">Analiz: Amortisman</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      {/* GRAFİK ALANI */}
-      <div className="relative w-full overflow-hidden bg-gradient-to-b from-slate-50/50 to-white rounded-xl p-2 border border-slate-100">
+    <div className="space-y-6">
+      {/* ======================================================== */}
+      {/* 1. ENDEKSA GRAFİK KARTI (EKRAN GÖRÜNTÜSÜ 1) */}
+      {/* ======================================================== */}
+      <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs">
         
-        {/* "Bu Ayki Ortalama" Rozeti */}
-        <div 
-          className="absolute z-10 pointer-events-none transition-all duration-300"
-          style={{
-            left: `${Math.min(78, (currentPointX / svgWidth) * 100)}%`,
-            top: "14px",
-          }}
-        >
-          <div className="bg-white/95 backdrop-blur-xs border border-blue-200 text-blue-950 px-2.5 py-1 rounded-lg shadow-sm text-center">
-            <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
-              Bu Ayki Ortalama
-            </div>
-            <div className="text-xs sm:text-sm font-black text-blue-700 font-mono">
-              {formatTL(currentPoint.price)} / m²
-            </div>
+        {/* Üst Bar: [Tarih Aralığı] ve [Analiz Seçici Açılır Menü] */}
+        <div className="flex items-center justify-between gap-3 mb-4 pb-2 border-b border-slate-100">
+          
+          {/* Sol: Tarih Aralığı Rozeti */}
+          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-700 shadow-2xs">
+            <span>Oca 21 - Ağu 26</span>
+            <Calendar className="w-3.5 h-3.5 text-rose-600" />
           </div>
+
+          {/* Sağ: Analiz Seçici Dropdown */}
+          <div className="relative" ref={dropdownRef}>
+            <button
+              type="button"
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-800 shadow-2xs transition cursor-pointer"
+            >
+              <span>Analiz: <strong className="text-rose-600 font-extrabold">{currentOption.label}</strong></span>
+              <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
+            </button>
+
+            {/* Görsel 1'deki Radyo Butonlu Açılır Pencere */}
+            {isDropdownOpen && (
+              <div className="absolute right-0 top-full mt-1.5 w-48 bg-white border border-slate-200 rounded-xl shadow-xl py-2 z-40 animate-in fade-in zoom-in-95 duration-100">
+                {analysisOptions.map((opt) => {
+                  const isSelected = opt.id === activeAnalysis;
+                  return (
+                    <div
+                      key={opt.id}
+                      onClick={() => {
+                        setActiveAnalysis(opt.id);
+                        setIsDropdownOpen(false);
+                      }}
+                      className="flex items-center gap-2.5 px-3.5 py-2 hover:bg-slate-50 text-xs text-slate-700 font-medium cursor-pointer transition"
+                    >
+                      <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                        isSelected ? "border-rose-600" : "border-slate-300"
+                      }`}>
+                        {isSelected && (
+                          <div className="w-2 h-2 rounded-full bg-rose-600"></div>
+                        )}
+                      </div>
+                      <span className={isSelected ? "font-bold text-slate-900" : ""}>
+                        {opt.label}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
         </div>
 
-        {/* SVG GRAFİĞİ */}
-        <div className="w-full aspect-[2.4/1] min-h-[220px]">
-          <svg
-            viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-            className="w-full h-full overflow-visible"
-          >
-            <defs>
-              {/* Trend Alanı Degradisi (Endeksa Açık Mavi Degradisi) */}
-              <linearGradient id="endeksaTrendGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.45" />
-                <stop offset="70%" stopColor="#0284c7" stopOpacity="0.12" />
-                <stop offset="100%" stopColor="#0284c7" stopOpacity="0.0" />
-              </linearGradient>
+        {/* SVG Grafik Alanı ve Arka Plan Endeksa Filigranı */}
+        <div className="relative w-full overflow-hidden bg-white rounded-xl">
+          
+          {/* Filigran (Endeksa Logosu ve Evi) */}
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none opacity-[0.06]">
+            <div className="flex items-center gap-2">
+              <div className="w-16 h-16 rounded-2xl bg-rose-600 flex items-center justify-center text-white text-3xl font-black">
+                ⌂
+              </div>
+              <span className="text-5xl font-black tracking-tighter text-rose-950 font-heading">
+                endeksa
+              </span>
+            </div>
+          </div>
 
-              {/* Forecast Degradisi */}
-              <linearGradient id="endeksaForecastGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#0ea5e9" stopOpacity="0.25" />
-                <stop offset="100%" stopColor="#0ea5e9" stopOpacity="0.02" />
-              </linearGradient>
-            </defs>
+          <div className="w-full aspect-[2.3/1] min-h-[250px]">
+            <svg
+              viewBox={`0 0 ${svgWidth} ${svgHeight}`}
+              className="w-full h-full overflow-visible"
+            >
+              <defs>
+                {/* Endeksa Açık Camgöbeği Mavi Degradisi */}
+                <linearGradient id="endeksaAreaGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.55" />
+                  <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.08" />
+                </linearGradient>
+              </defs>
 
-            {/* Yatay Kılavuz Çizgileri ve Y-Eksen Etiketleri */}
-            {yTicks.map((tick, i) => {
-              const y = getY(tick);
-              return (
-                <g key={i}>
-                  <line
-                    x1={padLeft}
-                    y1={y}
-                    x2={svgWidth - padRight}
-                    y2={y}
-                    stroke="#e2e8f0"
-                    strokeWidth="1"
-                    strokeDasharray="3 3"
-                  />
-                  <text
-                    x={padLeft - 8}
-                    y={y + 4}
-                    textAnchor="end"
-                    fontSize="9"
-                    fontWeight="600"
-                    fill="#94a3b8"
-                    fontFamily="monospace"
-                  >
-                    {tick >= 1000 ? `${Math.round(tick / 1000)}k ₺/m²` : `${Math.round(tick)} ₺`}
-                  </text>
-                </g>
-              );
-            })}
+              {/* Yatay Izgara Çizgileri ve Y-Eksen Etiketleri */}
+              {yTicks.map((tick, i) => {
+                const y = getY(tick);
+                let labelStr = `${Math.round(tick).toLocaleString("tr-TR")}`;
+                if (currentOption.id === "birim_fiyat") labelStr += " ₺/m²";
+                else if (currentOption.id === "fiyati") labelStr = `${(tick / 1000000).toFixed(1)}M ₺`;
+                else if (currentOption.id.includes("degisim") || currentOption.id === "getirisi") labelStr = `%${tick.toFixed(0)}`;
 
-            {/* X-Eksen Etiketleri */}
-            {xTicks.map((tick, i) => {
-              const idx = chartData.findIndex((c) => c.shortDate === tick.shortDate);
-              const x = getX(idx);
-              return (
-                <g key={i}>
-                  <line
-                    x1={x}
-                    y1={padTop + innerHeight}
-                    x2={x}
-                    y2={padTop + innerHeight + 5}
-                    stroke="#cbd5e1"
-                    strokeWidth="1"
-                  />
-                  <text
-                    x={x}
-                    y={padTop + innerHeight + 16}
-                    textAnchor="middle"
-                    fontSize="8.5"
-                    fontWeight="600"
-                    fill="#64748b"
-                    fontFamily="monospace"
-                  >
-                    {tick.shortDate}
-                  </text>
-                </g>
-              );
-            })}
+                return (
+                  <g key={i}>
+                    <line
+                      x1={padLeft}
+                      y1={y}
+                      x2={svgWidth - padRight}
+                      y2={y}
+                      stroke="#f1f5f9"
+                      strokeWidth="1.2"
+                    />
+                    <text
+                      x={padLeft - 10}
+                      y={y + 3.5}
+                      textAnchor="end"
+                      fontSize="9"
+                      fontWeight="500"
+                      fill="#64748b"
+                      fontFamily="sans-serif"
+                    >
+                      {labelStr}
+                    </text>
+                  </g>
+                );
+              })}
 
-            {/* Trend Doldurulmuş Alan */}
-            <path d={trendAreaD} fill="url(#endeksaTrendGrad)" />
+              {/* X-Eksen Çizgisi */}
+              <line
+                x1={padLeft}
+                y1={padTop + innerHeight}
+                x2={svgWidth - padRight}
+                y2={padTop + innerHeight}
+                stroke="#cbd5e1"
+                strokeWidth="1"
+              />
 
-            {/* Trend Çizgisi */}
-            <path
-              d={trendPathD}
-              fill="none"
-              stroke="#0284c7"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
+              {/* X-Eksen Etiketleri (45 Derece Döndürülmüş - Görsel 1 Birebir) */}
+              {xLabels.map((pt, i) => {
+                const idx = chartData.findIndex((c) => c.shortDate === pt.shortDate);
+                const x = getX(idx);
+                const y = padTop + innerHeight + 8;
+                return (
+                  <g key={i} transform={`translate(${x}, ${y})`}>
+                    <line x1="0" y1="-8" x2="0" y2="-4" stroke="#94a3b8" strokeWidth="1" />
+                    <text
+                      transform="rotate(-45)"
+                      textAnchor="end"
+                      fontSize="8"
+                      fontWeight="500"
+                      fill="#64748b"
+                      fontFamily="sans-serif"
+                      dy="2"
+                    >
+                      {pt.shortDate}
+                    </text>
+                  </g>
+                );
+              })}
 
-            {/* Forecast Çizgisi (Gelecek Tahmini - Noktalı) */}
-            <path
-              d={forecastPathD}
-              fill="none"
-              stroke="#0284c7"
-              strokeWidth="2"
-              strokeDasharray="4 4"
-              strokeLinecap="round"
-            />
+              {/* Doldurulmuş Mavi Alan */}
+              <path d={trendAreaD} fill="url(#endeksaAreaGrad)" />
 
-            {/* Forecast Noktaları */}
-            {forecastPoints.map((pt, i) => {
-              const idx = trendPoints.length - 1 + i;
-              const cx = getX(idx);
-              const cy = getY(pt.price);
-              return (
-                <circle
-                  key={i}
-                  cx={cx}
-                  cy={cy}
-                  r="3.5"
-                  fill="#ffffff"
-                  stroke="#0284c7"
-                  strokeWidth="2"
-                />
-              );
-            })}
+              {/* Mavi Çizgi (Trend) */}
+              <path
+                d={trendPathD}
+                fill="none"
+                stroke="#0284c7"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
 
-            {/* Güncel Ay İşaretçisi (Dikey Çizgi & Büyük Nokta) */}
-            <line
-              x1={currentPointX}
-              y1={padTop}
-              x2={currentPointX}
-              y2={padTop + innerHeight}
-              stroke="#0284c7"
-              strokeWidth="1.5"
-              strokeDasharray="2 2"
-            />
-            <circle
-              cx={currentPointX}
-              cy={currentPointY}
-              r="5"
-              fill="#0284c7"
-              stroke="#ffffff"
-              strokeWidth="2"
-            />
+              {/* Forecast (Gelecek Projeksiyonu Kesikli Çizgi) */}
+              <path
+                d={forecastPathD}
+                fill="none"
+                stroke="#0284c7"
+                strokeWidth="2"
+                strokeDasharray="3 3"
+                strokeLinecap="round"
+              />
 
-            {/* İnteraktif Hover Noktaları */}
-            {chartData.map((pt, idx) => {
-              const cx = getX(idx);
-              const cy = getY(pt.price);
-              return (
-                <g
-                  key={idx}
-                  className="cursor-pointer group"
-                  onMouseEnter={() => setHoveredPoint(pt)}
-                  onMouseLeave={() => setHoveredPoint(null)}
-                >
-                  <circle
-                    cx={cx}
-                    cy={cy}
-                    r="8"
-                    fill="transparent"
-                  />
-                  {hoveredPoint?.dateLabel === pt.dateLabel && (
+              {/* Noktalar (Çemberler) */}
+              {chartData.map((pt, idx) => {
+                const cx = getX(idx);
+                const cy = getY(pt.value);
+                const isHovered = hoveredPoint?.dateLabel === pt.dateLabel;
+                return (
+                  <g key={idx} className="cursor-pointer">
                     <circle
                       cx={cx}
                       cy={cy}
-                      r="4"
-                      fill="#e11d48"
-                      stroke="#ffffff"
-                      strokeWidth="2"
+                      r="2.8"
+                      fill="#ffffff"
+                      stroke="#0284c7"
+                      strokeWidth="1.6"
                     />
-                  )}
-                </g>
-              );
-            })}
-          </svg>
-        </div>
+                    {isHovered && (
+                      <circle
+                        cx={cx}
+                        cy={cy}
+                        r="4.5"
+                        fill="#e11d48"
+                        stroke="#ffffff"
+                        strokeWidth="2"
+                      />
+                    )}
+                    {/* Görünmez Geniş Tıklama Alanı */}
+                    <circle
+                      cx={cx}
+                      cy={cy}
+                      r="12"
+                      fill="transparent"
+                      onMouseEnter={() => setHoveredPoint(pt)}
+                      onMouseLeave={() => setHoveredPoint(null)}
+                    />
+                  </g>
+                );
+              })}
+            </svg>
+          </div>
 
-        {/* Hover Tooltip (Mouse Takip) */}
-        {hoveredPoint && (
-          <div className="absolute bottom-12 left-1/2 -translate-x-1/2 bg-slate-900/95 text-white text-xs px-3 py-1.5 rounded-lg shadow-lg pointer-events-none flex items-center gap-2 border border-slate-700">
-            <span className="text-slate-300 font-medium">{hoveredPoint.dateLabel}:</span>
-            <span className="font-bold text-amber-400 font-mono">
-              {formatTL(hoveredPoint.price)} / m²
-            </span>
-            {hoveredPoint.isForecast && (
-              <span className="text-[9px] bg-blue-600 text-white px-1.5 py-0.5 rounded font-bold uppercase">
-                Tahmin
-              </span>
-            )}
-          </div>
-        )}
+          {/* Hover Araç İpucu (Tooltip) */}
+          {hoveredPoint && (
+            <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-slate-900 text-white text-[11px] px-3 py-1.5 rounded-lg shadow-lg pointer-events-none flex items-center gap-2">
+              <span className="text-slate-300 font-medium">{hoveredPoint.dateLabel}:</span>
+              <span className="font-bold text-sky-400 font-mono">{hoveredPoint.formattedValue}</span>
+              {hoveredPoint.isForecast && (
+                <span className="text-[9px] bg-rose-600 px-1.5 py-0.5 rounded font-bold">Tahmin</span>
+              )}
+            </div>
+          )}
 
-        {/* Lejant: Trend vs Forecast */}
-        <div className="flex items-center justify-center gap-6 pt-2 text-xs font-semibold text-slate-600">
-          <div className="flex items-center gap-1.5">
-            <span className="w-5 h-2.5 rounded bg-sky-400/80 inline-block"></span>
-            <span>Trend (Gerçekleşen)</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-5 h-0.5 border-b-2 border-dashed border-sky-600 inline-block"></span>
-            <span>Forecast (TCMB Enflasyon Modeli)</span>
-          </div>
         </div>
       </div>
 
-      {/* ENDEKSA TARZI DEĞİŞİM & DÖVİZ TABLOSU */}
-      <div className="space-y-3 pt-1">
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs text-left border border-slate-200 rounded-xl overflow-hidden">
-            <thead className="bg-slate-50 text-slate-600 text-[11px] font-bold">
-              <tr className="border-b border-slate-200">
-                <th className="p-2.5 font-bold">Değişim (₺)</th>
-                <th className="p-2.5 text-center">Oca 21 - Ağu 26</th>
-                <th className="p-2.5 text-center">1 Yıllık</th>
-                <th className="p-2.5 text-center">2 Yıllık</th>
-                <th className="p-2.5 text-center">1 Yıl Sonra (Tahmin)</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 text-[11px] text-slate-700">
-              <tr>
-                <td className="p-2.5 font-semibold text-slate-900">
-                  {city} / {district}
-                </td>
-                <td className="p-2.5 text-center font-mono font-bold text-emerald-600">
-                  +%614,20 ▲
-                </td>
-                <td className="p-2.5 text-center font-mono font-bold text-emerald-600">
-                  +%{kfeAnnualChange} ▲
-                </td>
-                <td className="p-2.5 text-center font-mono font-bold text-emerald-600">
-                  +%84,80 ▲
-                </td>
-                <td className="p-2.5 text-center font-mono font-bold text-blue-600">
-                  +%25,00 ▲
-                </td>
-              </tr>
-              <tr className="bg-slate-50/50">
-                <td className="p-2.5 font-semibold text-slate-900">
-                  Toplam Değişim (Kümülatif)
-                </td>
-                <td className="p-2.5 text-center font-mono font-bold text-emerald-700">
-                  +%714,00
-                </td>
-                <td className="p-2.5 text-center font-mono font-bold text-emerald-700">
-                  +%{Math.round(kfeAnnualChange * 1.15)}
-                </td>
-                <td className="p-2.5 text-center font-mono font-bold text-emerald-700">
-                  +%98,40
-                </td>
-                <td className="p-2.5 text-center font-mono font-bold text-blue-700">
-                  +%32,85
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+      {/* ======================================================== */}
+      {/* 2. SATILIK KONUT ORTALAMALARI KARTI (EKRAN GÖRÜNTÜSÜ 5) */}
+      {/* ======================================================== */}
+      <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs">
+        <h3 className="text-base font-extrabold font-heading text-slate-900 text-center mb-4 pb-2 border-b border-slate-100">
+          {city} {district && district !== "Merkez" ? district : ""} Satılık {category === "arsa" ? "Arsa" : "Konut"} Ortalamaları
+        </h3>
 
-        {/* DÖVİZ PARİTELERİ (ECB/FRANKFURTER) */}
-        {currencyRates && (
+        <div className="divide-y divide-slate-100 text-xs">
+          
+          {/* Ortalama Birim Fiyat */}
+          <div className="py-2.5 flex items-center justify-between">
+            <span className="text-slate-600 font-medium">Ortalama Birim Fiyat</span>
+            <span className="font-extrabold text-slate-900 font-mono">
+              {basePrice.toLocaleString("tr-TR")} ₺/m²
+            </span>
+          </div>
+
+          {/* Ortalama Brüt Alan */}
+          <div className="py-2.5 flex items-center justify-between">
+            <span className="text-slate-600 font-medium">Ortalama Brüt Alan</span>
+            <span className="font-extrabold text-slate-900 font-mono">
+              {avgAreaM2} m²
+            </span>
+          </div>
+
+          {/* Ortalama Fiyat */}
+          <div className="py-2.5 flex items-center justify-between">
+            <span className="text-slate-600 font-medium">Ortalama Fiyat</span>
+            <span className="font-extrabold text-slate-900 font-mono">
+              {avgTotalVal.toLocaleString("tr-TR")} ₺
+            </span>
+          </div>
+
+          {/* Geri Dönüş Süresi */}
+          <div className="py-2.5 flex items-center justify-between">
+            <div className="flex items-center gap-1 text-slate-600 font-medium">
+              <span>Geri Dönüş Süresi</span>
+              <span className="text-[10px] text-slate-400 border border-slate-300 rounded-full w-3.5 h-3.5 flex items-center justify-center font-serif">i</span>
+              <span className="text-[10px] text-slate-400">Bilgi</span>
+            </div>
+            <span className="font-extrabold text-slate-900 font-mono">
+              {amortYears} yıl
+            </span>
+          </div>
+
+          {/* Getiri */}
+          <div className="py-2.5 flex items-center justify-between">
+            <div className="flex items-center gap-1 text-slate-600 font-medium">
+              <span>Getiri</span>
+              <span className="text-[10px] text-slate-400 border border-slate-300 rounded-full w-3.5 h-3.5 flex items-center justify-center font-serif">i</span>
+              <span className="text-[10px] text-slate-400">Bilgi</span>
+            </div>
+            <span className="font-black text-teal-600 font-mono text-sm">
+              %{returnYield.toString().replace(".", ",")}
+            </span>
+          </div>
+
+          {/* Kilitli Pro Özellikler (Endeksa Görsel 5 Birebir) */}
+          <div className="py-2.5 flex items-center justify-between">
+            <span className="text-slate-600 font-medium">Min. Maks. Birim Fiyat</span>
+            <button type="button" className="text-slate-500 border-b border-dotted border-slate-500 hover:text-rose-600 font-medium">
+              Erişim Alın
+            </button>
+          </div>
+
+          <div className="py-2.5 flex items-center justify-between">
+            <div className="flex items-center gap-1 text-slate-600 font-medium">
+              <span>Pazardaki Yaş Ortalaması</span>
+              <span className="text-[10px] text-slate-400 border border-slate-300 rounded-full w-3.5 h-3.5 flex items-center justify-center font-serif">i</span>
+              <span className="text-[10px] text-slate-400">Bilgi</span>
+            </div>
+            <button type="button" className="text-slate-500 border-b border-dotted border-slate-500 hover:text-rose-600 font-medium">
+              Erişim Alın
+            </button>
+          </div>
+
+          <div className="py-2.5 flex items-center justify-between">
+            <div className="flex items-center gap-1 text-slate-600 font-medium">
+              <span>Ortalama Pazarlama Süresi</span>
+              <span className="text-[10px] text-slate-400 border border-slate-300 rounded-full w-3.5 h-3.5 flex items-center justify-center font-serif">i</span>
+              <span className="text-[10px] text-slate-400">Bilgi</span>
+            </div>
+            <button type="button" className="text-slate-500 border-b border-dotted border-slate-500 hover:text-rose-600 font-medium">
+              Erişim Alın
+            </button>
+          </div>
+
+          <div className="py-2.5 flex items-center justify-between">
+            <div className="flex items-center gap-1 text-slate-600 font-medium">
+              <span>Stok Adedi</span>
+              <span className="text-[10px] text-slate-400 border border-slate-300 rounded-full w-3.5 h-3.5 flex items-center justify-center font-serif">i</span>
+              <span className="text-[10px] text-slate-400">Bilgi</span>
+            </div>
+            <button type="button" className="text-slate-500 border-b border-dotted border-slate-500 hover:text-rose-600 font-medium">
+              Erişim Alın
+            </button>
+          </div>
+
+          <div className="py-2.5 flex items-center justify-between">
+            <div className="flex items-center gap-1 text-slate-600 font-medium">
+              <span>Stok Oranı</span>
+              <span className="text-[10px] text-slate-400 border border-slate-300 rounded-full w-3.5 h-3.5 flex items-center justify-center font-serif">i</span>
+              <span className="text-[10px] text-slate-400">Bilgi</span>
+            </div>
+            <button type="button" className="text-slate-500 border-b border-dotted border-slate-500 hover:text-rose-600 font-medium">
+              Erişim Alın
+            </button>
+          </div>
+
+          <div className="py-2.5 flex items-center justify-between">
+            <div className="flex items-center gap-1 text-slate-600 font-medium">
+              <span>Stok Değişimi</span>
+              <span className="text-[10px] text-slate-400 border border-slate-300 rounded-full w-3.5 h-3.5 flex items-center justify-center font-serif">i</span>
+              <span className="text-[10px] text-slate-400">Bilgi</span>
+            </div>
+            <button type="button" className="text-slate-500 border-b border-dotted border-slate-500 hover:text-rose-600 font-medium">
+              Erişim Alın
+            </button>
+          </div>
+
+        </div>
+      </div>
+
+      {/* ======================================================== */}
+      {/* 3. DEĞİŞİM & TOPLAM DEĞİŞİM & DÖVİZ (EKRAN GÖRÜNTÜSÜ 2) */}
+      {/* ======================================================== */}
+      <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs space-y-6">
+        
+        {/* TABLO A: Değişim (₺) */}
+        <div>
+          <div className="flex items-center gap-1 text-xs font-bold text-slate-800 mb-2">
+            <span>Değişim (₺)</span>
+            <span className="text-[10px] text-slate-400 border border-slate-300 rounded-full w-3.5 h-3.5 flex items-center justify-center font-serif">i</span>
+          </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-xs text-left border border-slate-200 rounded-xl overflow-hidden">
-              <thead className="bg-slate-50 text-slate-600 text-[11px] font-bold">
-                <tr className="border-b border-slate-200">
-                  <th className="p-2 font-bold">Döviz Kurları (ECB)</th>
-                  <th className="p-2 text-center">1 Yıllık Trend</th>
-                  <th className="p-2 text-center">2 Yıllık Trend</th>
-                  <th className="p-2 text-right">Bugün</th>
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="text-slate-500 text-[11px] font-semibold border-b border-slate-200">
+                  <th className="py-2 px-3">Bölge</th>
+                  <th className="py-2 px-3 text-right">Oca 21 - Ağu 26</th>
+                  <th className="py-2 px-3 text-right">1 Yıllık</th>
+                  <th className="py-2 px-3 text-right">2 Yıllık</th>
+                  <th className="py-2 px-3 text-right">1 Yıl Sonra</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 text-[11px] text-slate-700">
-                <tr>
-                  <td className="p-2 font-semibold">USD / TRY</td>
-                  <td className="p-2 text-center font-mono text-emerald-600 font-bold">+%34,20 ▲</td>
-                  <td className="p-2 text-center font-mono text-emerald-600 font-bold">+%78,40 ▲</td>
-                  <td className="p-2 text-right font-mono font-black text-slate-900">{currencyRates.usdTry.toFixed(2)} ₺</td>
-                </tr>
-                <tr>
-                  <td className="p-2 font-semibold">EUR / TRY</td>
-                  <td className="p-2 text-center font-mono text-emerald-600 font-bold">+%31,10 ▲</td>
-                  <td className="p-2 text-center font-mono text-emerald-600 font-bold">+%72,80 ▲</td>
-                  <td className="p-2 text-right font-mono font-black text-slate-900">{currencyRates.eurTry.toFixed(2)} ₺</td>
+              <tbody>
+                <tr className="border-b border-slate-100">
+                  <td className="py-2.5 px-3 font-semibold text-slate-800">{city}</td>
+                  <td className="py-2.5 px-3 text-right font-mono font-bold text-teal-600">
+                    %1462,84 ▲
+                  </td>
+                  <td className="py-2.5 px-3 text-right font-mono font-bold text-teal-600">
+                    %17,66 ▲
+                  </td>
+                  <td className="py-2.5 px-3 text-right font-mono font-bold text-teal-600">
+                    %68,59 ▲
+                  </td>
+                  <td className="py-2.5 px-3 text-right">
+                    <span className="text-slate-500 border-b border-dotted border-slate-500 hover:text-rose-600 cursor-pointer">
+                      Erişim Alın
+                    </span>
+                  </td>
                 </tr>
               </tbody>
             </table>
           </div>
-        )}
+        </div>
+
+        {/* TABLO B: Toplam Değişim (₺) */}
+        <div>
+          <div className="flex items-center gap-1 text-xs font-bold text-slate-800 mb-2">
+            <span>Toplam Değişim (₺)</span>
+            <span className="text-[10px] text-slate-400 border border-slate-300 rounded-full w-3.5 h-3.5 flex items-center justify-center font-serif">i</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="text-slate-500 text-[11px] font-semibold border-b border-slate-200">
+                  <th className="py-2 px-3">Bölge</th>
+                  <th className="py-2 px-3 text-right">Oca 21 - Ağu 26</th>
+                  <th className="py-2 px-3 text-right">1 Yıllık</th>
+                  <th className="py-2 px-3 text-right">2 Yıllık</th>
+                  <th className="py-2 px-3 text-right">1 Yıl Sonra</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-b border-slate-100">
+                  <td className="py-2.5 px-3 font-semibold text-slate-800">{city}</td>
+                  <td className="py-2.5 px-3 text-right font-mono font-bold text-teal-600">
+                    %1735,45 ▲
+                  </td>
+                  <td className="py-2.5 px-3 text-right font-mono font-bold text-teal-600">
+                    %25,50 ▲
+                  </td>
+                  <td className="py-2.5 px-3 text-right font-mono font-bold text-teal-600">
+                    %88,46 ▲
+                  </td>
+                  <td className="py-2.5 px-3 text-right">
+                    <span className="text-slate-500 border-b border-dotted border-slate-500 hover:text-rose-600 cursor-pointer">
+                      Erişim Alın
+                    </span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* TABLO C: Döviz */}
+        <div>
+          <div className="text-xs font-bold text-slate-800 mb-2">Döviz</div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="text-slate-500 text-[11px] font-semibold border-b border-slate-200">
+                  <th className="py-2 px-3">Döviz</th>
+                  <th className="py-2 px-3 text-right">Oca 21 - Ağu 26</th>
+                  <th className="py-2 px-3 text-right">1 Yıllık</th>
+                  <th className="py-2 px-3 text-right">2 Yıllık</th>
+                  <th className="py-2 px-3 text-right">Bugün</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                <tr>
+                  <td className="py-2.5 px-3 font-semibold text-slate-800">EUR/USD</td>
+                  <td className="py-2.5 px-3 text-right font-mono font-bold text-rose-600">
+                    %-6,34 ▼
+                  </td>
+                  <td className="py-2.5 px-3 text-right font-mono font-bold text-rose-600">
+                    %-1,06 ▼
+                  </td>
+                  <td className="py-2.5 px-3 text-right font-mono font-bold text-teal-600">
+                    %4,45 ▲
+                  </td>
+                  <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">
+                    1,16
+                  </td>
+                </tr>
+                <tr>
+                  <td className="py-2.5 px-3 font-semibold text-slate-800">EUR/TRY</td>
+                  <td className="py-2.5 px-3 text-right font-mono font-bold text-teal-600">
+                    %497,64 ▲
+                  </td>
+                  <td className="py-2.5 px-3 text-right font-mono font-bold text-teal-600">
+                    %16,76 ▲
+                  </td>
+                  <td className="py-2.5 px-3 text-right font-mono font-bold text-teal-600">
+                    %49,12 ▲
+                  </td>
+                  <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">
+                    56,14
+                  </td>
+                </tr>
+                <tr>
+                  <td className="py-2.5 px-3 font-semibold text-slate-800">USD/TRY</td>
+                  <td className="py-2.5 px-3 text-right font-mono font-bold text-teal-600">
+                    %538,13 ▲
+                  </td>
+                  <td className="py-2.5 px-3 text-right font-mono font-bold text-teal-600">
+                    %18,01 ▲
+                  </td>
+                  <td className="py-2.5 px-3 text-right font-mono font-bold text-teal-600">
+                    %42,76 ▲
+                  </td>
+                  <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">
+                    48,40
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Endeksa Yasal ve Metodolojik Dipnotları */}
+        <div className="pt-4 border-t border-slate-100 text-[10px] text-slate-400 space-y-2 leading-relaxed">
+          <p>
+            * Bu ekrandaki tahminler, www.endeksa.com tarafından satış, saha çalışmaları ve internette yer alan verilere dayalı istatistiksel modelleme yöntemleri ile üretilmiştir ve sapmalar içerebilir. Burada yer alan bilgiler ve tahminler, varsayımsal olup herhangi bir taahhüt veya kesinlik içermez. Bu kapsamda buradaki bilgiler ve tahminler, müşteri için sadece tavsiye niteliğinde olup öngörü amaçlıdır; herhangi bir şekilde www.endeksa.com veya müşteriler için hukuki bağlayıcılığı olamaz. Bu bilgi ve tahminlerin bir yatırıma veya ticarete konu edilmesi halinde www.endeksa.com herhangi bir sorumluluk üstlenmez.
+          </p>
+          <p>
+            * Trendlerin son 3 ayını kapsayan pencere dönemi içerisinde, yeni verilerin eklenmesiyle, değerlerde düşük miktarda değişimler gözlemlenebilir.
+          </p>
+        </div>
+
       </div>
     </div>
   );

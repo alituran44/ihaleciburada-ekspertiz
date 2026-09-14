@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { ValuationWizard } from "@/components/ValuationWizard";
@@ -9,6 +9,7 @@ import { ReportView } from "@/components/ReportView";
 import { WhatsAppShareModal } from "@/components/WhatsAppShareModal";
 import { EndeksaSidebar } from "@/components/EndeksaSidebar";
 import { PriceTrendChart } from "@/components/PriceTrendChart";
+import { InvestmentScoreCard } from "@/components/InvestmentScoreCard";
 import { ParcelMap } from "@/components/ParcelMap";
 import { ParcelInput } from "@/types";
 import { SAMPLE_SCENARIOS, formatTL, formatNumber } from "@/lib/constants";
@@ -33,16 +34,62 @@ import {
   Share2,
   Printer,
   SlidersHorizontal,
-  Flame
+  Flame,
+  Loader2,
+  Trees,
+  Compass
 } from "lucide-react";
 
 export default function Home() {
-  // Varsayılan olarak Çanakkale senaryosu ile başlar
   const [parcelData, setParcelData] = useState<ParcelInput>(SAMPLE_SCENARIOS[0].data);
   const [activeTab, setActiveTab] = useState<"endeks" | "degerleme" | "ihale" | "rapor">("endeks");
   const [shareModalOpen, setShareModalOpen] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>("Çanakkale, Bayramiç");
   const [isSearching, setIsSearching] = useState<boolean>(false);
+
+  // Türkiye Geneli Canlı Konum Autocomplete Arama Durumu
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState<boolean>(false);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState<boolean>(false);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+
+  // Dışarı tıklandığında arama önerilerini kapatma
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
+        setShowSuggestions(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Canlı Konum Arama (Debounce ile 81 İl, 973 İlçe, Köy ve Mahalleler)
+  useEffect(() => {
+    if (!searchQuery || searchQuery.trim().length < 2) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setIsLoadingSuggestions(true);
+      try {
+        const res = await fetch(`/api/location/search?q=${encodeURIComponent(searchQuery.trim())}`);
+        const data = await res.json();
+        if (data.success && data.results) {
+          setSuggestions(data.results);
+          setShowSuggestions(data.results.length > 0);
+        }
+      } catch (err) {
+        console.warn("Konum arama servisi hatası:", err);
+      } finally {
+        setIsLoadingSuggestions(false);
+      }
+    }, 200);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   // Anlık fizibilite hesaplaması
   const calculation = useMemo(() => {
@@ -86,9 +133,113 @@ export default function Home() {
     }
   };
 
+  // Konum Autocomplete Seçildiğinde Çalışır
+  const handleSelectLocation = async (item: any) => {
+    setShowSuggestions(false);
+    setSearchQuery(`${item.label}, ${item.province}`);
+    setIsSearching(true);
+
+    const newCity = item.province;
+    const newDistrict = item.district || "Merkez";
+    const newNeighborhood = item.neighborhood || "";
+    const newCoords = item.lat && item.lng ? { lat: item.lat, lng: item.lng } : undefined;
+
+    try {
+      const url = `/api/emsal?il=${encodeURIComponent(newCity)}&ilce=${encodeURIComponent(newDistrict)}&mahalle=${encodeURIComponent(newNeighborhood)}&kategori=${parcelData.category}${newCoords ? `&lat=${newCoords.lat}&lng=${newCoords.lng}` : ""}`;
+      const res = await fetch(url);
+      const data = await res.json();
+
+      if (data.success && data.data) {
+        const resData = data.data;
+        setParcelData({
+          ...parcelData,
+          city: newCity,
+          district: newDistrict,
+          neighborhood: newNeighborhood,
+          coordinates: newCoords || resData.coordinates || parcelData.coordinates,
+          estimatedLandM2PriceTL: resData.landM2PriceTL,
+          estimatedUnitSaleM2PriceTL: resData.unitSaleM2PriceTL,
+          contractorSharePercent: resData.contractorSharePercent,
+          monthlyRentEstimateTL: isResidential ? resData.estimatedMonthlyRentTL : parcelData.monthlyRentEstimateTL,
+          marketResearch: resData,
+          comparables: resData.comparables,
+          tcmbOfficialData: resData.tcmbOfficialData,
+          buildingCostEstimate: resData.buildingCostEstimate,
+        });
+      } else {
+        setParcelData({
+          ...parcelData,
+          city: newCity,
+          district: newDistrict,
+          neighborhood: newNeighborhood,
+          coordinates: newCoords || parcelData.coordinates,
+        });
+      }
+    } catch (err) {
+      setParcelData({
+        ...parcelData,
+        city: newCity,
+        district: newDistrict,
+        neighborhood: newNeighborhood,
+        coordinates: newCoords || parcelData.coordinates,
+      });
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  // İlçe Tablosundan (Görsel 4 & 6) İlçe Seçildiğinde Çalışır
+  const handleSelectDistrict = async (districtName: string) => {
+    setSearchQuery(`${parcelData.city}, ${districtName}`);
+    setIsSearching(true);
+
+    try {
+      const url = `/api/emsal?il=${encodeURIComponent(parcelData.city)}&ilce=${encodeURIComponent(districtName)}&kategori=${parcelData.category}`;
+      const res = await fetch(url);
+      const data = await res.json();
+
+      if (data.success && data.data) {
+        const resData = data.data;
+        setParcelData({
+          ...parcelData,
+          district: districtName,
+          neighborhood: "",
+          coordinates: resData.coordinates || parcelData.coordinates,
+          estimatedLandM2PriceTL: resData.landM2PriceTL,
+          estimatedUnitSaleM2PriceTL: resData.unitSaleM2PriceTL,
+          contractorSharePercent: resData.contractorSharePercent,
+          monthlyRentEstimateTL: isResidential ? resData.estimatedMonthlyRentTL : parcelData.monthlyRentEstimateTL,
+          marketResearch: resData,
+          comparables: resData.comparables,
+          tcmbOfficialData: resData.tcmbOfficialData,
+          buildingCostEstimate: resData.buildingCostEstimate,
+        });
+      } else {
+        setParcelData({
+          ...parcelData,
+          district: districtName,
+          neighborhood: "",
+        });
+      }
+    } catch (err) {
+      setParcelData({
+        ...parcelData,
+        district: districtName,
+      });
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  // Form submit olduğunda arama
   const handleSearchSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!searchQuery.trim()) return;
+
+    if (suggestions.length > 0) {
+      handleSelectLocation(suggestions[0]);
+      return;
+    }
 
     setIsSearching(true);
     const parts = searchQuery.split(",").map((s) => s.trim());
@@ -137,7 +288,7 @@ export default function Home() {
   return (
     <div className="min-h-screen flex flex-col bg-[#F8FAFC]">
       {/* 1. ENDEKSA TARZI ÜST ARAMA & GEZİNİM ÇUBUĞU */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-2xs">
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-2xs">
         <div className="flex items-center justify-between px-3 sm:px-6 h-14 sm:h-16 gap-3">
           
           {/* Sol Kısım: Logo */}
@@ -155,44 +306,115 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Orta Kısım: Endeksa Arama Kutusu [Adres v] [İl / İlçe ...] [Değerini Öğren] */}
-          <form 
-            onSubmit={handleSearchSubmit}
-            className="flex-1 max-w-xl mx-2 flex items-center bg-slate-50 border border-slate-300 rounded-full p-1 shadow-2xs focus-within:ring-2 focus-within:ring-rose-500/20 focus-within:border-rose-500 transition"
-          >
-            {/* Adres Dropdown */}
-            <div className="hidden sm:flex items-center gap-1 px-3 py-1 text-xs font-bold text-slate-700 border-r border-slate-200 shrink-0 cursor-pointer">
-              <span>Adres</span>
-              <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-            </div>
-
-            {/* Arama Inputu */}
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="İl, İlçe veya Mahalle arayın (Örn: Çanakkale, Bayramiç)"
-              className="flex-1 bg-transparent px-3 text-xs sm:text-sm font-medium text-slate-900 outline-none placeholder:text-slate-400 min-w-0"
-            />
-
-            {/* Arama İkonu */}
-            <button 
-              type="submit"
-              aria-label="Konum Ara"
-              className="p-1.5 text-slate-400 hover:text-rose-600 transition shrink-0 cursor-pointer"
+          {/* Orta Kısım: Endeksa Arama Kutusu & Canlı Konum Autocomplete */}
+          <div className="relative flex-1 max-w-xl mx-2" ref={searchContainerRef}>
+            <form 
+              onSubmit={handleSearchSubmit}
+              className="w-full flex items-center bg-slate-50 border border-slate-300 rounded-full p-1 shadow-2xs focus-within:ring-2 focus-within:ring-rose-500/20 focus-within:border-rose-500 focus-within:bg-white transition"
             >
-              <Search className="w-4 h-4" />
-            </button>
+              {/* Adres Etiketi */}
+              <div className="hidden sm:flex items-center gap-1 px-3 py-1 text-xs font-bold text-slate-700 border-r border-slate-200 shrink-0 cursor-pointer">
+                <span>Adres</span>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+              </div>
 
-            {/* "Değerini Öğren" Kırmızı Butonu (Endeksa İmzası) */}
-            <button
-              type="button"
-              onClick={() => setActiveTab("degerleme")}
-              className="hidden md:flex items-center gap-1.5 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white text-xs font-extrabold px-4 py-1.5 rounded-full shadow-xs transition active:scale-95 cursor-pointer shrink-0"
-            >
-              <span>Değerini Öğren</span>
-            </button>
-          </form>
+              {/* Arama Inputu */}
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setShowSuggestions(true);
+                }}
+                onFocus={() => {
+                  if (suggestions.length > 0) setShowSuggestions(true);
+                }}
+                placeholder="İl, İlçe veya Köy arayın (Örn: Adatepe, Bayramiç, Kadıköy, Uzungöl)"
+                className="flex-1 bg-transparent px-3 text-xs sm:text-sm font-medium text-slate-900 outline-none placeholder:text-slate-400 min-w-0"
+              />
+
+              {/* Arama / Yükleniyor İkonu */}
+              <button 
+                type="submit"
+                aria-label="Konum Ara"
+                className="p-1.5 text-slate-400 hover:text-rose-600 transition shrink-0 cursor-pointer"
+              >
+                {isLoadingSuggestions || isSearching ? (
+                  <Loader2 className="w-4 h-4 animate-spin text-rose-600" />
+                ) : (
+                  <Search className="w-4 h-4" />
+                )}
+              </button>
+
+              {/* "Değerini Öğren" Kırmızı Butonu (Endeksa İmzası) */}
+              <button
+                type="button"
+                onClick={() => setActiveTab("degerleme")}
+                className="hidden md:flex items-center gap-1.5 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white text-xs font-extrabold px-4 py-1.5 rounded-full shadow-xs transition active:scale-95 cursor-pointer shrink-0"
+              >
+                <span>Değerini Öğren</span>
+              </button>
+            </form>
+
+            {/* TÜRKİYE 81 İL, 973 İLÇE VE KÖY CANLI ÖNERİ AÇILIR PENCERESİ */}
+            {showSuggestions && suggestions.length > 0 && (
+              <div className="absolute left-0 right-0 top-full mt-2 bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-100 max-h-80 overflow-y-auto divide-y divide-slate-100">
+                <div className="p-2 bg-slate-50 text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
+                  <span>Türkiye Mülki İdare & Harita Sonuçları</span>
+                  <span>{suggestions.length} Konum</span>
+                </div>
+                {suggestions.map((item) => (
+                  <div
+                    key={item.id}
+                    onClick={() => handleSelectLocation(item)}
+                    className="p-3 hover:bg-rose-50/60 cursor-pointer transition flex items-center justify-between gap-3 text-left"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                        item.type === "il" 
+                          ? "bg-blue-100 text-blue-700" 
+                          : item.type === "ilce" 
+                          ? "bg-amber-100 text-amber-700" 
+                          : item.type === "koy" 
+                          ? "bg-emerald-100 text-emerald-700" 
+                          : "bg-purple-100 text-purple-700"
+                      }`}>
+                        {item.type === "il" ? (
+                          <Building className="w-4 h-4" />
+                        ) : item.type === "ilce" ? (
+                          <Building2 className="w-4 h-4" />
+                        ) : item.type === "koy" ? (
+                          <Trees className="w-4 h-4" />
+                        ) : (
+                          <MapPin className="w-4 h-4" />
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-xs sm:text-sm font-bold text-slate-900 truncate">
+                          {item.label}
+                        </div>
+                        <div className="text-[11px] text-slate-500 truncate">
+                          {item.secondaryLabel}
+                        </div>
+                      </div>
+                    </div>
+
+                    <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase shrink-0 ${
+                      item.type === "il" 
+                        ? "bg-blue-50 text-blue-700 border border-blue-200" 
+                        : item.type === "ilce" 
+                        ? "bg-amber-50 text-amber-800 border border-amber-200" 
+                        : item.type === "koy" 
+                        ? "bg-emerald-50 text-emerald-800 border border-emerald-200" 
+                        : "bg-purple-50 text-purple-800 border border-purple-200"
+                    }`}>
+                      {item.type === "il" ? "İl" : item.type === "ilce" ? "İlçe" : item.type === "koy" ? "Köy" : "Mahalle"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
           {/* Sağ Kısım: Hızlı İşlemler */}
           <div className="flex items-center gap-2">
@@ -243,7 +465,7 @@ export default function Home() {
           <div className="flex-1 flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden">
             
             {/* SOL ANALİTİK & VERİ PANELİ (Scroll Edilebilir) */}
-            <div className="w-full lg:w-[50%] lg:h-[calc(100vh-64px)] overflow-y-auto p-3 sm:p-5 space-y-4 border-r border-slate-200">
+            <div className="w-full lg:w-[50%] lg:h-[calc(100vh-64px)] overflow-y-auto p-3 sm:p-5 space-y-5 border-r border-slate-200">
               
               {/* ENDEKSA FİLTRE HAPLARI (PILLS) */}
               <div className="flex flex-wrap items-center gap-2 pb-1 border-b border-slate-200/80">
@@ -262,7 +484,7 @@ export default function Home() {
                   Tip: <strong className="text-slate-900">Satılık / İhale</strong>
                 </span>
 
-                {/* Kategori: Tümü */}
+                {/* Kategori */}
                 <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold border border-slate-200">
                   Kategori: <strong className="text-slate-900">{isResidential ? parcelData.housingType || "Daire" : parcelData.zoningType || "İmar"}</strong>
                 </span>
@@ -321,10 +543,11 @@ export default function Home() {
                 </button>
               </div>
 
-              {/* SEKME 1: ENDEKS & FİYAT TRENDİ (ENDEKSA GRAFİĞİ) */}
+              {/* SEKME 1: ENDEKS & FİYAT TRENDİ & YATIRIM SKORLARI (ENDEKSA RESMİ GÖRSELLERİ) */}
               {activeTab === "endeks" && (
-                <div className="space-y-4">
-                  {/* İnteraktif Fiyat Trend Grafiği */}
+                <div className="space-y-6">
+                  
+                  {/* BÖLÜM 1: İnteraktif Fiyat Trend Grafiği (Görsel 1) + Satılık Konut Ortalamaları (Görsel 5) + Değişim & Döviz (Görsel 2) */}
                   <PriceTrendChart
                     city={parcelData.city}
                     district={parcelData.district}
@@ -332,7 +555,7 @@ export default function Home() {
                     category={parcelData.category}
                     currentUnitM2TL={
                       isResidential 
-                        ? (parcelData.estimatedUnitSaleM2PriceTL || 48000) 
+                        ? (parcelData.estimatedUnitSaleM2PriceTL || 54090) 
                         : (parcelData.estimatedLandM2PriceTL || 15000)
                     }
                     kfeIndex={parcelData.tcmbOfficialData?.kfeIndex}
@@ -340,56 +563,13 @@ export default function Home() {
                     currencyRates={parcelData.currencyRates}
                   />
 
-                  {/* ENDEKSA ÖZET METRİK KARTLARI */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                    <div className="p-3 rounded-xl bg-white border border-slate-200 shadow-2xs">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                        Adil Piyasa Değeri
-                      </span>
-                      <strong className="text-sm sm:text-base font-black text-slate-900 font-mono">
-                        {formatTL(calculation.fairMarketValueTL)}
-                      </strong>
-                      <span className="text-[9px] text-emerald-600 block mt-0.5 font-semibold">
-                        Güven Skoru: %94
-                      </span>
-                    </div>
-
-                    <div className="p-3 rounded-xl bg-white border border-slate-200 shadow-2xs">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                        TCMB KFE Endeksi
-                      </span>
-                      <strong className="text-sm sm:text-base font-black text-blue-700 font-mono">
-                        {parcelData.tcmbOfficialData?.kfeIndex || 204.36}
-                      </strong>
-                      <span className="text-[9px] text-slate-500 block mt-0.5 truncate">
-                        {parcelData.tcmbOfficialData?.benchmarkRegion || "Bölge Medyanı"}
-                      </span>
-                    </div>
-
-                    <div className="p-3 rounded-xl bg-white border border-slate-200 shadow-2xs">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                        Amortisman Süresi
-                      </span>
-                      <strong className="text-sm sm:text-base font-black text-slate-900 font-mono">
-                        {calculation.amortizationYears || 18} Yıl
-                      </strong>
-                      <span className="text-[9px] text-emerald-600 block mt-0.5 font-semibold">
-                        Yüksek Kira Verimi
-                      </span>
-                    </div>
-
-                    <div className="p-3 rounded-xl bg-white border border-slate-200 shadow-2xs">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                        Güvenli Tavan Pey
-                      </span>
-                      <strong className="text-sm sm:text-base font-black text-amber-900 font-mono">
-                        {formatTL(calculation.auctionAnalysis?.maxSafeBidTL || Math.round(calculation.fairMarketValueTL * 0.72))}
-                      </strong>
-                      <span className="text-[9px] text-orange-600 block mt-0.5 font-bold">
-                        İhale Fırsat Sınırı
-                      </span>
-                    </div>
-                  </div>
+                  {/* BÖLÜM 2: Bölge Yatırım Skoru (Görsel 3) + İlçeler Yatırım Skoru (Görsel 4) + İlçeler Piyasa Ortalamaları (Görsel 6) */}
+                  <InvestmentScoreCard
+                    city={parcelData.city}
+                    selectedDistrict={parcelData.district}
+                    category={parcelData.category}
+                    onSelectDistrict={handleSelectDistrict}
+                  />
 
                   {/* Eylemler: Rapor Aç & WhatsApp */}
                   <div className="grid grid-cols-2 gap-3 pt-2">
@@ -450,13 +630,16 @@ export default function Home() {
                 comparables={parcelData.comparables}
                 category={parcelData.category}
                 unitM2Price={
-                  isResidential 
-                    ? (parcelData.estimatedUnitSaleM2PriceTL || 48000) 
+                  isResidential
+                    ? (parcelData.estimatedUnitSaleM2PriceTL || 54090)
                     : (parcelData.estimatedLandM2PriceTL || 15000)
                 }
                 isEndeksaSplitView={true}
                 onLocationFound={(coords) => {
-                  setParcelData({ ...parcelData, coordinates: coords });
+                  setParcelData((prev) => ({
+                    ...prev,
+                    coordinates: coords,
+                  }));
                 }}
               />
             </div>

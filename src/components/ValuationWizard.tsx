@@ -40,6 +40,7 @@ import {
 } from "lucide-react";
 import { formatTL, formatNumber } from "@/lib/constants";
 import { ParcelMap } from "@/components/ParcelMap";
+import { ALL_PROVINCES, getDistrictsByProvince } from "@/lib/turkeyLocations";
 
 interface ValuationWizardProps {
   input: ParcelInput;
@@ -461,24 +462,41 @@ export const ValuationWizard: React.FC<ValuationWizardProps> = ({
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">İl *</label>
-                <input
-                  type="text"
+                <label className="block text-xs font-bold text-slate-700 mb-1">İl (81 İl) *</label>
+                <select
                   value={input.city}
-                  onChange={(e) => updateField("city", e.target.value)}
-                  placeholder="İstanbul / Çanakkale"
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-900 font-semibold focus:bg-white focus:border-blue-500 focus:outline-none"
-                />
+                  onChange={(e) => {
+                    const newCity = e.target.value;
+                    const districts = getDistrictsByProvince(newCity);
+                    onChange({
+                      ...input,
+                      city: newCity,
+                      district: districts[0] || "Merkez",
+                      neighborhood: "",
+                    });
+                  }}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-900 font-semibold focus:bg-white focus:border-blue-500 focus:outline-none cursor-pointer"
+                >
+                  {ALL_PROVINCES.map((prov) => (
+                    <option key={prov} value={prov}>
+                      {prov}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">İlçe *</label>
-                <input
-                  type="text"
+                <label className="block text-xs font-bold text-slate-700 mb-1">İlçe ({getDistrictsByProvince(input.city).length} İlçe) *</label>
+                <select
                   value={input.district}
                   onChange={(e) => updateField("district", e.target.value)}
-                  placeholder="Kadıköy / Merkez"
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-900 font-semibold focus:bg-white focus:border-blue-500 focus:outline-none"
-                />
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-900 font-semibold focus:bg-white focus:border-blue-500 focus:outline-none cursor-pointer"
+                >
+                  {getDistrictsByProvince(input.city).map((dist) => (
+                    <option key={dist} value={dist}>
+                      {dist}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">Mahalle / Köy</label>
@@ -486,7 +504,7 @@ export const ValuationWizard: React.FC<ValuationWizardProps> = ({
                   type="text"
                   value={input.neighborhood}
                   onChange={(e) => updateField("neighborhood", e.target.value)}
-                  placeholder="Caferağa / Kepez"
+                  placeholder="Örn: Adatepe Köyü / Barbaros"
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-900 font-semibold focus:bg-white focus:border-blue-500 focus:outline-none"
                 />
               </div>
