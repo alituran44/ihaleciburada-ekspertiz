@@ -7,8 +7,11 @@ import { ValuationWizard } from "@/components/ValuationWizard";
 import { FeasibilityPreview } from "@/components/FeasibilityPreview";
 import { ReportView } from "@/components/ReportView";
 import { WhatsAppShareModal } from "@/components/WhatsAppShareModal";
+import { EndeksaSidebar } from "@/components/EndeksaSidebar";
+import { PriceTrendChart } from "@/components/PriceTrendChart";
+import { ParcelMap } from "@/components/ParcelMap";
 import { ParcelInput } from "@/types";
-import { SAMPLE_SCENARIOS } from "@/lib/constants";
+import { SAMPLE_SCENARIOS, formatTL, formatNumber } from "@/lib/constants";
 import { calculateFeasibility } from "@/lib/calculator";
 import { 
   Building, 
@@ -19,268 +22,456 @@ import {
   CheckCircle, 
   Layers, 
   TrendingUp,
-  FileCheck
+  FileCheck,
+  Search,
+  ChevronDown,
+  MapPin,
+  Home as HomeIcon,
+  Building2,
+  Calendar,
+  DollarSign,
+  Share2,
+  Printer,
+  SlidersHorizontal,
+  Flame
 } from "lucide-react";
 
 export default function Home() {
-  // Varsayılan olarak Çanakkale Belediye İhalesi senaryosu ile başlar
+  // Varsayılan olarak Çanakkale senaryosu ile başlar
   const [parcelData, setParcelData] = useState<ParcelInput>(SAMPLE_SCENARIOS[0].data);
-  const [viewMode, setViewMode] = useState<"calculator" | "report">("calculator");
+  const [activeTab, setActiveTab] = useState<"endeks" | "degerleme" | "ihale" | "rapor">("endeks");
   const [shareModalOpen, setShareModalOpen] = useState<boolean>(false);
+  const [searchQuery, setSearchQuery] = useState<string>("Çanakkale, Bayramiç");
+  const [isSearching, setIsSearching] = useState<boolean>(false);
 
   // Anlık fizibilite hesaplaması
   const calculation = useMemo(() => {
     return calculateFeasibility(parcelData);
   }, [parcelData]);
 
-  const handleReset = () => {
-    if (parcelData.category === "konut") {
+  const isResidential = parcelData.category === "konut";
+
+  const handleCategorySwitch = (cat: "arsa" | "konut") => {
+    if (cat === "konut") {
       setParcelData({
+        ...parcelData,
         category: "konut",
-        title: "Yeni Konut / Daire Portföyü",
-        city: "İstanbul",
-        district: "Kadıköy",
-        neighborhood: "Caferağa",
-        ada: "",
-        parsel: "",
-        areaM2: 125,
-        netAreaM2: 105,
-        housingType: "daire",
+        title: "Konut & Daire Portföyü",
+        areaM2: 135,
+        netAreaM2: 110,
         roomCount: "3+1",
         buildingAge: "1-5",
         floorLocation: "ara_kat",
-        totalFloorsInBuilding: 5,
+        housingType: "daire",
         heatingType: "dogalgaz_kombi",
         deedStatus: "kat_mulkiyeti",
         hasElevator: true,
         hasParking: true,
         hasBalcony: true,
-        inGatedCommunity: false,
-        isFurnished: false,
-        isCreditEligible: true,
-        monthlyRentEstimateTL: 35000,
-        roadAccess: "var",
-        roadFrontageM: 15,
-        isCornerParcel: false,
-        topography: "duz",
-        zoningType: "konut",
-        kaks: 1.5,
-        taks: 0.35,
-        gabariM: 15,
-        maxFloors: 5,
-        relinquishmentRatio: 0,
-        askedPriceTL: 6500000,
-        isTender: false,
-        estimatedLandM2PriceTL: 25000,
-        estimatedUnitSaleM2PriceTL: 55000,
-        contractorSharePercent: 50,
-        consultantName: "",
-        consultantPhone: "",
-        consultantAgency: "İhaleciBurada Portföy Danışmanlığı",
+        monthlyRentEstimateTL: 32000,
+        askedPriceTL: 5800000,
       });
     } else {
       setParcelData({
+        ...parcelData,
         category: "arsa",
-        title: "Yeni Arsa Portföyü",
-        city: "Çanakkale",
-        district: "Merkez",
-        neighborhood: "",
-        ada: "",
-        parsel: "",
+        title: "İmarlı Arsa Portföyü",
         areaM2: 1000,
-        roadAccess: "var",
-        roadFrontageM: 20,
-        isCornerParcel: false,
-        topography: "duz",
         zoningType: "konut",
-        kaks: 1.50,
+        kaks: 1.5,
         taks: 0.35,
-        gabariM: 15.5,
         maxFloors: 5,
-        relinquishmentRatio: 10,
-        askedPriceTL: 10000000,
-        isTender: false,
-        estimatedLandM2PriceTL: 10000,
-        estimatedUnitSaleM2PriceTL: 40000,
-        contractorSharePercent: 50,
-        consultantName: "",
-        consultantPhone: "",
-        consultantAgency: "İhaleciBurada Portföy Danışmanlığı",
+        askedPriceTL: 9500000,
       });
     }
   };
 
-  return (
-    <div className="min-h-screen flex flex-col bg-[#F4F6F9]">
-      <Header onNewReportClick={() => {
-        handleReset();
-        setViewMode("calculator");
-      }} />
+  const handleSearchSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!searchQuery.trim()) return;
 
-      {/* RAPOR GÖRÜNÜMÜ MODU */}
-      {viewMode === "report" ? (
-        <main className="flex-1 py-8 px-4 sm:px-6">
-          <ReportView 
+    setIsSearching(true);
+    const parts = searchQuery.split(",").map((s) => s.trim());
+    const newCity = parts[0] || "Çanakkale";
+    const newDistrict = parts[1] || "Bayramiç";
+
+    try {
+      const url = `/api/emsal?il=${encodeURIComponent(newCity)}&ilce=${encodeURIComponent(newDistrict)}&kategori=${parcelData.category}`;
+      const res = await fetch(url);
+      const data = await res.json();
+
+      if (data.success && data.data) {
+        const resData = data.data;
+        setParcelData({
+          ...parcelData,
+          city: newCity,
+          district: newDistrict,
+          neighborhood: resData.neighborhood || "",
+          estimatedLandM2PriceTL: resData.landM2PriceTL,
+          estimatedUnitSaleM2PriceTL: resData.unitSaleM2PriceTL,
+          contractorSharePercent: resData.contractorSharePercent,
+          monthlyRentEstimateTL: isResidential ? resData.estimatedMonthlyRentTL : parcelData.monthlyRentEstimateTL,
+          marketResearch: resData,
+          comparables: resData.comparables,
+          tcmbOfficialData: resData.tcmbOfficialData,
+          buildingCostEstimate: resData.buildingCostEstimate,
+        });
+      } else {
+        setParcelData({
+          ...parcelData,
+          city: newCity,
+          district: newDistrict,
+        });
+      }
+    } catch (err) {
+      setParcelData({
+        ...parcelData,
+        city: newCity,
+        district: newDistrict,
+      });
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex flex-col bg-[#F8FAFC]">
+      {/* 1. ENDEKSA TARZI ÜST ARAMA & GEZİNİM ÇUBUĞU */}
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-2xs">
+        <div className="flex items-center justify-between px-3 sm:px-6 h-14 sm:h-16 gap-3">
+          
+          {/* Sol Kısım: Logo */}
+          <div className="flex items-center gap-3">
+            <div 
+              className="flex items-center gap-2 cursor-pointer"
+              onClick={() => setActiveTab("endeks")}
+            >
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-rose-600 to-pink-500 flex items-center justify-center text-white shadow-sm font-black text-sm">
+                İB
+              </div>
+              <span className="font-black text-lg sm:text-xl font-heading tracking-tight text-slate-900 hidden sm:inline">
+                ihaleciburada<span className="text-rose-600">.endeks</span>
+              </span>
+            </div>
+          </div>
+
+          {/* Orta Kısım: Endeksa Arama Kutusu [Adres v] [İl / İlçe ...] [Değerini Öğren] */}
+          <form 
+            onSubmit={handleSearchSubmit}
+            className="flex-1 max-w-xl mx-2 flex items-center bg-slate-50 border border-slate-300 rounded-full p-1 shadow-2xs focus-within:ring-2 focus-within:ring-rose-500/20 focus-within:border-rose-500 transition"
+          >
+            {/* Adres Dropdown */}
+            <div className="hidden sm:flex items-center gap-1 px-3 py-1 text-xs font-bold text-slate-700 border-r border-slate-200 shrink-0 cursor-pointer">
+              <span>Adres</span>
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+            </div>
+
+            {/* Arama Inputu */}
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="İl, İlçe veya Mahalle arayın (Örn: Çanakkale, Bayramiç)"
+              className="flex-1 bg-transparent px-3 text-xs sm:text-sm font-medium text-slate-900 outline-none placeholder:text-slate-400 min-w-0"
+            />
+
+            {/* Arama İkonu */}
+            <button 
+              type="submit"
+              aria-label="Konum Ara"
+              className="p-1.5 text-slate-400 hover:text-rose-600 transition shrink-0 cursor-pointer"
+            >
+              <Search className="w-4 h-4" />
+            </button>
+
+            {/* "Değerini Öğren" Kırmızı Butonu (Endeksa İmzası) */}
+            <button
+              type="button"
+              onClick={() => setActiveTab("degerleme")}
+              className="hidden md:flex items-center gap-1.5 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white text-xs font-extrabold px-4 py-1.5 rounded-full shadow-xs transition active:scale-95 cursor-pointer shrink-0"
+            >
+              <span>Değerini Öğren</span>
+            </button>
+          </form>
+
+          {/* Sağ Kısım: Hızlı İşlemler */}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShareModalOpen(true)}
+              className="p-2 rounded-xl text-slate-600 hover:bg-slate-100 hover:text-emerald-600 transition cursor-pointer"
+              title="WhatsApp İle Paylaş"
+            >
+              <Share2 className="w-4 h-4" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab("rapor")}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-xs transition cursor-pointer"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Rapor Al</span>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* 2. RAPOR GÖRÜNÜMÜ MODU (Seçildiğinde Tam Ekran A4 Formatı) */}
+      {activeTab === "rapor" ? (
+        <main className="flex-1 py-6 px-4 sm:px-6">
+          <ReportView
             input={parcelData}
             calc={calculation}
-            onBack={() => setViewMode("calculator")}
+            onBack={() => setActiveTab("endeks")}
             onOpenShareModal={() => setShareModalOpen(true)}
           />
         </main>
       ) : (
-        /* HESAPLAYICI VE ÇALIŞMA ALANI MODU */
-        <main className="flex-1">
-          {/* Hero Tanıtım Şeridi */}
-          <section className="bg-gradient-to-b from-[#0F223D] via-[#0B1E3B] to-[#07111F] text-white py-12 px-4 sm:px-6 border-b border-slate-800">
-            <div className="max-w-7xl mx-auto space-y-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="px-3 py-1 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-300 font-bold text-xs flex items-center gap-1.5 font-heading">
-                  <span className="w-2 h-2 rounded-full bg-blue-400 animate-ping"></span>
-                  ihaleciburada.com Sub-Domain Altyapısı
+        /* 3. ENDEKSA İKİYE BÖLÜNMÜŞ (SPLIT-SCREEN) ANA ÇALIŞMA ALANI */
+        <div className="flex-1 flex flex-row overflow-hidden">
+          
+          {/* Sol Kenar Çubuğu (Icon Sidebar) */}
+          <EndeksaSidebar
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            category={parcelData.category}
+            onCategoryChange={handleCategorySwitch}
+          />
+
+          {/* İkili Çalışma Alanı: Sol Analitik (%50) + Sağ Harita (%50) */}
+          <div className="flex-1 flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden">
+            
+            {/* SOL ANALİTİK & VERİ PANELİ (Scroll Edilebilir) */}
+            <div className="w-full lg:w-[50%] lg:h-[calc(100vh-64px)] overflow-y-auto p-3 sm:p-5 space-y-4 border-r border-slate-200">
+              
+              {/* ENDEKSA FİLTRE HAPLARI (PILLS) */}
+              <div className="flex flex-wrap items-center gap-2 pb-1 border-b border-slate-200/80">
+                {/* Gayrimenkul: Konut / Arsa */}
+                <button
+                  type="button"
+                  onClick={() => handleCategorySwitch(isResidential ? "arsa" : "konut")}
+                  className="flex items-center gap-1 px-3 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-xs font-bold hover:bg-rose-100 transition cursor-pointer"
+                >
+                  <span>Gayrimenkul: <strong className="text-rose-900">{isResidential ? "Konut" : "Arsa"}</strong></span>
+                  <ChevronDown className="w-3 h-3 text-rose-500" />
+                </button>
+
+                {/* Tip: Satılık */}
+                <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold border border-slate-200">
+                  Tip: <strong className="text-slate-900">Satılık / İhale</strong>
                 </span>
-                <span className="px-3 py-1 rounded-full bg-orange-500/20 border border-orange-400/30 text-orange-300 font-bold text-xs flex items-center gap-1.5">
-                  <Gavel className="w-3.5 h-3.5 text-orange-400" />
-                  Arsa & Konut İhale Ekspertizi
+
+                {/* Kategori: Tümü */}
+                <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold border border-slate-200">
+                  Kategori: <strong className="text-slate-900">{isResidential ? parcelData.housingType || "Daire" : parcelData.zoningType || "İmar"}</strong>
                 </span>
+
+                {/* Oda / Kat */}
+                {isResidential ? (
+                  <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold border border-slate-200">
+                    Oda: <strong className="text-slate-900">{parcelData.roomCount || "3+1"}</strong>
+                  </span>
+                ) : (
+                  <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold border border-slate-200">
+                    Emsal: <strong className="text-slate-900">KAKS {parcelData.kaks || 1.5}</strong>
+                  </span>
+                )}
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
-                <div className="lg:col-span-8 space-y-3">
-                  <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black font-heading tracking-tight leading-tight">
-                    Arsa ve Konut Yatırımcıları İçin <br className="hidden sm:inline" />
-                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-sky-300 to-amber-300">
-                      3 Dakikada Ekspertiz, Fizibilite & A-Sınıfı Rapor
-                    </span>
-                  </h1>
-                  <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
-                    Arsa için 3194 İmar Kanunu algoritmalarıyla KAKS, taban alanı, kat karşılığı ve inşaat hasılatı; 
-                    Konut için bina yaşı, deprem kriteri, kira amortismanı ve adil piyasa değerini saniyeler içinde hesaplayın.
-                  </p>
-                </div>
+              {/* ÇALIŞMA SEKMELERİ: [ENDEKS & TREND] | [DEĞERLEME SİHİRBAZI] | [İHALE ANALİZİ] */}
+              <div className="grid grid-cols-3 gap-1 p-1 bg-slate-100 rounded-xl text-xs font-bold">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("endeks")}
+                  className={`py-2 rounded-lg transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                    activeTab === "endeks"
+                      ? "bg-white text-rose-700 shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  <TrendingUp className="w-3.5 h-3.5" />
+                  <span>Fiyat Endeksi</span>
+                </button>
 
-                <div className="lg:col-span-4 bg-white/5 border border-white/10 rounded-2xl p-4 backdrop-blur-xs space-y-2.5 text-xs text-slate-300">
-                  <div className="flex items-center gap-2 text-white font-bold pb-2 border-b border-white/10">
-                    <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                    <span>Neler Kazanırsınız?</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                    <span>Banka standardında A4 PDF Ekspertiz Raporu</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                    <span>İhale teklif tavanı ve amortisman simülatörü</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                    <span>Müşteriye tek tıkla WhatsApp Yatırım Brifi</span>
-                  </div>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("degerleme")}
+                  className={`py-2 rounded-lg transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                    activeTab === "degerleme"
+                      ? "bg-white text-blue-700 shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5" />
+                  <span>Değerleme Girişi</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("ihale")}
+                  className={`py-2 rounded-lg transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                    activeTab === "ihale"
+                      ? "bg-white text-orange-700 shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  <Gavel className="w-3.5 h-3.5" />
+                  <span>İhale & Pey</span>
+                </button>
               </div>
-            </div>
-          </section>
 
-          {/* İKİLİ ÇALIŞMA ALANI: FORM (SOL) + CANLI FİZİBİLİTE KARTI (SAĞ) */}
-          <section className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-              {/* Sol Taraf: Sihirbaz (7 Kolon) */}
-              <div className="lg:col-span-7 space-y-6">
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <h2 className="text-lg font-black font-heading text-slate-900 flex items-center gap-2">
-                      <FileSpreadsheet className="w-5 h-5 text-blue-600" />
-                      <span>{parcelData.category === "konut" ? "Konut & Daire Değerleme Girişi" : "Arsa & İmar Veri Girişi"}</span>
-                    </h2>
-                    <span className="text-xs text-slate-500">
-                      Tüm alanlar anlık hesaplanır
-                    </span>
+              {/* SEKME 1: ENDEKS & FİYAT TRENDİ (ENDEKSA GRAFİĞİ) */}
+              {activeTab === "endeks" && (
+                <div className="space-y-4">
+                  {/* İnteraktif Fiyat Trend Grafiği */}
+                  <PriceTrendChart
+                    city={parcelData.city}
+                    district={parcelData.district}
+                    neighborhood={parcelData.neighborhood}
+                    category={parcelData.category}
+                    currentUnitM2TL={
+                      isResidential 
+                        ? (parcelData.estimatedUnitSaleM2PriceTL || 48000) 
+                        : (parcelData.estimatedLandM2PriceTL || 15000)
+                    }
+                    kfeIndex={parcelData.tcmbOfficialData?.kfeIndex}
+                    kfeAnnualChange={parcelData.tcmbOfficialData?.kfeAnnualChangePercent}
+                    currencyRates={parcelData.currencyRates}
+                  />
+
+                  {/* ENDEKSA ÖZET METRİK KARTLARI */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                    <div className="p-3 rounded-xl bg-white border border-slate-200 shadow-2xs">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                        Adil Piyasa Değeri
+                      </span>
+                      <strong className="text-sm sm:text-base font-black text-slate-900 font-mono">
+                        {formatTL(calculation.fairMarketValueTL)}
+                      </strong>
+                      <span className="text-[9px] text-emerald-600 block mt-0.5 font-semibold">
+                        Güven Skoru: %94
+                      </span>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-white border border-slate-200 shadow-2xs">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                        TCMB KFE Endeksi
+                      </span>
+                      <strong className="text-sm sm:text-base font-black text-blue-700 font-mono">
+                        {parcelData.tcmbOfficialData?.kfeIndex || 204.36}
+                      </strong>
+                      <span className="text-[9px] text-slate-500 block mt-0.5 truncate">
+                        {parcelData.tcmbOfficialData?.benchmarkRegion || "Bölge Medyanı"}
+                      </span>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-white border border-slate-200 shadow-2xs">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                        Amortisman Süresi
+                      </span>
+                      <strong className="text-sm sm:text-base font-black text-slate-900 font-mono">
+                        {calculation.amortizationYears || 18} Yıl
+                      </strong>
+                      <span className="text-[9px] text-emerald-600 block mt-0.5 font-semibold">
+                        Yüksek Kira Verimi
+                      </span>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-white border border-slate-200 shadow-2xs">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                        Güvenli Tavan Pey
+                      </span>
+                      <strong className="text-sm sm:text-base font-black text-amber-900 font-mono">
+                        {formatTL(calculation.auctionAnalysis?.maxSafeBidTL || Math.round(calculation.fairMarketValueTL * 0.72))}
+                      </strong>
+                      <span className="text-[9px] text-orange-600 block mt-0.5 font-bold">
+                        İhale Fırsat Sınırı
+                      </span>
+                    </div>
                   </div>
 
-                  <ValuationWizard 
+                  {/* Eylemler: Rapor Aç & WhatsApp */}
+                  <div className="grid grid-cols-2 gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("rapor")}
+                      className="py-3 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-sm flex items-center justify-center gap-2 transition cursor-pointer"
+                    >
+                      <Printer className="w-4 h-4" />
+                      <span>Kapsamlı Raporu Aç (PDF)</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setShareModalOpen(true)}
+                      className="py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-sm flex items-center justify-center gap-2 transition cursor-pointer"
+                    >
+                      <Share2 className="w-4 h-4" />
+                      <span>WhatsApp Yatırımcı Brifi</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* SEKME 2: DEĞERLEME SİHİRBAZI */}
+              {activeTab === "degerleme" && (
+                <div className="space-y-4">
+                  <ValuationWizard
                     input={parcelData}
                     onChange={setParcelData}
-                    onReset={handleReset}
+                    onReset={() => handleCategorySwitch(parcelData.category)}
                   />
                 </div>
-              </div>
+              )}
 
-              {/* Sağ Taraf: Canlı Fizibilite Kartı (5 Kolon - Sticky) */}
-              <div className="lg:col-span-5">
-                <FeasibilityPreview 
-                  input={parcelData}
-                  calc={calculation}
-                  onViewReport={() => setViewMode("report")}
-                />
-              </div>
+              {/* SEKME 3: İHALE VE FİZİBİLİTE ÖNİZLEMESİ */}
+              {activeTab === "ihale" && (
+                <div className="space-y-4">
+                  <FeasibilityPreview
+                    input={parcelData}
+                    calc={calculation}
+                    onViewReport={() => setActiveTab("rapor")}
+                  />
+                </div>
+              )}
             </div>
-          </section>
 
-          {/* NASIL ÇALIŞIR? BÖLÜMÜ */}
-          <section id="nasil-calisir" className="bg-white border-y border-slate-200 py-12 px-4 sm:px-6">
-            <div className="max-w-7xl mx-auto space-y-8">
-              <div className="text-center max-w-xl mx-auto space-y-2">
-                <span className="text-xs font-bold text-blue-600 uppercase tracking-wider font-heading">
-                  Süreç & Metodoloji
-                </span>
-                <h2 className="text-2xl font-black font-heading text-slate-900">
-                  3 Adımda Eksiksiz Arsa Ekspertizi
-                </h2>
-                <p className="text-xs text-slate-600">
-                  Belediye belediye dolaşmadan, karmaşık yönetmeliklerle boğuşmadan profesyonel yatırım kararı alın.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="p-6 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
-                  <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-black font-heading text-base">
-                    01
-                  </div>
-                  <h3 className="text-sm font-black text-slate-900 font-heading">
-                    Ada, Parsel ve İmar Parametreleri
-                  </h3>
-                  <p className="text-xs text-slate-600 leading-relaxed">
-                    Arsanın tapu alanını, KAKS (emsal), TAKS, gabari ve terk oranını girin. İhale ise dosya no ve ihale başlangıç bedelini tanımlayın.
-                  </p>
-                </div>
-
-                <div className="p-6 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
-                  <div className="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-black font-heading text-base">
-                    02
-                  </div>
-                  <h3 className="text-sm font-black text-slate-900 font-heading">
-                    Yönetmelik ve Hasılat Algoritması
-                  </h3>
-                  <p className="text-xs text-slate-600 leading-relaxed">
-                    Sistem 3194 Sayılı İmar Kanunu ve Planlı Alanlar Yönetmeliği çerçevesinde net satılabilir inşaat alanını, maliyeti ve kat karşılığı dağılımını hesaplar.
-                  </p>
-                </div>
-
-                <div className="p-6 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-black font-heading text-base">
-                    03
-                  </div>
-                  <h3 className="text-sm font-black text-slate-900 font-heading">
-                    Kurumsal Rapor ve Hızlı Paylaşım
-                  </h3>
-                  <p className="text-xs text-slate-600 leading-relaxed">
-                    Emlak ofisinizin künyesi ve İhaleciBurada doğrulama rozetiyle A4 PDF çıktısı alın veya WhatsApp'tan tek tıkla yatırımcı brifi gönderin.
-                  </p>
-                </div>
-              </div>
+            {/* SAĞ HARİTA PANELİ (%50 Genişlik - Endeksa Tam Ekran Haritası) */}
+            <div className="w-full lg:w-[50%] lg:h-[calc(100vh-64px)] relative bg-slate-100 flex flex-col">
+              <ParcelMap
+                city={parcelData.city}
+                district={parcelData.district}
+                neighborhood={parcelData.neighborhood}
+                ada={parcelData.ada}
+                parsel={parcelData.parsel}
+                coordinates={parcelData.coordinates}
+                elevationMeters={parcelData.elevationMeters}
+                comparables={parcelData.comparables}
+                category={parcelData.category}
+                unitM2Price={
+                  isResidential 
+                    ? (parcelData.estimatedUnitSaleM2PriceTL || 48000) 
+                    : (parcelData.estimatedLandM2PriceTL || 15000)
+                }
+                isEndeksaSplitView={true}
+                onLocationFound={(coords) => {
+                  setParcelData({ ...parcelData, coordinates: coords });
+                }}
+              />
             </div>
-          </section>
-        </main>
+
+          </div>
+        </div>
       )}
 
       {/* WhatsApp Paylaşım Modalı */}
-      <WhatsAppShareModal 
+      <WhatsAppShareModal
         isOpen={shareModalOpen}
         onClose={() => setShareModalOpen(false)}
         input={parcelData}
         calc={calculation}
       />
-
-      <Footer />
     </div>
   );
 }

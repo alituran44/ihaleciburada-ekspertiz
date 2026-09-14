@@ -21,6 +21,8 @@ interface ParcelMapProps {
   elevationMeters?: number;
   comparables?: ComparableListing[];
   category?: "arsa" | "konut";
+  unitM2Price?: number;
+  isEndeksaSplitView?: boolean;
   onLocationFound?: (coords: { lat: number; lng: number }) => void;
 }
 
@@ -57,6 +59,8 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
   elevationMeters,
   comparables,
   category = "arsa",
+  unitM2Price = 45000,
+  isEndeksaSplitView = false,
   onLocationFound,
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -318,6 +322,45 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
         dashArray: "4, 6",
       }).addTo(map);
 
+      // Endeksa Isı Haritası (Choropleth Mahalle Poligonları)
+      if (isEndeksaSplitView) {
+        const polyDefs = [
+          { dLat: 0.006, dLng: 0.007, color: "#166534", name: "Merkez Mah.", price: Math.round(unitM2Price * 0.75) },
+          { dLat: 0.005, dLng: -0.006, color: "#15803d", name: "Cumhuriyet Mah.", price: Math.round(unitM2Price * 0.88) },
+          { dLat: -0.005, dLng: 0.006, color: "#84cc16", name: "İsmetpaşa Mah.", price: Math.round(unitM2Price * 0.98) },
+          { dLat: -0.006, dLng: -0.005, color: "#eab308", name: "Gazi Mah.", price: Math.round(unitM2Price * 1.15) },
+          { dLat: 0.009, dLng: 0.002, color: "#f97316", name: "Yeni Mahalle", price: Math.round(unitM2Price * 1.35) },
+          { dLat: -0.003, dLng: 0.011, color: "#b91c1c", name: "Sahil / Tepe Mevkii", price: Math.round(unitM2Price * 1.65) },
+        ];
+
+        polyDefs.forEach((po) => {
+          const cLat = lat + po.dLat;
+          const cLng = lng + po.dLng;
+          const r = 0.004;
+          const coords = [
+            [cLat + r * 0.7, cLng - r * 0.6],
+            [cLat + r * 0.8, cLng + r * 0.7],
+            [cLat - r * 0.3, cLng + r * 0.9],
+            [cLat - r * 0.8, cLng + r * 0.2],
+            [cLat - r * 0.5, cLng - r * 0.8],
+          ];
+          const poly = L.polygon(coords, {
+            color: "#ffffff",
+            weight: 1.5,
+            fillColor: po.color,
+            fillOpacity: 0.55,
+          }).addTo(map);
+
+          poly.bindPopup(`
+            <div style="font-family: sans-serif; padding: 2px;">
+              <strong style="color: #0F172A; font-size: 11px;">${po.name}</strong>
+              <div style="color: ${po.color}; font-weight: 800; font-size: 12px; margin-top: 2px;">${po.price.toLocaleString("tr-TR")} ₺/m²</div>
+              <div style="color: #64748B; font-size: 9px;">Endeksa Bölgesel Isı Değeri</div>
+            </div>
+          `);
+        });
+      }
+
       // Hedef Taşınmaz Pin
       const targetIcon = L.divIcon({
         className: "leaflet-target-pin",
@@ -520,7 +563,11 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
       </div>
 
       {/* 2. ETKİLEŞİMLİ LEAFLET HARİTA ALANI */}
-      <div className="relative w-full h-72 sm:h-80 bg-slate-100 z-10">
+      <div className={`relative w-full bg-slate-100 z-10 ${
+        isEndeksaSplitView 
+          ? "h-full min-h-[540px] sm:min-h-[680px] lg:min-h-[820px]" 
+          : "h-72 sm:h-80"
+      }`}>
         <div ref={mapContainerRef} className="w-full h-full" />
 
         {/* GPS Geri Bildirim Bildirimi */}
@@ -531,26 +578,58 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
           </div>
         )}
 
-        {/* Harita İçi Gösterge Rozeti (Legend) */}
-        <div className="absolute bottom-2.5 left-2.5 z-[400] bg-white/95 backdrop-blur-xs border border-slate-300 rounded-xl px-2.5 py-1.5 shadow-md flex items-center gap-3 text-[10px] text-slate-700 font-semibold">
-          <div className="flex items-center gap-1">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#0F223D] border border-amber-400 inline-block"></span>
-            <span>Hedef Taşınmaz</span>
+        {/* Endeksa Üst Ekmek Kırıntısı (Breadcrumb Overlay) */}
+        {isEndeksaSplitView && (
+          <div className="absolute top-3 left-3 z-[400] bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-xl shadow-md border border-slate-200 flex items-center gap-1.5 text-xs font-semibold text-slate-700">
+            <span className="text-slate-500">Dünya</span>
+            <span className="text-slate-300">&gt;</span>
+            <span className="text-slate-500">Türkiye</span>
+            <span className="text-slate-300">&gt;</span>
+            <span className="text-slate-700">{city}</span>
+            <span className="text-slate-300">&gt;</span>
+            <span className="text-rose-600 font-bold">{district}</span>
           </div>
-          <div className="flex items-center gap-1">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 inline-block"></span>
-            <span>Satılık Emsal</span>
-          </div>
-          {kiralikCount > 0 && (
-            <div className="flex items-center gap-1">
-              <span className="w-2.5 h-2.5 rounded-full bg-blue-600 inline-block"></span>
-              <span>Kiralık Emsal</span>
+        )}
+
+        {/* Endeksa Lejant Çubuğu (Isı Haritası Skalası) */}
+        {isEndeksaSplitView ? (
+          <div className="absolute bottom-4 left-3 z-[400] bg-white/95 backdrop-blur-md px-3.5 py-2 rounded-xl shadow-lg border border-slate-200 text-slate-800">
+            <div className="text-[10px] font-extrabold text-slate-800 mb-1 flex items-center justify-between">
+              <span>{category === "arsa" ? "Arsa" : "Konut"} m² Birim Fiyatı</span>
+              <span className="text-[9px] font-normal text-slate-400">Bölgesel Isı</span>
             </div>
-          )}
-          <div className="flex items-center gap-1 text-slate-400 border-l border-slate-200 pl-2">
-            <span>⭕ 500m Etki Çemberi</span>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-mono font-bold text-slate-600">
+                {formatShortPrice(Math.round(unitM2Price * 0.45))}
+              </span>
+              <div className="w-28 sm:w-36 h-2 rounded-full bg-gradient-to-r from-emerald-700 via-amber-400 to-rose-700 shadow-inner"></div>
+              <span className="text-[10px] font-mono font-bold text-slate-900">
+                {formatShortPrice(Math.round(unitM2Price * 2.1))}
+              </span>
+            </div>
           </div>
-        </div>
+        ) : (
+          /* Standart Harita İçi Gösterge Rozeti (Legend) */
+          <div className="absolute bottom-2.5 left-2.5 z-[400] bg-white/95 backdrop-blur-xs border border-slate-300 rounded-xl px-2.5 py-1.5 shadow-md flex items-center gap-3 text-[10px] text-slate-700 font-semibold">
+            <div className="flex items-center gap-1">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#0F223D] border border-amber-400 inline-block"></span>
+              <span>Hedef Taşınmaz</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 inline-block"></span>
+              <span>Satılık Emsal</span>
+            </div>
+            {kiralikCount > 0 && (
+              <div className="flex items-center gap-1">
+                <span className="w-2.5 h-2.5 rounded-full bg-blue-600 inline-block"></span>
+                <span>Kiralık Emsal</span>
+              </div>
+            )}
+            <div className="flex items-center gap-1 text-slate-400 border-l border-slate-200 pl-2">
+              <span>⭕ 500m Etki Çemberi</span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 3. ÇEVREDEKİ EMSAL İLANLAR YATAY ŞERİDİ (ETKİLEŞİMLİ) */}
