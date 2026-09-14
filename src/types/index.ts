@@ -108,6 +108,10 @@ export interface ParcelInput {
     source: string;
   };
 
+  // Resmi Veri Kaynakları (TCMB & ÇŞB & Mimarlar Odası)
+  tcmbOfficialData?: TcmbOfficialData;
+  buildingCostEstimate?: BuildingCostEstimate;
+
   // İhale / İcra Özel Parametreleri
   isAuction?: boolean;
   auctionStartingPriceTL?: number; // Muhammen / Açılış bedeli
@@ -161,6 +165,29 @@ export interface ComparableListing {
   date: string;
 }
 
+export interface TcmbOfficialData {
+  kfeIndex: number;
+  kfeAnnualChangePercent: number;
+  officialAvgM2TL: number;
+  mortgageInterestAnnualPercent: number;
+  mortgageInterestMonthlyPercent: number;
+  benchmarkRegion: string;
+  lastUpdated: string;
+  source: string;
+}
+
+export interface BuildingCostEstimate {
+  csbBuildingClass: string;
+  unitCostTL: number;
+  totalBuildingCostTL: number;
+  architecturalProjectFeeTL: number;
+  engineeringAndSupervisionFeeTL: number;
+  municipalPermitFeeTL: number;
+  totalPermitAndProjectCostTL: number;
+  grandTotalDevelopmentCostTL: number;
+  source: string;
+}
+
 export interface MarketResearchResult {
   searchedAt: string;
   queryLocation: string;
@@ -179,6 +206,8 @@ export interface MarketResearchResult {
   sources: string[];
   summaryNote: string;
   comparables?: ComparableListing[];
+  tcmbOfficialData?: TcmbOfficialData;
+  buildingCostEstimate?: BuildingCostEstimate;
 }
 
 export interface CalculationResult {
@@ -238,6 +267,10 @@ export interface CalculationResult {
   // İhale Analitiği & Kredi Uygunluğu
   auctionAnalysis?: AuctionAnalysisResult;
   loanAnalysis?: LoanAnalysisResult;
+
+  // Resmi Veri Kaynakları (TCMB KFE & ÇŞB Mimarlık Maliyetleri)
+  tcmbOfficialData?: TcmbOfficialData;
+  buildingCostEstimate?: BuildingCostEstimate;
 }
 
 export interface AppraisalReport {

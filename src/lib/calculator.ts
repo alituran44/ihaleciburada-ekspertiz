@@ -7,6 +7,7 @@ import {
   AuctionAnalysisResult,
   LoanAnalysisResult
 } from "@/types";
+import { calculateBuildingAndArchitecturalCost } from "./api/moEnAzBedel";
 
 export function calculateAuctionMetrics(
   input: ParcelInput,
@@ -72,7 +73,8 @@ export function calculateLoanMetrics(
   monthlyRentTL?: number
 ): LoanAnalysisResult {
   const ltvPercent = input.creditLtvPercent ?? 60; // BDDK varsayılan %60 LTV
-  const interestRateMonthly = input.creditInterestRateMonthly ?? 2.89; // Aylık %2.89
+  const interestRateMonthly = input.creditInterestRateMonthly ?? 
+    (input.tcmbOfficialData?.mortgageInterestMonthlyPercent || 2.89);
   const termMonths = input.creditTermMonths ?? 120; // 120 ay (10 yıl)
 
   const maxLoanAmountTL = Math.round((fairMarketValueTL * ltvPercent) / 100);
@@ -323,6 +325,9 @@ export function calculateFeasibility(input: ParcelInput): CalculationResult {
       contractorGrossM2: 0,
       landownerRevenueTL: fairMarketValueTL,
       developerCeilingValueTL: fairMarketValueTL,
+
+      tcmbOfficialData: input.tcmbOfficialData,
+      buildingCostEstimate: input.buildingCostEstimate,
     };
   }
 
@@ -345,7 +350,16 @@ export function calculateFeasibility(input: ParcelInput): CalculationResult {
   if (input.topography === "az_egimli") topographyCostMultiplier = 1.08;
   if (input.topography === "dik_egimli") topographyCostMultiplier = 1.22;
 
-  const estimatedConstructionCostPerM2TL = Math.round(baseCostPerM2 * topographyCostMultiplier);
+  // ÇŞB 2026/1 Yapı Sınıfı & Mimarlar Odası En Az Bedel Entegrasyonu
+  const buildingCostEstimate = input.buildingCostEstimate || calculateBuildingAndArchitecturalCost(
+    totalSellableGrossM2,
+    input.maxFloors || 4,
+    input.zoningType
+  );
+
+  const estimatedConstructionCostPerM2TL = Math.round(
+    (buildingCostEstimate ? buildingCostEstimate.unitCostTL : baseCostPerM2) * topographyCostMultiplier
+  );
   const totalEstimatedConstructionCostTL = Math.round(totalSellableGrossM2 * estimatedConstructionCostPerM2TL);
   
   const unitSaleM2Price = input.estimatedUnitSaleM2PriceTL || 45000;
@@ -478,5 +492,8 @@ export function calculateFeasibility(input: ParcelInput): CalculationResult {
     scoreLabel,
     advantages,
     risksAndWarnings,
+
+    tcmbOfficialData: input.tcmbOfficialData,
+    buildingCostEstimate,
   };
 }

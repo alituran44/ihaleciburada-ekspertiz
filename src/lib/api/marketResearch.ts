@@ -5,6 +5,8 @@
 
 import { MarketResearchResult, ComparableListing } from "@/types";
 import { TURKEY_81_PROVINCES } from "./valuation";
+import { fetchTcmbHousingMetrics } from "./tcmbEvds";
+import { calculateBuildingAndArchitecturalCost } from "./moEnAzBedel";
 
 interface DistrictBenchmark {
   landM2: number;
@@ -370,9 +372,15 @@ export async function performMarketResearch(params: {
     coordinates: coords,
   });
 
+  // Resmi TCMB EVDS3 ve ÇŞB / Mimarlar Odası Entegrasyonu
+  const [tcmbOfficialData, buildingCostEstimate] = await Promise.all([
+    fetchTcmbHousingMetrics(cityRaw),
+    Promise.resolve(calculateBuildingAndArchitecturalCost(1000, 4, params.category === "arsa" ? "konut" : "konut")),
+  ]);
+
   const summaryNote = isResidential
-    ? `İnternet emlak portalları ve piyasa endeksleri araştırmasına göre ${queryLocation} bölgesinde taranan ${benchmark.sampleSize} adet emsal konut ilanına göre ortalama satılık konut m² birim fiyatı ${baseUnitM2.toLocaleString("tr-TR")} TL (${unitSaleM2MinTL.toLocaleString("tr-TR")} - ${unitSaleM2MaxTL.toLocaleString("tr-TR")} TL bandı), aylık m² kira rayici ${baseRentM2} TL/m² olarak tespit edilmiştir.`
-    : `İnternet emlak portalları ve değerleme araştırmasına göre ${queryLocation} bölgesinde taranan ${benchmark.sampleSize} adet emsal arsa ilanına göre ortalama arsa m² birim fiyatı ${baseLandM2.toLocaleString("tr-TR")} TL (${landM2MinTL.toLocaleString("tr-TR")} - ${landM2MaxTL.toLocaleString("tr-TR")} TL bandı), satılabilir sıfır konut birim fiyatı ${baseUnitM2.toLocaleString("tr-TR")} TL ve bölgesel kat karşılığı müteahhit paylaşım teamülü %${benchmark.contractorShare} olarak belirlenmiştir.`;
+    ? `İnternet emlak portalları, TCMB KFE (${tcmbOfficialData.benchmarkRegion} Endeksi: ${tcmbOfficialData.kfeIndex}) ve piyasa araştırmasına göre ${queryLocation} bölgesinde taranan ${benchmark.sampleSize} adet emsal konut ilanına göre ortalama satılık konut m² birim fiyatı ${baseUnitM2.toLocaleString("tr-TR")} TL (${unitSaleM2MinTL.toLocaleString("tr-TR")} - ${unitSaleM2MaxTL.toLocaleString("tr-TR")} TL bandı), aylık m² kira rayici ${baseRentM2} TL/m² ve güncel konut kredisi faizi %${tcmbOfficialData.mortgageInterestMonthlyPercent}/ay olarak tespit edilmiştir.`
+    : `İnternet emlak portalları, ÇŞB 2026 birim maliyetleri ve TCMB KFE verilerine göre ${queryLocation} bölgesinde taranan ${benchmark.sampleSize} adet emsal arsa ilanına göre ortalama arsa m² birim fiyatı ${baseLandM2.toLocaleString("tr-TR")} TL (${landM2MinTL.toLocaleString("tr-TR")} - ${landM2MaxTL.toLocaleString("tr-TR")} TL bandı), satılabilir sıfır konut birim fiyatı ${baseUnitM2.toLocaleString("tr-TR")} TL ve bölgesel kat karşılığı müteahhit paylaşım teamülü %${benchmark.contractorShare} olarak belirlenmiştir.`;
 
   return {
     searchedAt: new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }),
@@ -393,9 +401,12 @@ export async function performMarketResearch(params: {
       "Sahibinden Emsal İlan Havuzu",
       "Hepsiemlak Bölge Rayici",
       "Endeksa B2B Değerleme Endeksi",
-      "TCMB KFE (Konut Fiyat Endeksi)"
+      "TCMB EVDS3 (Resmi Konut Fiyat Endeksi)",
+      "ÇŞB & Mimarlar Odası 2026 Maliyetleri"
     ],
     summaryNote,
     comparables,
+    tcmbOfficialData,
+    buildingCostEstimate,
   };
 }

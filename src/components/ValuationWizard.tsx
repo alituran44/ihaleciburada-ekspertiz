@@ -136,6 +136,12 @@ export const ValuationWizard: React.FC<ValuationWizardProps> = ({
           if (data.research.comparables) {
             updated.comparables = data.research.comparables;
           }
+          if (data.research.tcmbOfficialData) {
+            updated.tcmbOfficialData = data.research.tcmbOfficialData;
+          }
+          if (data.research.buildingCostEstimate) {
+            updated.buildingCostEstimate = data.research.buildingCostEstimate;
+          }
         }
 
         // Açık API Portalı (public-apis) Katmanları
@@ -198,11 +204,13 @@ export const ValuationWizard: React.FC<ValuationWizardProps> = ({
           monthlyRentEstimateTL: isResidential ? resData.estimatedMonthlyRentTL : input.monthlyRentEstimateTL,
           marketResearch: resData,
           comparables: resData.comparables,
+          tcmbOfficialData: resData.tcmbOfficialData,
+          buildingCostEstimate: resData.buildingCostEstimate,
         };
         onChange(updated);
         setEmsalFeedback({
           status: "success",
-          message: `${resData.queryLocation} bölgesinde internetten ${resData.sampleCount} adet güncel emsal ilan ve piyasa endeksi analiz edildi. Emsal m² fiyatları ve müteahhit paylaşım oranları otomatik güncellendi.`,
+          message: `${resData.queryLocation} bölgesinde internetten ${resData.sampleCount} adet güncel emsal ilan ve TCMB KFE (${resData.tcmbOfficialData?.benchmarkRegion || "Bölge"}) resmi verileri analiz edildi.`,
         });
       } else {
         setEmsalFeedback({

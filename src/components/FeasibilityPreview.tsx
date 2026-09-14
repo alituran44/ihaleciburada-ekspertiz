@@ -462,6 +462,60 @@ export const FeasibilityPreview: React.FC<FeasibilityPreviewProps> = ({
         </div>
       )}
 
+      {/* RESMİ DEĞERLEME & MALİYET TABANI (TCMB EVDS3 & ÇŞB MİMARLAR ODASI) */}
+      {(calc.tcmbOfficialData || calc.buildingCostEstimate) && (
+        <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-2.5">
+          <div className="flex items-center justify-between text-[11px] font-bold text-slate-700 border-b border-slate-200/80 pb-1.5">
+            <span className="flex items-center gap-1.5 font-heading text-slate-900">
+              <Landmark className="w-3.5 h-3.5 text-blue-700" />
+              Resmi Değerleme & Maliyet Tabanı
+            </span>
+            <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 font-bold uppercase">
+              TCMB & ÇŞB 2026
+            </span>
+          </div>
+
+          <div className="space-y-2">
+            {calc.tcmbOfficialData && (
+              <div className="p-2.5 rounded-lg bg-white border border-slate-200 space-y-1">
+                <div className="flex items-center justify-between text-[10px] text-slate-500">
+                  <span>TCMB Konut Fiyat Endeksi (KFE):</span>
+                  <span className="font-bold text-blue-700 font-mono">{calc.tcmbOfficialData.kfeIndex} Puan</span>
+                </div>
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="text-slate-600">Resmi Bölge Medyanı:</span>
+                  <span className="font-extrabold text-slate-900">{formatTL(calc.tcmbOfficialData.officialAvgM2TL)} / m²</span>
+                </div>
+                <div className="flex items-center justify-between text-[10px] text-slate-500 pt-0.5 border-t border-slate-100">
+                  <span>Haftalık Konut Kredisi Faizi:</span>
+                  <span className="font-semibold text-slate-700">Yıllık %{calc.tcmbOfficialData.mortgageInterestAnnualPercent} (Aylık ~%{calc.tcmbOfficialData.mortgageInterestMonthlyPercent})</span>
+                </div>
+                <div className="text-[9px] text-slate-400">
+                  {calc.tcmbOfficialData.benchmarkRegion} • {calc.tcmbOfficialData.source}
+                </div>
+              </div>
+            )}
+
+            {calc.buildingCostEstimate && !isResidential && (
+              <div className="p-2.5 rounded-lg bg-white border border-slate-200 space-y-1">
+                <div className="flex items-center justify-between text-[10px] text-slate-500">
+                  <span>ÇŞB 2026 Yapı Sınıfı:</span>
+                  <span className="font-bold text-slate-800">{calc.buildingCostEstimate.csbBuildingClass}</span>
+                </div>
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="text-slate-600">ÇŞB İnşaat Birim Maliyeti:</span>
+                  <span className="font-extrabold text-slate-900">{formatTL(calc.buildingCostEstimate.unitCostTL)} / m²</span>
+                </div>
+                <div className="flex items-center justify-between text-[10px] text-slate-500 pt-0.5 border-t border-slate-100">
+                  <span>Mimarlar Odası En Az Bedel:</span>
+                  <span className="font-bold text-blue-700">{formatTL(calc.buildingCostEstimate.architecturalProjectFeeTL)}</span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* BANKA KREDİSİ & BDDK KALDIRAÇ ÖZETİ */}
       {calc.loanAnalysis && (
         <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-2">

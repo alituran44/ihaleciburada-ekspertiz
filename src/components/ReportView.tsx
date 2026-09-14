@@ -465,6 +465,73 @@ export const ReportView: React.FC<ReportViewProps> = ({
               )}
             </div>
           )}
+
+          {/* RESMİ DEĞERLEME & MALİYET TABANI (TCMB EVDS3 & ÇŞB MİMARLAR ODASI) */}
+          {(calc.tcmbOfficialData || calc.buildingCostEstimate) && (
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-200 pb-1.5">
+                <span className="font-bold text-slate-900 flex items-center gap-1.5 font-heading">
+                  <Landmark className="w-3.5 h-3.5 text-blue-700" />
+                  Resmi Değerleme & Yasal Maliyet Tabanı
+                </span>
+                <span className="text-[10px] text-blue-700 font-mono font-bold bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                  TCMB EVDS3 & ÇŞB 2026/1
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {calc.tcmbOfficialData && (
+                  <div className="p-3 rounded-lg bg-white border border-slate-200 space-y-1.5">
+                    <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                      TCMB Resmi Konut Fiyat Endeksi (KFE)
+                    </div>
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-sm font-extrabold text-blue-900 font-mono">
+                        {calc.tcmbOfficialData.kfeIndex} Puan
+                      </span>
+                      <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
+                        Yıllık +%{calc.tcmbOfficialData.kfeAnnualChangePercent}
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-slate-600 flex justify-between pt-1 border-t border-slate-100">
+                      <span>Bölge Resmi Birim Medyanı:</span>
+                      <strong className="text-slate-900">{formatTL(calc.tcmbOfficialData.officialAvgM2TL)} / m²</strong>
+                    </div>
+                    <div className="text-[10px] text-slate-500 flex justify-between">
+                      <span>Haftalık Konut Kredisi Faizi:</span>
+                      <strong>Yıllık %{calc.tcmbOfficialData.mortgageInterestAnnualPercent}</strong>
+                    </div>
+                    <div className="text-[9px] text-slate-400 truncate">
+                      {calc.tcmbOfficialData.benchmarkRegion} • {calc.tcmbOfficialData.source}
+                    </div>
+                  </div>
+                )}
+
+                {calc.buildingCostEstimate && !isResidential && (
+                  <div className="p-3 rounded-lg bg-white border border-slate-200 space-y-1.5">
+                    <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                      ÇŞB 2026/1 & Mimarlar Odası Proje Maliyetleri
+                    </div>
+                    <div className="text-xs font-bold text-slate-800">
+                      {calc.buildingCostEstimate.csbBuildingClass}
+                    </div>
+                    <div className="text-[11px] text-slate-600 flex justify-between pt-1 border-t border-slate-100">
+                      <span>ÇŞB m² Kaba+İnce İnşaat:</span>
+                      <strong className="text-slate-900">{formatTL(calc.buildingCostEstimate.unitCostTL)} / m²</strong>
+                    </div>
+                    <div className="text-[10px] text-slate-500 flex justify-between">
+                      <span>Mimarlar Odası Asgari Proje Bedeli:</span>
+                      <strong className="text-blue-700">{formatTL(calc.buildingCostEstimate.architecturalProjectFeeTL)}</strong>
+                    </div>
+                    <div className="text-[10px] text-slate-500 flex justify-between">
+                      <span>Mühendislik & Yapı Denetim:</span>
+                      <strong className="text-slate-800">{formatTL(calc.buildingCostEstimate.engineeringAndSupervisionFeeTL)}</strong>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* İHALE MASRAF, VERGİ & GÜVENLİ TAVAN TEKLİF (PEY) ANALİZİ */}
