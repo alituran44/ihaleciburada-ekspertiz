@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { ComparableListing } from "@/types";
 import { generateValuationZones, ValuationZone } from "@/lib/valuationZones";
+import { getDistrictValuation, getDistrictChoroplethColor } from "@/lib/districtValuations";
 import { 
   MapPin, 
   Mountain, 
@@ -77,6 +78,13 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
   const [locateFeedback, setLocateFeedback] = useState<string | null>(null);
   const [showValuationZones, setShowValuationZones] = useState<boolean>(true);
   const [showZoneBadges, setShowZoneBadges] = useState<boolean>(true);
+  const [viewMode, setViewMode] = useState<"ilceler" | "parsel">("ilceler");
+
+  useEffect(() => {
+    (window as any).__switchToParcelMode = () => {
+      setViewMode("parsel");
+    };
+  }, []);
 
   const handleGetLiveLocation = () => {
     if (!navigator.geolocation) {
@@ -304,9 +312,12 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
         mapInstanceRef.current = null;
       }
 
+      const isMacro = viewMode === "ilceler";
+      const initialZoom = isMacro ? 10 : 15;
+
       const map = L.map(mapContainerRef.current, {
         center: [lat, lng],
-        zoom: 15,
+        zoom: initialZoom,
         zoomControl: true,
         scrollWheelZoom: false,
       });
@@ -317,114 +328,234 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
         attribution: '© OpenStreetMap contributors',
       }).addTo(map);
 
-      // 500m Etki Çemberi
-      L.circle([lat, lng], {
-        radius: 500,
-        color: "#2563EB",
-        weight: 1.5,
-        opacity: 0.85,
-        fillColor: "#3B82F6",
-        fillOpacity: 0.07,
-        dashArray: "4, 6",
-      }).addTo(map);
+      // 1. MAKRO GÖRÜNÜM: GERÇEK İLÇE SINIRLARI GEOJSON (Ekran Görüntüsü ile Birebir)
+      if (isMacro) {
+        const citySlug = (city || "çanakkale")
+          .toLowerCase()
+          .trim()
+          .replace(/i̇/g, "i")
+          .replace(/ı/g, "i")
+          .replace(/ş/g, "s")
+          .replace(/ç/g, "c")
+          .replace(/ğ/g, "g")
+          .replace(/ü/g, "u")
+          .replace(/ö/g, "o")
+          .replace(/[^a-z0-9]/g, "");
 
-      // İhaleci Burada Bölgesel Değerleme Isı Haritası (Sıfır Boşluklu Bitişik Mahalle Mozaği)
-      if (isEndeksaSplitView && showValuationZones) {
-        const valuationZones = generateValuationZones(
-          lat,
-          lng,
-          city,
-          district,
-          neighborhood,
-          unitM2Price
-        );
+        fetch(`/data/districts/${citySlug}.geojson`)
+          .then((res) => {
+            if (!res.ok) throw new Error("GeoJSON not found");
+            return res.json();
+          })
+          .then((geoData) => {
+            if (!mapInstanceRef.current) return;
 
-        valuationZones.forEach((zone) => {
-          const poly = L.polygon(zone.coordinates, {
-            color: "#FFFFFF",
-            weight: zone.isCenter ? 2.5 : 1.8,
-            opacity: 0.95,
-            fillColor: zone.color,
-            fillOpacity: zone.isCenter ? 0.38 : 0.30,
-            dashArray: zone.isCenter ? "4, 4" : undefined,
-          }).addTo(map);
+            const geoLayer = L.geoJSON(geoData, {
+              style: (feature: any) => {
+                const distName = feature?.properties?.name || "";
+                const val = getDistrictValuation(city, distName, unitM2Price);
+                const isSelected = Boolean(district && distName.toLowerCase().includes(district.toLowerCase()));
+                const choropleth = getDistrictChoroplethColor(val.pricePerM2TL, distName);
 
-          // Fare Üzerine Geldiğinde Parlama ve Vurgu
-          poly.on("mouseover", () => {
-            poly.setStyle({
-              fillOpacity: 0.62,
-              weight: 3.5,
-              color: "#F59E0B",
-            });
-            poly.bringToFront();
-          });
+                return {
+                  fillColor: choropleth.fillColor,
+                  fillOpacity: choropleth.fillOpacity,
+                  color: choropleth.color,
+                  weight: isSelected ? 2.5 : 1.5,
+                  opacity: 0.95,
+                };
+              },
+              onEachFeature: (feature: any, layer: any) => {
+                const distName = feature?.properties?.name || "";
+                const val = getDistrictValuation(city, distName, unitM2Price);
+                const priceText = val.pricePerM2TL.toLocaleString("tr-TR");
 
-          poly.on("mouseout", () => {
-            poly.setStyle({
-              fillOpacity: zone.isCenter ? 0.38 : 0.30,
-              weight: zone.isCenter ? 2.5 : 1.8,
-              color: "#FFFFFF",
-            });
-          });
-
-          // Kurumsal İhaleci Burada Detaylı Açılır Kartı (Popup)
-          poly.bindPopup(`
-            <div style="font-family: ui-sans-serif, system-ui, sans-serif; min-width: 220px; padding: 4px;">
-              <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #E2E8F0; padding-bottom: 5px; margin-bottom: 6px;">
-                <strong style="color: #0F223D; font-size: 13px; font-weight: 800;">${zone.name}</strong>
-                <span style="background: ${zone.color}22; color: ${zone.color}; font-size: 9px; font-weight: 800; padding: 2px 6px; border-radius: 4px; border: 1px solid ${zone.color}40;">
-                  ${zone.status}
-                </span>
-              </div>
-              <div style="font-size: 10px; color: #64748B; margin-bottom: 6px; line-height: 1.3;">
-                ${zone.description}
-              </div>
-              <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 6px 8px; margin-bottom: 6px;">
-                <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 3px;">
-                  <span style="font-size: 10px; color: #64748B; font-weight: 600;">Ort. m² Piyasa Değeri:</span>
-                  <span style="font-size: 13px; font-weight: 900; color: #0F223D;">${zone.unitPriceTL.toLocaleString("tr-TR")} ₺/m²</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; align-items: baseline;">
-                  <span style="font-size: 10px; color: #059669; font-weight: 600;">İhale Başlangıç (%50):</span>
-                  <span style="font-size: 11px; font-weight: 800; color: #059669;">${zone.tenderStartPriceTL.toLocaleString("tr-TR")} ₺/m²</span>
-                </div>
-              </div>
-              <div style="display: flex; justify-content: space-between; align-items: center; font-size: 9.5px;">
-                <span style="color: #64748B;">Yıllık Değer Artış Hızı:</span>
-                <span style="font-weight: 800; color: #16A34A;">+%${zone.yearlyGrowthRate}</span>
-              </div>
-              <div style="font-size: 8.5px; color: #94A3B8; text-align: center; margin-top: 6px; border-top: 1px solid #F1F5F9; padding-top: 4px;">
-                İhaleci Burada Emsal Değerleme & Bölge Isı Katmanı
-              </div>
-            </div>
-          `);
-
-          // Poligon Üzerinde Kalıcı Bilgi Rozeti (Sleek Centroid Pill)
-          if (showZoneBadges) {
-            const badgeIcon = L.divIcon({
-              className: "leaflet-zone-pill",
-              html: `
-                <div style="display: flex; align-items: center; transform: translate(-50%, -50%); cursor: pointer;">
-                  <div style="background: rgba(15, 34, 61, 0.90); backdrop-filter: blur(4px); color: #FFFFFF; font-weight: 700; font-size: 9.5px; padding: 2.5px 8px; border-radius: 9999px; border: 1px solid rgba(255,255,255,0.4); box-shadow: 0 3px 8px rgba(0,0,0,0.3); white-space: nowrap; display: flex; align-items: center; gap: 5px; font-family: ui-sans-serif, system-ui, sans-serif;">
-                    <span style="width: 6px; height: 6px; border-radius: 50%; background: ${zone.color}; box-shadow: 0 0 5px ${zone.color};"></span>
-                    <span style="color: #F8FAFC;">${zone.name}</span>
-                    <span style="color: #F59E0B; font-weight: 900; border-left: 1px solid rgba(255,255,255,0.25); padding-left: 5px;">${formatShortPrice(zone.unitPriceTL)}/m²</span>
+                // Ekran görüntüsüyle birebir beyaz rounded tooltip: "Yenice (41.711 ₺/m²)"
+                layer.bindTooltip(`
+                  <div style="font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif; font-size: 11px; font-weight: 700; color: #1E293B; padding: 5px 12px; background: #FFFFFF; border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.18); border: 1px solid rgba(0,0,0,0.08); white-space: nowrap; pointer-events: none;">
+                    ${distName} (${priceText} ₺/m²)
                   </div>
-                </div>
-              `,
-              iconSize: [0, 0],
-            });
-            const badgeMarker = L.marker(zone.centroid, {
-              icon: badgeIcon,
-              interactive: true,
-              zIndexOffset: zone.isCenter ? 800 : 500,
+                `, {
+                  sticky: true,
+                  direction: "top",
+                  opacity: 1,
+                  className: "custom-district-tooltip"
+                });
+
+                layer.on("mouseover", () => {
+                  layer.setStyle({
+                    fillOpacity: 0.78,
+                    weight: 2.5,
+                    color: "#FFFFFF",
+                  });
+                  layer.bringToFront();
+                  if (targetMarker) targetMarker.bringToFront();
+                });
+
+                layer.on("mouseout", () => {
+                  geoLayer.resetStyle(layer);
+                });
+
+                layer.on("click", () => {
+                  layer.bindPopup(`
+                    <div style="font-family: ui-sans-serif, system-ui, sans-serif; min-width: 220px; padding: 4px;">
+                      <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #E2E8F0; padding-bottom: 5px; margin-bottom: 6px;">
+                        <strong style="color: #0F223D; font-size: 13px; font-weight: 800;">${distName}</strong>
+                        <span style="background: #10B98120; color: #059669; font-size: 9px; font-weight: 800; padding: 2px 6px; border-radius: 4px; border: 1px solid #10B98140;">
+                          İlçe Analizi
+                        </span>
+                      </div>
+                      <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 6px 8px; margin-bottom: 6px;">
+                        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 3px;">
+                          <span style="font-size: 10px; color: #64748B; font-weight: 600;">Ort. m² Piyasa Değeri:</span>
+                          <span style="font-size: 13px; font-weight: 900; color: #0F223D;">${priceText} ₺/m²</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                          <span style="font-size: 10px; color: #059669; font-weight: 600;">İcra / İhale Başlangıç (%50):</span>
+                          <span style="font-size: 11px; font-weight: 800; color: #059669;">${val.tenderStartM2TL.toLocaleString("tr-TR")} ₺/m²</span>
+                        </div>
+                      </div>
+                      <div style="display: flex; justify-content: space-between; align-items: center; font-size: 9.5px; margin-bottom: 8px;">
+                        <span style="color: #64748B;">Yıllık Değer Artış Trendi:</span>
+                        <span style="font-weight: 800; color: #16A34A;">+%${val.yearlyGrowth}</span>
+                      </div>
+                      <button
+                        onclick="window.__switchToParcelMode && window.__switchToParcelMode()"
+                        style="width: 100%; background: #0F223D; color: #FFFFFF; font-weight: 700; font-size: 10px; padding: 6px 10px; border-radius: 6px; border: none; cursor: pointer;"
+                      >
+                        🔍 Parsel Seviyesine Yaklaş & Emsalleri Gör
+                      </button>
+                    </div>
+                  `).openPopup();
+                });
+
+                // Bozcaada için ekran görüntüsündeki kırmızı B harfi rozeti
+                if (val.isSpecialBadge && layer.getBounds) {
+                  const badgeIcon = L.divIcon({
+                    className: "special-district-badge-b",
+                    html: `<div style="color: #FFFFFF; font-weight: 900; font-size: 11px; text-shadow: 0 1px 3px rgba(0,0,0,0.8); pointer-events: none;">${val.isSpecialBadge}</div>`,
+                    iconSize: [0, 0],
+                  });
+                  L.marker(layer.getBounds().getCenter(), { icon: badgeIcon, interactive: false }).addTo(map);
+                }
+              }
             }).addTo(map);
 
-            badgeMarker.on("click", () => {
-              poly.openPopup();
+            try {
+              map.fitBounds(geoLayer.getBounds(), { padding: [20, 20] });
+            } catch (e) {}
+          })
+          .catch((err) => {
+            console.warn("Could not load district geojson:", err);
+          });
+      }
+
+      // 2. MİKRO GÖRÜNÜM: 500M ETKİ ÇEMBERİ VE MAHALLE DEĞERLEME MOZAİĞİ
+      if (!isMacro) {
+        L.circle([lat, lng], {
+          radius: 500,
+          color: "#2563EB",
+          weight: 1.5,
+          opacity: 0.85,
+          fillColor: "#3B82F6",
+          fillOpacity: 0.07,
+          dashArray: "4, 6",
+        }).addTo(map);
+
+        if (isEndeksaSplitView && showValuationZones) {
+          const valuationZones = generateValuationZones(
+            lat,
+            lng,
+            city,
+            district,
+            neighborhood,
+            unitM2Price
+          );
+
+          valuationZones.forEach((zone) => {
+            const poly = L.polygon(zone.coordinates, {
+              color: "#FFFFFF",
+              weight: zone.isCenter ? 2.5 : 1.8,
+              opacity: 0.95,
+              fillColor: zone.color,
+              fillOpacity: zone.isCenter ? 0.38 : 0.30,
+              dashArray: zone.isCenter ? "4, 4" : undefined,
+            }).addTo(map);
+
+            poly.on("mouseover", () => {
+              poly.setStyle({
+                fillOpacity: 0.62,
+                weight: 3.5,
+                color: "#F59E0B",
+              });
+              poly.bringToFront();
             });
-          }
-        });
+
+            poly.on("mouseout", () => {
+              poly.setStyle({
+                fillOpacity: zone.isCenter ? 0.38 : 0.30,
+                weight: zone.isCenter ? 2.5 : 1.8,
+                color: "#FFFFFF",
+              });
+            });
+
+            poly.bindPopup(`
+              <div style="font-family: ui-sans-serif, system-ui, sans-serif; min-width: 220px; padding: 4px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #E2E8F0; padding-bottom: 5px; margin-bottom: 6px;">
+                  <strong style="color: #0F223D; font-size: 13px; font-weight: 800;">${zone.name}</strong>
+                  <span style="background: ${zone.color}22; color: ${zone.color}; font-size: 9px; font-weight: 800; padding: 2px 6px; border-radius: 4px; border: 1px solid ${zone.color}40;">
+                    ${zone.status}
+                  </span>
+                </div>
+                <div style="font-size: 10px; color: #64748B; margin-bottom: 6px; line-height: 1.3;">
+                  ${zone.description}
+                </div>
+                <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 6px 8px; margin-bottom: 6px;">
+                  <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 3px;">
+                    <span style="font-size: 10px; color: #64748B; font-weight: 600;">Ort. m² Piyasa Değeri:</span>
+                    <span style="font-size: 13px; font-weight: 900; color: #0F223D;">${zone.unitPriceTL.toLocaleString("tr-TR")} ₺/m²</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                    <span style="font-size: 10px; color: #059669; font-weight: 600;">İhale Başlangıç (%50):</span>
+                    <span style="font-size: 11px; font-weight: 800; color: #059669;">${zone.tenderStartPriceTL.toLocaleString("tr-TR")} ₺/m²</span>
+                  </div>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; font-size: 9.5px;">
+                  <span style="color: #64748B;">Yıllık Değer Artış Hızı:</span>
+                  <span style="font-weight: 800; color: #16A34A;">+%${zone.yearlyGrowthRate}</span>
+                </div>
+                <div style="font-size: 8.5px; color: #94A3B8; text-align: center; margin-top: 6px; border-top: 1px solid #F1F5F9; padding-top: 4px;">
+                  İhaleci Burada Emsal Değerleme & Bölge Isı Katmanı
+                </div>
+              </div>
+            `);
+
+            if (showZoneBadges) {
+              const badgeIcon = L.divIcon({
+                className: "leaflet-zone-pill",
+                html: `
+                  <div style="display: flex; align-items: center; transform: translate(-50%, -50%); cursor: pointer;">
+                    <div style="background: rgba(15, 34, 61, 0.90); backdrop-filter: blur(4px); color: #FFFFFF; font-weight: 700; font-size: 9.5px; padding: 2.5px 8px; border-radius: 9999px; border: 1px solid rgba(255,255,255,0.4); box-shadow: 0 3px 8px rgba(0,0,0,0.3); white-space: nowrap; display: flex; align-items: center; gap: 5px; font-family: ui-sans-serif, system-ui, sans-serif;">
+                      <span style="width: 6px; height: 6px; border-radius: 50%; background: ${zone.color}; box-shadow: 0 0 5px ${zone.color};"></span>
+                      <span style="color: #F8FAFC;">${zone.name}</span>
+                      <span style="color: #F59E0B; font-weight: 900; border-left: 1px solid rgba(255,255,255,0.25); padding-left: 5px;">${formatShortPrice(zone.unitPriceTL)}/m²</span>
+                    </div>
+                  </div>
+                `,
+                iconSize: [0, 0],
+              });
+              const badgeMarker = L.marker(zone.centroid, {
+                icon: badgeIcon,
+                interactive: true,
+                zIndexOffset: zone.isCenter ? 800 : 500,
+              }).addTo(map);
+
+              badgeMarker.on("click", () => {
+                poly.openPopup();
+              });
+            }
+          });
+        }
       }
 
       // Hedef Taşınmaz Pin
@@ -539,7 +670,8 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
     unitM2Price,
     isEndeksaSplitView,
     showValuationZones,
-    showZoneBadges
+    showZoneBadges,
+    viewMode
   ]);
 
   const handleSelectComp = (comp: ComparableListing) => {
@@ -597,8 +729,38 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
             </span>
           )}
 
-          {/* Bölge Isı Katmanı Aç/Kapat Butonu */}
-          {isEndeksaSplitView && (
+          {/* Görünüm Modu Seçimi: İlçe Sınırları vs Parsel/Emsaller */}
+          <div className="flex items-center bg-slate-900/90 rounded-lg p-0.5 border border-slate-700 text-[10px]">
+            <button
+              type="button"
+              onClick={() => setViewMode("ilceler")}
+              className={`px-2.5 py-1 rounded-md font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                viewMode === "ilceler"
+                  ? "bg-emerald-600 text-white shadow-xs"
+                  : "text-slate-300 hover:text-white"
+              }`}
+              title="İl geneli gerçek ilçe sınırları ve değerleme haritası"
+            >
+              <Layers className="w-3 h-3 text-emerald-300" />
+              <span>İlçe Sınırları</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("parsel")}
+              className={`px-2.5 py-1 rounded-md font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                viewMode === "parsel"
+                  ? "bg-blue-600 text-white shadow-xs"
+                  : "text-slate-300 hover:text-white"
+              }`}
+              title="Değerlenen taşınmaz, mahalle mozaiği ve emsal ilanlar"
+            >
+              <MapPin className="w-3 h-3 text-blue-300" />
+              <span>Parsel & Emsaller</span>
+            </button>
+          </div>
+
+          {/* Bölge Isı Katmanı Aç/Kapat Butonu (Parsel modunda) */}
+          {isEndeksaSplitView && viewMode === "parsel" && (
             <button
               type="button"
               onClick={() => setShowValuationZones((prev) => !prev)}
@@ -667,6 +829,19 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
       }`}>
         <div ref={mapContainerRef} className="w-full h-full" />
 
+        {/* Global Tooltip Stili */}
+        <style jsx global>{`
+          .custom-district-tooltip {
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            padding: 0 !important;
+          }
+          .custom-district-tooltip:before {
+            display: none !important;
+          }
+        `}</style>
+
         {/* GPS Geri Bildirim Bildirimi */}
         {locateFeedback && (
           <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[450] bg-slate-900/90 text-amber-300 border border-amber-500/40 text-[11px] font-bold px-3 py-1.5 rounded-full shadow-lg backdrop-blur-xs flex items-center gap-2 animate-bounce">
@@ -689,33 +864,59 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
         {/* İhaleci Burada Lejant Çubuğu (Isı Haritası Skalası) */}
         {isEndeksaSplitView ? (
           <div className="absolute bottom-4 left-3 z-[400] bg-white/95 backdrop-blur-md px-3.5 py-2.5 rounded-xl shadow-lg border border-slate-200 text-slate-800">
-            <div className="text-[10px] font-extrabold text-slate-800 mb-1.5 flex items-center justify-between gap-3">
-              <span>{category === "arsa" ? "Arsa" : "Konut"} m² Değer Skalası</span>
-              <span className="text-[9px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
-                Sıfır Boşluklu İdari Bölge Mozaği
-              </span>
-            </div>
-            <div className="flex items-center gap-2 mb-1.5">
-              <span className="text-[10px] font-mono font-bold text-emerald-700">
-                {formatShortPrice(Math.round(unitM2Price * 0.74))}
-              </span>
-              <div className="w-28 sm:w-36 h-2 rounded-full bg-gradient-to-r from-emerald-600 via-amber-400 to-rose-600 shadow-inner"></div>
-              <span className="text-[10px] font-mono font-bold text-rose-700">
-                {formatShortPrice(Math.round(unitM2Price * 1.38))}
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-[9px] text-slate-500 pt-1 border-t border-slate-100">
-              <span>🟢 Fırsat Bölgesi</span>
-              <span>🟡 Değerlenen</span>
-              <span>🔴 Prestij Aksı</span>
-              <button
-                type="button"
-                onClick={() => setShowZoneBadges((p) => !p)}
-                className="ml-2 text-blue-600 hover:text-blue-800 font-bold underline cursor-pointer"
-              >
-                Etiketler: {showZoneBadges ? "Gizle" : "Göster"}
-              </button>
-            </div>
+            {viewMode === "ilceler" ? (
+              <div>
+                <div className="text-[10px] font-extrabold text-slate-800 mb-1.5 flex items-center justify-between gap-3">
+                  <span>{city} İlçe Değerleme Isı Haritası</span>
+                  <span className="text-[9px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                    Gerçek İlçe İdari Sınırları
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className="text-[10px] font-mono font-bold text-emerald-800">
+                    31.800 ₺
+                  </span>
+                  <div className="w-28 sm:w-36 h-2 rounded-full bg-gradient-to-r from-emerald-800 via-emerald-500 via-amber-400 to-rose-700 shadow-inner"></div>
+                  <span className="text-[10px] font-mono font-bold text-rose-700">
+                    96.400 ₺
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-[9px] text-slate-500 pt-1 border-t border-slate-100 gap-2">
+                  <span>🟢 Uygun Emsal (Çan, Yenice)</span>
+                  <span>🔴 Lüks Segment (Bozcaada)</span>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <div className="text-[10px] font-extrabold text-slate-800 mb-1.5 flex items-center justify-between gap-3">
+                  <span>{category === "arsa" ? "Arsa" : "Konut"} m² Değer Skalası</span>
+                  <span className="text-[9px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                    Sıfır Boşluklu İdari Bölge Mozaği
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className="text-[10px] font-mono font-bold text-emerald-700">
+                    {formatShortPrice(Math.round(unitM2Price * 0.74))}
+                  </span>
+                  <div className="w-28 sm:w-36 h-2 rounded-full bg-gradient-to-r from-emerald-600 via-amber-400 to-rose-600 shadow-inner"></div>
+                  <span className="text-[10px] font-mono font-bold text-rose-700">
+                    {formatShortPrice(Math.round(unitM2Price * 1.38))}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-[9px] text-slate-500 pt-1 border-t border-slate-100">
+                  <span>🟢 Fırsat Bölgesi</span>
+                  <span>🟡 Değerlenen</span>
+                  <span>🔴 Prestij Aksı</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowZoneBadges((p) => !p)}
+                    className="ml-2 text-blue-600 hover:text-blue-800 font-bold underline cursor-pointer"
+                  >
+                    Etiketler: {showZoneBadges ? "Gizle" : "Göster"}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           /* Standart Harita İçi Gösterge Rozeti (Legend) */
