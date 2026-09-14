@@ -2,13 +2,17 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { ComparableListing } from "@/types";
+import { generateValuationZones, ValuationZone } from "@/lib/valuationZones";
 import { 
   MapPin, 
   Mountain, 
   ExternalLink, 
   Layers, 
+  Layers2,
   Compass,
-  Navigation
+  Navigation,
+  Eye,
+  EyeOff
 } from "lucide-react";
 
 interface ParcelMapProps {
@@ -71,6 +75,8 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
   const [selectedCompId, setSelectedCompId] = useState<string | null>(null);
   const [isLocating, setIsLocating] = useState<boolean>(false);
   const [locateFeedback, setLocateFeedback] = useState<string | null>(null);
+  const [showValuationZones, setShowValuationZones] = useState<boolean>(true);
+  const [showZoneBadges, setShowZoneBadges] = useState<boolean>(true);
 
   const handleGetLiveLocation = () => {
     if (!navigator.geolocation) {
@@ -322,42 +328,102 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
         dashArray: "4, 6",
       }).addTo(map);
 
-      // Endeksa Isı Haritası (Choropleth Mahalle Poligonları)
-      if (isEndeksaSplitView) {
-        const polyDefs = [
-          { dLat: 0.006, dLng: 0.007, color: "#166534", name: "Merkez Mah.", price: Math.round(unitM2Price * 0.75) },
-          { dLat: 0.005, dLng: -0.006, color: "#15803d", name: "Cumhuriyet Mah.", price: Math.round(unitM2Price * 0.88) },
-          { dLat: -0.005, dLng: 0.006, color: "#84cc16", name: "İsmetpaşa Mah.", price: Math.round(unitM2Price * 0.98) },
-          { dLat: -0.006, dLng: -0.005, color: "#eab308", name: "Gazi Mah.", price: Math.round(unitM2Price * 1.15) },
-          { dLat: 0.009, dLng: 0.002, color: "#f97316", name: "Yeni Mahalle", price: Math.round(unitM2Price * 1.35) },
-          { dLat: -0.003, dLng: 0.011, color: "#b91c1c", name: "Sahil / Tepe Mevkii", price: Math.round(unitM2Price * 1.65) },
-        ];
+      // İhaleci Burada Bölgesel Değerleme Isı Haritası (Sıfır Boşluklu Bitişik Mahalle Mozaği)
+      if (isEndeksaSplitView && showValuationZones) {
+        const valuationZones = generateValuationZones(
+          lat,
+          lng,
+          city,
+          district,
+          neighborhood,
+          unitM2Price
+        );
 
-        polyDefs.forEach((po) => {
-          const cLat = lat + po.dLat;
-          const cLng = lng + po.dLng;
-          const r = 0.004;
-          const coords = [
-            [cLat + r * 0.7, cLng - r * 0.6],
-            [cLat + r * 0.8, cLng + r * 0.7],
-            [cLat - r * 0.3, cLng + r * 0.9],
-            [cLat - r * 0.8, cLng + r * 0.2],
-            [cLat - r * 0.5, cLng - r * 0.8],
-          ];
-          const poly = L.polygon(coords, {
-            color: "#ffffff",
-            weight: 1.5,
-            fillColor: po.color,
-            fillOpacity: 0.55,
+        valuationZones.forEach((zone) => {
+          const poly = L.polygon(zone.coordinates, {
+            color: "#FFFFFF",
+            weight: zone.isCenter ? 2.5 : 1.8,
+            opacity: 0.95,
+            fillColor: zone.color,
+            fillOpacity: zone.isCenter ? 0.38 : 0.30,
+            dashArray: zone.isCenter ? "4, 4" : undefined,
           }).addTo(map);
 
+          // Fare Üzerine Geldiğinde Parlama ve Vurgu
+          poly.on("mouseover", () => {
+            poly.setStyle({
+              fillOpacity: 0.62,
+              weight: 3.5,
+              color: "#F59E0B",
+            });
+            poly.bringToFront();
+          });
+
+          poly.on("mouseout", () => {
+            poly.setStyle({
+              fillOpacity: zone.isCenter ? 0.38 : 0.30,
+              weight: zone.isCenter ? 2.5 : 1.8,
+              color: "#FFFFFF",
+            });
+          });
+
+          // Kurumsal İhaleci Burada Detaylı Açılır Kartı (Popup)
           poly.bindPopup(`
-            <div style="font-family: sans-serif; padding: 2px;">
-              <strong style="color: #0F172A; font-size: 11px;">${po.name}</strong>
-              <div style="color: ${po.color}; font-weight: 800; font-size: 12px; margin-top: 2px;">${po.price.toLocaleString("tr-TR")} ₺/m²</div>
-              <div style="color: #64748B; font-size: 9px;">İhaleci Burada Emsal Değerleme Skalası</div>
+            <div style="font-family: ui-sans-serif, system-ui, sans-serif; min-width: 220px; padding: 4px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #E2E8F0; padding-bottom: 5px; margin-bottom: 6px;">
+                <strong style="color: #0F223D; font-size: 13px; font-weight: 800;">${zone.name}</strong>
+                <span style="background: ${zone.color}22; color: ${zone.color}; font-size: 9px; font-weight: 800; padding: 2px 6px; border-radius: 4px; border: 1px solid ${zone.color}40;">
+                  ${zone.status}
+                </span>
+              </div>
+              <div style="font-size: 10px; color: #64748B; margin-bottom: 6px; line-height: 1.3;">
+                ${zone.description}
+              </div>
+              <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 6px 8px; margin-bottom: 6px;">
+                <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 3px;">
+                  <span style="font-size: 10px; color: #64748B; font-weight: 600;">Ort. m² Piyasa Değeri:</span>
+                  <span style="font-size: 13px; font-weight: 900; color: #0F223D;">${zone.unitPriceTL.toLocaleString("tr-TR")} ₺/m²</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                  <span style="font-size: 10px; color: #059669; font-weight: 600;">İhale Başlangıç (%50):</span>
+                  <span style="font-size: 11px; font-weight: 800; color: #059669;">${zone.tenderStartPriceTL.toLocaleString("tr-TR")} ₺/m²</span>
+                </div>
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center; font-size: 9.5px;">
+                <span style="color: #64748B;">Yıllık Değer Artış Hızı:</span>
+                <span style="font-weight: 800; color: #16A34A;">+%${zone.yearlyGrowthRate}</span>
+              </div>
+              <div style="font-size: 8.5px; color: #94A3B8; text-align: center; margin-top: 6px; border-top: 1px solid #F1F5F9; padding-top: 4px;">
+                İhaleci Burada Emsal Değerleme & Bölge Isı Katmanı
+              </div>
             </div>
           `);
+
+          // Poligon Üzerinde Kalıcı Bilgi Rozeti (Sleek Centroid Pill)
+          if (showZoneBadges) {
+            const badgeIcon = L.divIcon({
+              className: "leaflet-zone-pill",
+              html: `
+                <div style="display: flex; align-items: center; transform: translate(-50%, -50%); cursor: pointer;">
+                  <div style="background: rgba(15, 34, 61, 0.90); backdrop-filter: blur(4px); color: #FFFFFF; font-weight: 700; font-size: 9.5px; padding: 2.5px 8px; border-radius: 9999px; border: 1px solid rgba(255,255,255,0.4); box-shadow: 0 3px 8px rgba(0,0,0,0.3); white-space: nowrap; display: flex; align-items: center; gap: 5px; font-family: ui-sans-serif, system-ui, sans-serif;">
+                    <span style="width: 6px; height: 6px; border-radius: 50%; background: ${zone.color}; box-shadow: 0 0 5px ${zone.color};"></span>
+                    <span style="color: #F8FAFC;">${zone.name}</span>
+                    <span style="color: #F59E0B; font-weight: 900; border-left: 1px solid rgba(255,255,255,0.25); padding-left: 5px;">${formatShortPrice(zone.unitPriceTL)}/m²</span>
+                  </div>
+                </div>
+              `,
+              iconSize: [0, 0],
+            });
+            const badgeMarker = L.marker(zone.centroid, {
+              icon: badgeIcon,
+              interactive: true,
+              zIndexOffset: zone.isCenter ? 800 : 500,
+            }).addTo(map);
+
+            badgeMarker.on("click", () => {
+              poly.openPopup();
+            });
+          }
         });
       }
 
@@ -378,7 +444,7 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
 
       const targetMarker = L.marker([lat, lng], {
         icon: targetIcon,
-        zIndexOffset: 1000,
+        zIndexOffset: 2000,
       }).addTo(map);
 
       targetMarker.bindPopup(`
@@ -460,7 +526,21 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
         mapInstanceRef.current = null;
       }
     };
-  }, [lat, lng, filteredComps, city, district, neighborhood, ada, parsel, elevationMeters]);
+  }, [
+    lat, 
+    lng, 
+    filteredComps, 
+    city, 
+    district, 
+    neighborhood, 
+    ada, 
+    parsel, 
+    elevationMeters,
+    unitM2Price,
+    isEndeksaSplitView,
+    showValuationZones,
+    showZoneBadges
+  ]);
 
   const handleSelectComp = (comp: ComparableListing) => {
     setSelectedCompId(comp.id);
@@ -515,6 +595,23 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
               <Mountain className="w-3 h-3 text-emerald-400" />
               Rakım: {elevationMeters}m
             </span>
+          )}
+
+          {/* Bölge Isı Katmanı Aç/Kapat Butonu */}
+          {isEndeksaSplitView && (
+            <button
+              type="button"
+              onClick={() => setShowValuationZones((prev) => !prev)}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-bold transition text-[10px] cursor-pointer border ${
+                showValuationZones
+                  ? "bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30"
+                  : "bg-slate-800 text-slate-400 border-slate-700 hover:text-white"
+              }`}
+              title="Bölgesel değerleme ve mahalle katmanını aç/kapat"
+            >
+              <Layers2 className="w-3 h-3 text-amber-400" />
+              <span>Bölgeler: {showValuationZones ? "Açık" : "Kapalı"}</span>
+            </button>
           )}
 
           {/* Emsal Filtre Butonları */}
@@ -591,19 +688,33 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
 
         {/* İhaleci Burada Lejant Çubuğu (Isı Haritası Skalası) */}
         {isEndeksaSplitView ? (
-          <div className="absolute bottom-4 left-3 z-[400] bg-white/95 backdrop-blur-md px-3.5 py-2 rounded-xl shadow-lg border border-slate-200 text-slate-800">
-            <div className="text-[10px] font-extrabold text-slate-800 mb-1 flex items-center justify-between">
+          <div className="absolute bottom-4 left-3 z-[400] bg-white/95 backdrop-blur-md px-3.5 py-2.5 rounded-xl shadow-lg border border-slate-200 text-slate-800">
+            <div className="text-[10px] font-extrabold text-slate-800 mb-1.5 flex items-center justify-between gap-3">
               <span>{category === "arsa" ? "Arsa" : "Konut"} m² Değer Skalası</span>
-              <span className="text-[9px] font-normal text-slate-400">Bölgesel Emsal Isı</span>
+              <span className="text-[9px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                Sıfır Boşluklu İdari Bölge Mozaği
+              </span>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-mono font-bold text-slate-600">
-                {formatShortPrice(Math.round(unitM2Price * 0.45))}
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="text-[10px] font-mono font-bold text-emerald-700">
+                {formatShortPrice(Math.round(unitM2Price * 0.74))}
               </span>
-              <div className="w-28 sm:w-36 h-2 rounded-full bg-gradient-to-r from-emerald-700 via-amber-400 to-rose-700 shadow-inner"></div>
-              <span className="text-[10px] font-mono font-bold text-slate-900">
-                {formatShortPrice(Math.round(unitM2Price * 2.1))}
+              <div className="w-28 sm:w-36 h-2 rounded-full bg-gradient-to-r from-emerald-600 via-amber-400 to-rose-600 shadow-inner"></div>
+              <span className="text-[10px] font-mono font-bold text-rose-700">
+                {formatShortPrice(Math.round(unitM2Price * 1.38))}
               </span>
+            </div>
+            <div className="flex items-center justify-between text-[9px] text-slate-500 pt-1 border-t border-slate-100">
+              <span>🟢 Fırsat Bölgesi</span>
+              <span>🟡 Değerlenen</span>
+              <span>🔴 Prestij Aksı</span>
+              <button
+                type="button"
+                onClick={() => setShowZoneBadges((p) => !p)}
+                className="ml-2 text-blue-600 hover:text-blue-800 font-bold underline cursor-pointer"
+              >
+                Etiketler: {showZoneBadges ? "Gizle" : "Göster"}
+              </button>
             </div>
           </div>
         ) : (
