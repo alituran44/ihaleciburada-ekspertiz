@@ -66,11 +66,39 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Default Çanakkale Bayramiç (TR-D-17-002) fallback
+    // Default fallback: Sadece il Çanakkale ise veya il hiç belirtilmemişse Bayramiç'e dön
     if (!districtId) {
-      districtId = "TR-D-17-002";
-      resolvedDistrictName = "Bayramiç";
-      resolvedProvinceName = "Çanakkale";
+      const normProv = normalizeTurkish(province);
+      if (!province || normProv.includes("canakkale")) {
+        districtId = "TR-D-17-002";
+        resolvedDistrictName = "Bayramiç";
+        resolvedProvinceName = "Çanakkale";
+      } else {
+        // İlgili ilin ilk ilçesini bulmayı dene
+        const mappingPath = path.join(dataDir, "districts_mapping.json");
+        if (fs.existsSync(mappingPath)) {
+          const mapping = JSON.parse(fs.readFileSync(mappingPath, "utf8"));
+          for (const plate of Object.keys(mapping.byPlate || {})) {
+            const provObj = mapping.byPlate[plate];
+            if (normalizeTurkish(provObj.provinceName).includes(normProv) || normProv.includes(normalizeTurkish(provObj.provinceName))) {
+              if (provObj.districts && provObj.districts.length > 0) {
+                const firstDist = provObj.districts[0];
+                districtId = firstDist.id;
+                resolvedDistrictName = firstDist.name;
+                resolvedProvinceName = provObj.provinceName;
+                break;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    if (!districtId) {
+      return NextResponse.json(
+        { success: false, error: `District mahalle GeoJSON not found for ${province} / ${district}` },
+        { status: 404 }
+      );
     }
 
     const localFile = path.join(mahalleDir, `${districtId}.geojson`);

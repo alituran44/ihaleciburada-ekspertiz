@@ -104,6 +104,19 @@ export interface LocationSearchResult {
   lng: number;
 }
 
+function findClosestProvince(lat: number, lng: number): string {
+  let closest = "Ankara";
+  let minDist = Infinity;
+  for (const [pName, pCoords] of Object.entries(PROVINCE_COORDINATES)) {
+    const dist = Math.hypot(pCoords.lat - lat, pCoords.lng - lng);
+    if (dist < minDist) {
+      minDist = dist;
+      closest = pName;
+    }
+  }
+  return closest;
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const latParam = searchParams.get("lat");
@@ -132,7 +145,8 @@ export async function GET(request: NextRequest) {
         if (osmRes.ok) {
           const item = await osmRes.json();
           const addr = item.address || {};
-          const province = addr.province || addr.state || "Çanakkale";
+          const detectedProvince = addr.province || addr.state || addr.city || addr.region;
+          const province = detectedProvince || findClosestProvince(lat, lng);
           const district = addr.county || addr.town || addr.district || addr.city_district || "Merkez";
           const neighborhood = addr.suburb || addr.neighbourhood || addr.quarter || addr.village || addr.hamlet || "Merkez";
           const road = addr.road || addr.pedestrian || addr.street || "";
@@ -153,6 +167,20 @@ export async function GET(request: NextRequest) {
       } catch (e) {
         console.warn("Reverse lookup error:", e);
       }
+
+      // Fallback: Türkiye 81 il merkez koordinatlarından en yakın ili hesapla
+      const fallbackProv = findClosestProvince(lat, lng);
+      const fallbackDist = TURKEY_PROVINCES_AND_DISTRICTS[fallbackProv]?.districts?.[0] || "Merkez";
+      const fallbackObj = {
+        province: fallbackProv,
+        district: fallbackDist,
+        neighborhood: "Merkez",
+        road: "",
+        displayName: `${fallbackDist}, ${fallbackProv}`,
+        lat,
+        lng,
+      };
+      return NextResponse.json({ success: true, location: fallbackObj });
     }
   }
 

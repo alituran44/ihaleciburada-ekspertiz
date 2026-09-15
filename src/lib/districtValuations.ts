@@ -55,6 +55,33 @@ export function getDistrictValuation(
     price = istPrices[normDist] || 0;
   }
 
+  if (!price && (normProv.includes("ankara") || normDist.includes("cankaya"))) {
+    // Ankara ilçeleri referansı
+    const ankPrices: Record<string, number> = {
+      "cankaya": 68000, "golbasi": 48000, "yenimahalle": 42000, "etimesgut": 38000,
+      "kecioren": 32000, "mamak": 26000, "altindag": 28000, "sincan": 24000, "pursaklar": 30000,
+    };
+    price = ankPrices[normDist] || 45000;
+  }
+
+  if (!price && (normProv.includes("antalya") || normDist.includes("konyaalti"))) {
+    // Antalya ilçeleri referansı
+    const antPrices: Record<string, number> = {
+      "muratpasa": 58000, "konyaalti": 72000, "kepez": 34000, "alanya": 62000,
+      "manavgat": 48000, "kemer": 76000, "kas": 95000, "serik": 42000,
+    };
+    price = antPrices[normDist] || 52000;
+  }
+
+  if (!price && normProv.includes("bursa")) {
+    // Bursa ilçeleri referansı
+    const burPrices: Record<string, number> = {
+      "nilufer": 54000, "osmangazi": 36000, "yildirim": 28000, "mudanya": 48000,
+      "gemlik": 32000, "inegol": 28000,
+    };
+    price = burPrices[normDist] || 38000;
+  }
+
   if (!price) {
     // İzmir ilçeleri referansı
     const izmPrices: Record<string, number> = {

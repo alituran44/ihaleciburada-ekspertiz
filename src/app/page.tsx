@@ -245,6 +245,34 @@ export default function Home() {
     }
   };
 
+  // Haritadan Herhangi Bir Noktaya Tıklandığında Tüm Uygulamayı Senkronize Et
+  const handleMapLocationSelect = (loc: {
+    city: string;
+    district: string;
+    neighborhood: string;
+    coordinates: { lat: number; lng: number };
+    unitPrice?: number;
+  }) => {
+    // 1. Üst arama çubuğunu haritada tıklanan noktayla anında güncelle
+    setSearchQuery(`${loc.city}, ${loc.district}${loc.neighborhood ? `, ${loc.neighborhood}` : ""}`);
+
+    // 2. Sol analitik paneli ve taşınmaz verilerini güncelle
+    setParcelData((prev) => {
+      const isRes = prev.category === "konut";
+      const newUnitM2 = loc.unitPrice || prev.estimatedUnitSaleM2PriceTL || 54090;
+      const newLandM2 = isRes ? (prev.estimatedLandM2PriceTL || 15000) : newUnitM2;
+      return {
+        ...prev,
+        city: loc.city,
+        district: loc.district,
+        neighborhood: loc.neighborhood,
+        coordinates: loc.coordinates,
+        estimatedUnitSaleM2PriceTL: isRes ? newUnitM2 : prev.estimatedUnitSaleM2PriceTL,
+        estimatedLandM2PriceTL: newLandM2,
+      };
+    });
+  };
+
   // Form submit olduğunda arama
   const handleSearchSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -931,6 +959,7 @@ export default function Home() {
                     neighborhood: neigh,
                   }));
                 }}
+                onLocationSelect={handleMapLocationSelect}
               />
             </div>
 
