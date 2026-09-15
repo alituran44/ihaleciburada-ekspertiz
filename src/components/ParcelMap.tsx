@@ -122,7 +122,7 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
   // Floating Harita Kontrolleri & Bildirimleri (Görsel 1789487723574 İle Birebir)
   const [currentZoom, setCurrentZoom] = useState<number>(7);
   const [mapLayerType, setMapLayerType] = useState<"uydu" | "hibrit" | "sokak">("uydu");
-  const [isLocked, setIsLocked] = useState<boolean>(true);
+  const [isLocked, setIsLocked] = useState<boolean>(false);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [showLayerMenu, setShowLayerMenu] = useState<boolean>(false);
   const [parcelNotice, setParcelNotice] = useState<string | null>("Parsel bilgisi bulunamadı.");
@@ -142,6 +142,17 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
   const toggleFullscreen = () => {
     setIsFullscreen((prev) => !prev);
   };
+
+  // Mausun topuzu (scroll wheel zoom) ve kilit durumunu senkronize et
+  useEffect(() => {
+    if (mapInstanceRef.current && mapInstanceRef.current.scrollWheelZoom) {
+      if (isLocked) {
+        mapInstanceRef.current.scrollWheelZoom.disable();
+      } else {
+        mapInstanceRef.current.scrollWheelZoom.enable();
+      }
+    }
+  }, [isLocked]);
 
   // Sync prop changes
   useEffect(() => {
@@ -360,8 +371,11 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
         center: [lat, lng],
         zoom: initialZoom,
         zoomControl: false,
-        scrollWheelZoom: !isLocked,
+        scrollWheelZoom: true,
+        wheelDebounceTime: 40,
+        wheelPxPerZoomLevel: 60,
       });
+      map.scrollWheelZoom.enable();
       mapInstanceRef.current = map;
       setCurrentZoom(initialZoom);
 
