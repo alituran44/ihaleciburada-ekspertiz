@@ -90,6 +90,7 @@ const PROVINCE_COORDINATES: Record<string, { lat: number; lng: number }> = {
 };
 
 const searchCache = new Map<string, any[]>();
+const reverseCache = new Map<string, any>();
 
 export interface LocationSearchResult {
   id: string;
@@ -105,6 +106,56 @@ export interface LocationSearchResult {
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
+  const latParam = searchParams.get("lat");
+  const lngParam = searchParams.get("lng");
+
+  // Koordinatla Tersine Konum Çözümleme (Haritada Tıklanan Noktanın Bilgilerini Getirme)
+  if (latParam && lngParam) {
+    const lat = parseFloat(latParam);
+    const lng = parseFloat(lngParam);
+    if (!isNaN(lat) && !isNaN(lng)) {
+      const revCacheKey = `rev-${lat.toFixed(4)}-${lng.toFixed(4)}`;
+      if (reverseCache.has(revCacheKey)) {
+        return NextResponse.json({ success: true, location: reverseCache.get(revCacheKey) });
+      }
+
+      try {
+        const osmRes = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&countrycodes=tr&addressdetails=1&format=json`,
+          {
+            headers: {
+              "User-Agent": "IhaleciBurada-Ekspertiz-Reverse/1.0 (info@ihaleciburada.com)",
+            },
+          }
+        );
+
+        if (osmRes.ok) {
+          const item = await osmRes.json();
+          const addr = item.address || {};
+          const province = addr.province || addr.state || "Çanakkale";
+          const district = addr.county || addr.town || addr.district || addr.city_district || "Merkez";
+          const neighborhood = addr.suburb || addr.neighbourhood || addr.quarter || addr.village || addr.hamlet || "Merkez";
+          const road = addr.road || addr.pedestrian || addr.street || "";
+
+          const locObj = {
+            province,
+            district,
+            neighborhood,
+            road,
+            displayName: item.display_name,
+            lat,
+            lng,
+          };
+
+          reverseCache.set(revCacheKey, locObj);
+          return NextResponse.json({ success: true, location: locObj });
+        }
+      } catch (e) {
+        console.warn("Reverse lookup error:", e);
+      }
+    }
+  }
+
   const query = searchParams.get("q") || "";
   const trimmed = query.trim();
 
