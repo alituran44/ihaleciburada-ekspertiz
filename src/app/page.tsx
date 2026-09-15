@@ -53,6 +53,11 @@ export default function Home() {
   const [shareModalOpen, setShareModalOpen] = useState<boolean>(false);
   const [showElectronicReportModal, setShowElectronicReportModal] = useState<boolean>(false);
   const [showReportSelectionModal, setShowReportSelectionModal] = useState<boolean>(false);
+  const [subTab, setSubTab] = useState<"deger" | "trend" | "rayic" | "best_use">("deger");
+  const [valuationMode, setValuationMode] = useState<"otomatik" | "manuel">("otomatik");
+  const [isEmsalOpen, setIsEmsalOpen] = useState<boolean>(true);
+  const [isWeightedOpen, setIsWeightedOpen] = useState<boolean>(true);
+  const [isSummaryOpen, setIsSummaryOpen] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>("Çanakkale, Bayramiç");
   const [isSearching, setIsSearching] = useState<boolean>(false);
 
@@ -577,28 +582,65 @@ export default function Home() {
                 )}
               </div>
 
+              {/* TAPUSOR ESİNTİLİ 4'LÜ ÇALIŞMA SEKMESİ (Görsel 1789501075638) */}
+              <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl text-xs font-bold border border-slate-200">
+                {(["deger", "trend", "rayic", "best_use"] as const).map((tab) => {
+                  const titles: Record<string, string> = {
+                    deger: "Değer",
+                    trend: "Trend",
+                    rayic: "Rayiç",
+                    best_use: "Best-Use",
+                  };
+                  const isActive = subTab === tab;
+                  return (
+                    <button
+                      key={tab}
+                      type="button"
+                      onClick={() => setSubTab(tab)}
+                      className={`flex-1 py-1.5 rounded-lg text-xs font-black transition cursor-pointer ${
+                        isActive
+                          ? "bg-amber-500 text-slate-950 shadow-xs"
+                          : "text-slate-600 hover:text-slate-900"
+                      }`}
+                    >
+                      {titles[tab]}
+                    </button>
+                  );
+                })}
+              </div>
+
               {/* TAPUSOR ESİNTİLİ OTOMATİK DEĞERLEME & FİNANS ANALİZ KARTI */}
-              <div className="bg-gradient-to-br from-slate-900 via-[#0B1E3B] to-slate-950 text-white rounded-2xl p-4 sm:p-5 border border-slate-800 shadow-md space-y-3">
+              <div className="bg-gradient-to-br from-slate-900 via-[#0B1E3B] to-slate-950 text-white rounded-2xl p-4 sm:p-5 border border-slate-800 shadow-md space-y-3.5">
                 <div className="flex items-center justify-between">
                   <span className="px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-400 text-[10px] font-black border border-amber-500/30 flex items-center gap-1">
                     <Sparkles className="w-3 h-3 text-amber-400" />
-                    Otomatik Değerleme • Finans Analiz
+                    Finansal Analiz
                   </span>
-                  <span className="text-[11px] font-mono text-emerald-400 font-bold">
-                    TKGM Doğrulandı
-                  </span>
+                  <div className="flex items-center gap-1 text-[10px] font-bold text-slate-300">
+                    <button
+                      type="button"
+                      onClick={() => setValuationMode("otomatik")}
+                      className={`px-2 py-0.5 rounded cursor-pointer ${valuationMode === "otomatik" ? "bg-amber-500/30 text-amber-300 font-black border border-amber-400/40" : "text-slate-400"}`}
+                    >
+                      ● Otomatik
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setValuationMode("manuel")}
+                      className={`px-2 py-0.5 rounded cursor-pointer ${valuationMode === "manuel" ? "bg-amber-500/30 text-amber-300 font-black border border-amber-400/40" : "text-slate-400"}`}
+                    >
+                      ○ Manuel
+                    </button>
+                  </div>
                 </div>
 
                 <div className="flex items-baseline justify-between pt-1">
                   <div>
-                    <div className="text-2xl sm:text-3xl font-black text-white font-heading tracking-tight">
-                      {isResidential 
-                        ? `${(parcelData.estimatedUnitSaleM2PriceTL || 54085).toLocaleString("tr-TR")} ₺`
-                        : `${(parcelData.estimatedLandM2PriceTL || 18500).toLocaleString("tr-TR")} ₺`
-                      } <span className="text-xs font-semibold text-slate-400">/ m²</span>
+                    <div className="text-2xl sm:text-3xl font-black text-white font-heading tracking-tight font-mono">
+                      {(isResidential ? (parcelData.estimatedUnitSaleM2PriceTL || 54085) : (parcelData.estimatedLandM2PriceTL || 18500)).toLocaleString("tr-TR")} ₺ <span className="text-xs font-semibold text-slate-400">/ m²</span>
                     </div>
                     <div className="text-[11px] text-slate-400 mt-0.5">
-                      Bölgesel Emsal Birim Fiyatı
+                      {parcelData.neighborhood || "Merkez"} Bölgesel Emsal m² Fiyatı
                     </div>
                   </div>
 
@@ -612,6 +654,26 @@ export default function Home() {
                   </div>
                 </div>
 
+                {/* Görsel 1789501075638: Hızlı Satış - Ortalama - Tok Satış Skalası */}
+                <div className="pt-2 pb-1 border-t border-slate-800/80">
+                  <div className="flex items-center justify-between text-[10px] font-semibold text-slate-300 mb-1.5 font-mono">
+                    <span className="flex items-center gap-1 text-amber-400">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                      Hızlı Satış: {Math.round((isResidential ? (parcelData.estimatedUnitSaleM2PriceTL || 54085) : (parcelData.estimatedLandM2PriceTL || 18500)) * 0.90).toLocaleString("tr-TR")} ₺
+                    </span>
+                    <span className="text-white font-black text-[11px]">
+                      m² Ortalama
+                    </span>
+                    <span className="flex items-center gap-1 text-rose-400">
+                      Tok Satış: {Math.round((isResidential ? (parcelData.estimatedUnitSaleM2PriceTL || 54085) : (parcelData.estimatedLandM2PriceTL || 18500)) * 1.10).toLocaleString("tr-TR")} ₺
+                      <span className="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
+                    </span>
+                  </div>
+                  <div className="w-full h-2 rounded-full bg-gradient-to-r from-amber-400 via-emerald-500 to-rose-500 relative">
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-white border-2 border-slate-950 shadow-md"></div>
+                  </div>
+                </div>
+
                 {/* Tapusor Stili Sarı/Kehribar "Hemen Rapor Al" Butonu */}
                 <button
                   type="button"
@@ -621,6 +683,127 @@ export default function Home() {
                   <FileText className="w-4 h-4 text-slate-950" />
                   <span>Hemen Ekspertiz Raporu Al (13 Sayfa PDF)</span>
                 </button>
+              </div>
+
+              {/* GÖRSEL 1789501075638: EMSALLER AKORDİYONU */}
+              <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-2xs">
+                <button
+                  type="button"
+                  onClick={() => setIsEmsalOpen(!isEmsalOpen)}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 hover:bg-slate-100/80 transition flex items-center justify-between text-xs font-bold text-slate-800 cursor-pointer"
+                >
+                  <span className="flex items-center gap-1.5 font-heading">
+                    <Layers className="w-3.5 h-3.5 text-blue-600" />
+                    Çevredeki Emsal Parseller (Bal Peteği Verisi)
+                  </span>
+                  <ChevronDown className={`w-3.5 h-3.5 text-slate-500 transition-transform ${isEmsalOpen ? "rotate-180" : ""}`} />
+                </button>
+
+                {isEmsalOpen && (
+                  <div className="p-3 space-y-2.5 text-xs divide-y divide-slate-100">
+                    <div className="flex items-center justify-between pb-1.5 text-[11px]">
+                      <div>
+                        <div className="font-bold text-slate-900 line-clamp-1">{parcelData.neighborhood || "Arslanca"} 3+1 Cadde Cepheli</div>
+                        <div className="text-[10px] text-slate-500">Kuzeydoğu • 240m • 135 m²</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-mono font-black text-emerald-700">₺ 6.480.000</div>
+                        <div className="text-[9.5px] text-slate-400 font-mono">48.000 ₺/m²</div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between py-1.5 text-[11px]">
+                      <div>
+                        <div className="font-bold text-slate-900 line-clamp-1">{parcelData.neighborhood || "Arslanca"} Sıfır Lüks Konut</div>
+                        <div className="text-[10px] text-slate-500">Doğu • 380m • 100 m²</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-mono font-black text-emerald-700">₺ 5.200.000</div>
+                        <div className="text-[9.5px] text-slate-400 font-mono">52.000 ₺/m²</div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1.5 text-[11px]">
+                      <div>
+                        <div className="font-bold text-slate-900 line-clamp-1">{parcelData.neighborhood || "Arslanca"} Geniş Aile Dairesi</div>
+                        <div className="text-[10px] text-slate-500">Güneydoğu • 520m • 145 m²</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-mono font-black text-emerald-700">₺ 6.525.000</div>
+                        <div className="text-[9.5px] text-slate-400 font-mono">45.000 ₺/m²</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* GÖRSEL 1789501075638: AĞIRLIKLI ORTALAMALAR */}
+              <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-2xs">
+                <button
+                  type="button"
+                  onClick={() => setIsWeightedOpen(!isWeightedOpen)}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 hover:bg-slate-100/80 transition flex items-center justify-between text-xs font-bold text-slate-800 cursor-pointer"
+                >
+                  <span className="flex items-center gap-1.5 font-heading">
+                    <TrendingUp className="w-3.5 h-3.5 text-amber-600" />
+                    Ağırlıklı Ortalamalar
+                  </span>
+                  <ChevronDown className={`w-3.5 h-3.5 text-slate-500 transition-transform ${isWeightedOpen ? "rotate-180" : ""}`} />
+                </button>
+
+                {isWeightedOpen && (
+                  <div className="p-3 grid grid-cols-2 gap-3 text-xs bg-slate-50/50">
+                    <div className="p-2.5 rounded-lg bg-white border border-slate-200">
+                      <div className="text-[10px] text-slate-500 font-semibold">Mesafe Ağırlıklı</div>
+                      <div className="text-sm font-black text-slate-900 font-mono mt-0.5">
+                        {Math.round((isResidential ? (parcelData.estimatedUnitSaleM2PriceTL || 54085) : (parcelData.estimatedLandM2PriceTL || 18500)) * 0.984).toLocaleString("tr-TR")} ₺ <span className="text-[10px] text-slate-400 font-normal">/ m²</span>
+                      </div>
+                    </div>
+
+                    <div className="p-2.5 rounded-lg bg-white border border-slate-200">
+                      <div className="text-[10px] text-slate-500 font-semibold">Zaman Ağırlıklı</div>
+                      <div className="text-sm font-black text-slate-900 font-mono mt-0.5">
+                        {Math.round((isResidential ? (parcelData.estimatedUnitSaleM2PriceTL || 54085) : (parcelData.estimatedLandM2PriceTL || 18500)) * 1.014).toLocaleString("tr-TR")} ₺ <span className="text-[10px] text-slate-400 font-normal">/ m²</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* GÖRSEL 1789501075638: ANALİZ ÖZETİ & İİK M.115 TABANI */}
+              <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-2xs">
+                <button
+                  type="button"
+                  onClick={() => setIsSummaryOpen(!isSummaryOpen)}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 hover:bg-slate-100/80 transition flex items-center justify-between text-xs font-bold text-slate-800 cursor-pointer"
+                >
+                  <span className="flex items-center gap-1.5 font-heading">
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                    Analiz Özeti & İcra Tabanı
+                  </span>
+                  <ChevronDown className={`w-3.5 h-3.5 text-slate-500 transition-transform ${isSummaryOpen ? "rotate-180" : ""}`} />
+                </button>
+
+                {isSummaryOpen && (
+                  <div className="p-3 space-y-2 text-xs">
+                    <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                      <span className="text-slate-500">Konum & Parsel:</span>
+                      <span className="font-bold text-slate-900">{parcelData.district} / {parcelData.neighborhood || "Merkez"} • {parcelData.ada || "48507"}/{parcelData.parsel || "1"}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                      <span className="text-slate-500">Piyasa Değeri ({parcelData.areaM2 || 110} m²):</span>
+                      <span className="font-bold text-slate-900 font-mono">₺ {Math.round((isResidential ? (parcelData.estimatedUnitSaleM2PriceTL || 54085) : (parcelData.estimatedLandM2PriceTL || 18500)) * (parcelData.areaM2 || 110)).toLocaleString("tr-TR")}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                      <span className="text-emerald-700 font-semibold">İİK m.115 %50 Tabanı:</span>
+                      <span className="font-black text-emerald-700 font-mono">₺ {Math.round((isResidential ? (parcelData.estimatedUnitSaleM2PriceTL || 54085) : (parcelData.estimatedLandM2PriceTL || 18500)) * (parcelData.areaM2 || 110) * 0.5).toLocaleString("tr-TR")}</span>
+                    </div>
+                    <div className="flex justify-between items-center pt-1 text-amber-700 font-black">
+                      <span>Potansiyel Arbitraj Kârı:</span>
+                      <span className="font-mono text-sm">₺ {Math.round((isResidential ? (parcelData.estimatedUnitSaleM2PriceTL || 54085) : (parcelData.estimatedLandM2PriceTL || 18500)) * (parcelData.areaM2 || 110) * 0.5).toLocaleString("tr-TR")}</span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* ÇALIŞMA SEKMELERİ: [PİYASA ANALİZİ] | [İHALE & PEY SİMÜLATÖRÜ] */}

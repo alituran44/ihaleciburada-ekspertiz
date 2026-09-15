@@ -776,7 +776,7 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
           weight: 2,
           opacity: 0.85,
           fillColor: "#3B82F6",
-          fillOpacity: 0.18,
+          fillOpacity: 0.14,
           dashArray: "3, 4",
         }).addTo(map);
 
@@ -786,7 +786,7 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
           weight: 1.5,
           opacity: 0.65,
           fillColor: "#3B82F6",
-          fillOpacity: 0.10,
+          fillOpacity: 0.08,
           dashArray: "5, 6",
         }).addTo(map);
 
@@ -796,9 +796,113 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
           weight: 1,
           opacity: 0.40,
           fillColor: "#3B82F6",
-          fillOpacity: 0.04,
+          fillOpacity: 0.03,
           dashArray: "6, 8",
         }).addTo(map);
+
+        // =========================================================================
+        // TAPUSOR BAL PETEĞİ EMSAL KÜMESİ (Hexagonal Spatial Honeycomb Mesh - Görsel 1789501075638)
+        // =========================================================================
+        const hexRadius = 55; // metre cinsinden petek yarıçapı
+        const hexStep = hexRadius * 1.732; // komşu petek merkez mesafesi (~95m)
+
+        const getHexCorners = (cLat: number, cLng: number, r: number): [number, number][] => {
+          const pts: [number, number][] = [];
+          for (let i = 0; i < 6; i++) {
+            const angleDeg = i * 60 + 30;
+            const pt = offsetCoord(cLat, cLng, r, angleDeg);
+            pts.push([pt.lat, pt.lng]);
+          }
+          return pts;
+        };
+
+        // 1. Merkez Hedef Altıgen (Görseldeki Gibi Sarı Vurgulu Petek)
+        const centerHexPts = getHexCorners(lat, lng, hexRadius);
+        L.polygon(centerHexPts, {
+          color: "#EAB308",
+          weight: 2.5,
+          fillColor: "#FACC15",
+          fillOpacity: 0.65,
+        }).addTo(map);
+
+        // Hedef m² Fiyat Rozeti (Sarı Rozet - Örn: 54.085 ₺/m²)
+        const centerBadgeIcon = L.divIcon({
+          className: "leaflet-hex-center-badge",
+          html: `
+            <div style="transform: translate(-50%, -50%); background: #FACC15; color: #713F12; font-weight: 900; font-size: 11px; padding: 2px 7px; border-radius: 6px; border: 1.5px solid #CA8A04; box-shadow: 0 2px 8px rgba(0,0,0,0.35); font-family: monospace; white-space: nowrap; pointer-events: none;">
+              ${(unitM2Price || 54085).toLocaleString("tr-TR")} ₺/m²
+            </div>
+          `,
+          iconSize: [0, 0],
+        });
+        L.marker([lat, lng], { icon: centerBadgeIcon, interactive: false, zIndexOffset: 2100 }).addTo(map);
+
+        // 2. Çevredeki Bal Peteği Emsal Parselleri (Görsel 1789501075638 Birebir)
+        const surroundingHexList = [
+          { angle: 30, dist: hexStep, price: Math.round((unitM2Price || 54085) * 1.254), count: 6, label: "Kuzeydoğu Emsal Bölgesi" },  // Örn: 67.847 ₺
+          { angle: 90, dist: hexStep, price: Math.round((unitM2Price || 54085) * 0.456), count: 3, label: "Doğu Emsal Bölgesi" },       // Örn: 24.664 ₺
+          { angle: 150, dist: hexStep, price: Math.round((unitM2Price || 54085) * 0.852), count: 2, label: "Güneydoğu Emsal Bölgesi" }, // Örn: 46.057 ₺
+          { angle: 210, dist: hexStep, price: Math.round((unitM2Price || 54085) * 0.915), count: 4, label: "Güneybatı Emsal Bölgesi" }, // Örn: 49.500 ₺
+          { angle: 270, dist: hexStep, price: Math.round((unitM2Price || 54085) * 0.891), count: 3, label: "Batı Emsal Bölgesi" },      // Örn: 48.200 ₺
+          { angle: 330, dist: hexStep, price: Math.round((unitM2Price || 54085) * 1.042), count: 5, label: "Kuzeybatı Emsal Bölgesi" }, // Örn: 56.400 ₺
+          // Dış Çember Genişlemeleri (Görseldeki dış mavi petekler)
+          { angle: 0, dist: hexStep * 1.732, price: Math.round((unitM2Price || 54085) * 1.148), count: 3, label: "Kuzey Emsalleri" },
+          { angle: 60, dist: hexStep * 1.732, price: Math.round((unitM2Price || 54085) * 1.182), count: 4, label: "Dış Doğu Emsalleri" },
+          { angle: 120, dist: hexStep * 1.732, price: Math.round((unitM2Price || 54085) * 0.745), count: 2, label: "Dış Güneydoğu Emsalleri" },
+          { angle: 180, dist: hexStep * 1.732, price: Math.round((unitM2Price || 54085) * 0.825), count: 3, label: "Güney Emsalleri" },
+          { angle: 240, dist: hexStep * 1.732, price: Math.round((unitM2Price || 54085) * 0.948), count: 2, label: "Dış Güneybatı Emsalleri" },
+          { angle: 300, dist: hexStep * 1.732, price: Math.round((unitM2Price || 54085) * 1.078), count: 4, label: "Dış Kuzeybatı Emsalleri" },
+        ];
+
+        surroundingHexList.forEach((hex, idx) => {
+          const hexCenter = offsetCoord(lat, lng, hex.dist, hex.angle);
+          const hexCorners = getHexCorners(hexCenter.lat, hexCenter.lng, hexRadius);
+
+          // Mavi Petek Poligonu
+          const poly = L.polygon(hexCorners, {
+            color: "#2563EB",
+            weight: 1.6,
+            opacity: 0.85,
+            fillColor: "#3B82F6",
+            fillOpacity: 0.20,
+          }).addTo(map);
+
+          // Emsal Fiyat Etiketi (Görsel 1789501075638 Birebir Rozet)
+          const hexBadgeIcon = L.divIcon({
+            className: "leaflet-hex-badge",
+            html: `
+              <div style="transform: translate(-50%, -50%); background: #0B1E3B; color: #FFFFFF; font-weight: 800; font-size: 10px; padding: 2.5px 6px; border-radius: 6px; border: 1.5px solid #3B82F6; box-shadow: 0 2px 8px rgba(0,0,0,0.35); font-family: monospace; white-space: nowrap; display: flex; align-items: center; gap: 4px; cursor: pointer;">
+                <span>${hex.price.toLocaleString("tr-TR")} ₺/m²</span>
+                <span style="background: #F59E0B; color: #000; font-size: 9px; font-weight: 900; padding: 0.5px 3.5px; border-radius: 3px;">${hex.count} •</span>
+              </div>
+            `,
+            iconSize: [0, 0],
+          });
+
+          const badgeMarker = L.marker([hexCenter.lat, hexCenter.lng], {
+            icon: hexBadgeIcon,
+            zIndexOffset: 1200 + idx,
+          }).addTo(map);
+
+          const hexPopupHtml = `
+            <div style="font-family: ui-sans-serif, system-ui, sans-serif; min-width: 220px; padding: 4px;">
+              <div style="font-size: 10px; font-weight: 800; color: #2563EB; text-transform: uppercase;">${hex.label}</div>
+              <div style="font-size: 13px; font-weight: 900; color: #0F172A; margin: 2px 0;">${hex.price.toLocaleString("tr-TR")} ₺/m²</div>
+              <div style="font-size: 10.5px; color: #64748B;">Bu petekte <strong>${hex.count} adet</strong> güncel emsal ilan bulunuyor.</div>
+              <div style="font-size: 10px; color: #059669; font-weight: 700; margin-top: 4px;">İcra Tabanı (İİK %50): ${Math.round(hex.price * 0.5).toLocaleString("tr-TR")} ₺/m²</div>
+            </div>
+          `;
+
+          poly.bindPopup(hexPopupHtml);
+          badgeMarker.bindPopup(hexPopupHtml);
+
+          poly.on("mouseover", () => {
+            poly.setStyle({ fillOpacity: 0.45, weight: 2.5, color: "#1D4ED8" });
+          });
+          poly.on("mouseout", () => {
+            poly.setStyle({ fillOpacity: 0.20, weight: 1.6, color: "#2563EB" });
+          });
+        });
 
         // Hedef Taşınmaz Pin
         const targetIcon = L.divIcon({
