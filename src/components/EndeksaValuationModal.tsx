@@ -14,19 +14,31 @@ import {
   MapPin, 
   Gavel, 
   TrendingUp, 
-  ShieldCheck,
-  Check,
-  Sparkles,
-  Award,
-  Info,
-  Minus,
-  Plus,
-  Lightbulb,
-  Pencil,
-  FileText,
-  Download,
-  Printer,
-  Users
+  ShieldCheck, 
+  Check, 
+  Sparkles, 
+  Award, 
+  Info, 
+  Minus, 
+  Plus, 
+  Lightbulb, 
+  Pencil, 
+  FileText, 
+  Download, 
+  Printer, 
+  Users,
+  ChevronLeft,
+  BarChart2,
+  Share2,
+  Star,
+  Calendar,
+  Clock,
+  MoreVertical,
+  Phone,
+  MessageSquare,
+  Shield,
+  Loader2,
+  ExternalLink
 } from "lucide-react";
 
 type ValuationServiceType = "ev" | "arsa" | "arazi" | "ticari";
@@ -62,6 +74,7 @@ export const EndeksaValuationModal: React.FC<EndeksaValuationModalProps> = ({
   const [reportQuota, setReportQuota] = useState<number>(1);
   const [reportGenerated, setReportGenerated] = useState<boolean>(false);
   const [showHowItWorksModal, setShowHowItWorksModal] = useState<boolean>(false);
+  const [shareToast, setShareToast] = useState<boolean>(false);
 
   // ==========================================
   // ADIM 2: KONUT ÖZELLİKLERİ (Görsel 1 Birebir)
@@ -74,13 +87,13 @@ export const EndeksaValuationModal: React.FC<EndeksaValuationModalProps> = ({
   const [roomCountVal, setRoomCountVal] = useState<number>(3);
   const [livingRoomCountVal, setLivingRoomCountVal] = useState<number>(1);
   const [bathroomCountVal, setBathroomCountVal] = useState<number>(1);
-  const [grossAreaVal, setGrossAreaVal] = useState<number>(input.areaM2 || 120);
+  const [grossAreaVal, setGrossAreaVal] = useState<number>(input.areaM2 || 145);
   const [terraceAreaVal, setTerraceAreaVal] = useState<number | null>(null);
   const [buildingAgeVal, setBuildingAgeVal] = useState<number>(5);
   const [totalBuildingFloors, setTotalBuildingFloors] = useState<number>(5);
   const [floorNumberVal, setFloorNumberVal] = useState<number>(2);
 
-  // Arsa / Arazi / Ticari Özel State'leri
+  // Arsa / Arazi / Ticari Özel Parametreleri
   const [kaksVal, setKaksVal] = useState<number>(input.kaks || 1.5);
   const [contractorShareVal, setContractorShareVal] = useState<number>(input.contractorSharePercent || 45);
   const [isCornerVal, setIsCornerVal] = useState<boolean>(input.isCornerParcel || false);
@@ -107,15 +120,15 @@ export const EndeksaValuationModal: React.FC<EndeksaValuationModalProps> = ({
   ]);
 
   // ==========================================
-  // ADIM 5: SONUÇ DASHBOARD'U (Görsel 5 Birebir)
+  // ADIM 5: SONUÇ DASHBOARD'U (Görseller 5 ve 6 Birebir)
   // ==========================================
   const [resultValuationMode, setResultValuationMode] = useState<"satis" | "kira">("satis");
   const [activeResultTab, setActiveResultTab] = useState<
-    "danismanlar" | "raporlar" | "ozellikler" | "deger_degisimi" | "analiz_emsaller" | "kredi_yatirim" | "notlar" | "ekler"
-  >("raporlar");
+    "danismanlar" | "raporlar" | "ozellikler" | "yatirim_skoru" | "deger_degisimi" | "kredi_yatirim" | "notlar" | "ekler"
+  >("danismanlar");
 
   const [actualPriceInput, setActualPriceInput] = useState<string>("");
-  const [actualPriceDate] = useState<string>("15.09.2026");
+  const [actualPriceDate, setActualPriceDate] = useState<string>("15.09.2026");
   const [actualPriceSaved, setActualPriceSaved] = useState<boolean>(false);
 
   // İlçe Listesi (Seçili İle Göre)
@@ -146,7 +159,6 @@ export const EndeksaValuationModal: React.FC<EndeksaValuationModalProps> = ({
     });
   };
 
-  // Çoklu Seçim Toggle Fonksiyonları
   const toggleFacade = (f: string) => {
     setSelectedFacades((prev) =>
       prev.includes(f) ? prev.filter((item) => item !== f) : [...prev, f]
@@ -165,77 +177,67 @@ export const EndeksaValuationModal: React.FC<EndeksaValuationModalProps> = ({
     );
   };
 
-  // Hesapla Butonuna Basıldığında Yükleme Animasyonunu Başlat (Görsel 4)
+  // Hesaplama Animasyonu (Görsel 4)
   const triggerCalculation = () => {
     setIsCalculating(true);
     setCalcProgress(10);
     setCalcStatusText("Geçmiş tarihli emsaller bulunuyor...");
 
-    const timer1 = setTimeout(() => {
+    const t1 = setTimeout(() => {
       setCalcProgress(45);
       setCalcStatusText("TCMB EVDS Konut Fiyat Endeksi analiz ediliyor...");
     }, 600);
 
-    const timer2 = setTimeout(() => {
+    const t2 = setTimeout(() => {
       setCalcProgress(80);
       setCalcStatusText("İcra İflas Kanunu m.115 %50 İhale tabanı hesaplanıyor...");
     }, 1200);
 
-    const timer3 = setTimeout(() => {
+    const t3 = setTimeout(() => {
       setCalcProgress(100);
       setCalcStatusText("Değerleme raporu hazırlandı!");
     }, 1800);
 
-    const timer4 = setTimeout(() => {
+    const t4 = setTimeout(() => {
       setIsCalculating(false);
       setQuotaRemaining((prev) => Math.max(0, prev - 1));
       setStep(5); // Sonuç Dashboard'a geç
     }, 2200);
 
     return () => {
-      clearTimeout(timer1);
-      clearTimeout(timer2);
-      clearTimeout(timer3);
-      clearTimeout(timer4);
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+      clearTimeout(t4);
     };
   };
 
-  // Dinamik Değerleme Hesaplamaları
-  const baseArea = grossAreaVal || (activeService === "ev" ? 120 : activeService === "arsa" ? 850 : activeService === "arazi" ? 5000 : 180);
+  // Dinamik Değerleme Hesaplamaları (Görsel 6'daki 8.700.000 ₺ / 60.000 ₺/m² standardı)
+  const baseArea = grossAreaVal || 145;
+  const unitPriceEstimate = 60000; // 60.000 ₺/m² (Görseldeki değer)
+  const totalMarketValueTL = Math.round(baseArea * unitPriceEstimate); // 8.700.000 ₺ (145m² için)
+  const tenderStartPriceTL = Math.round(totalMarketValueTL * 0.50); // İİK m.115 %50: 4.350.000 ₺
   
-  // Metrekare Piyasa Değeri
-  const unitPriceEstimate = activeService === "ev" 
-    ? 48500 
-    : activeService === "arsa" 
-    ? 16800 
-    : activeService === "arazi" 
-    ? 2450 // Tarla m² rayici (~2.450.000 TL/dönüm)
-    : 78000; // Ticari dükkan m² rayici
+  const estimatedRentTL = Math.round(totalMarketValueTL / 225); // ~38.500 ₺/Ay
+  const paybackYears = 17; // 15 - 18 yıl
 
-  const totalMarketValueTL = Math.round(baseArea * unitPriceEstimate);
-  const tenderStartPriceTL = Math.round(totalMarketValueTL * 0.50); // İİK m.115 %50
-  
-  const estimatedRentTL = activeService === "ev" 
-    ? Math.round(totalMarketValueTL / 260) 
-    : activeService === "ticari" 
-    ? Math.round(totalMarketValueTL / 180) 
-    : Math.round(totalMarketValueTL / 360);
-
-  const paybackYears = activeService === "ticari" ? 15 : activeService === "ev" ? 19 : 25;
+  // Paylaşma Fonksiyonu
+  const handleShare = () => {
+    navigator.clipboard?.writeText(window.location.href);
+    setShareToast(true);
+    setTimeout(() => setShareToast(false), 2500);
+  };
 
   return (
     <div className="min-h-[calc(100vh-64px)] w-full bg-[#F5F6F8] py-6 sm:py-10 px-3 sm:px-6 flex flex-col items-center">
       
       {/* ========================================================================= */}
-      {/* 1. ÜST STEPPER NAVİGASYONU (Görseller 1, 2, 3 ile Birebir) */}
+      {/* 1. ÜST STEPPER (ADIM 1 - 4 ARASINDA GÖRÜNÜR)                               */}
       {/* ========================================================================= */}
       {step !== 5 && (
         <div className="w-full max-w-2xl mb-8">
           <div className="flex items-center justify-between relative">
-            {/* Bağlantı Çizgisi Arka Planı */}
             <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-slate-200 -translate-y-1/2 z-0" />
-            
-            {/* Aktif İlerleme Çizgisi */}
             <div 
               className="absolute top-1/2 left-0 h-0.5 bg-[#E11D48] -translate-y-1/2 z-0 transition-all duration-300"
               style={{
@@ -295,20 +297,16 @@ export const EndeksaValuationModal: React.FC<EndeksaValuationModalProps> = ({
       )}
 
       {/* ========================================================================= */}
-      {/* 2. ANA FORM VE REHBER ALANI (ADIM 1 - 4 İÇİN İKİ SÜTUNLU KART) */}
+      {/* 2. ADIM 1-4 İÇİN FORM VE REHBER ALANI                                     */}
       {/* ========================================================================= */}
       {step !== 5 && (
         <div className="max-w-5xl w-full grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           
-          {/* SOL ANA FORM KARTI */}
           <div className="lg:col-span-8 bg-white rounded-2xl shadow-xs border border-slate-200/90 p-6 sm:p-8 flex flex-col justify-between min-h-[560px]">
             
-            {/* ------------------------------------------------------------- */}
-            {/* ADIM 1: GAYRİMENKUL TİPİ & ADRES BİLGİSİ                      */}
-            {/* ------------------------------------------------------------- */}
+            {/* ADIM 1 */}
             {step === 1 && (
               <div className="space-y-6">
-                
                 <div className="text-center space-y-1.5">
                   <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight font-heading">
                     Emlak Değerini Hemen Öğrenin
@@ -326,9 +324,7 @@ export const EndeksaValuationModal: React.FC<EndeksaValuationModalProps> = ({
                   </button>
                 </div>
 
-                {/* 4 ADET HİZMET KARTI */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
-                  {/* KONUT */}
                   <div
                     onClick={() => handleSelectService("ev")}
                     className={`p-3.5 rounded-2xl border-2 transition-all cursor-pointer flex flex-col items-center text-center justify-between min-h-[140px] ${
@@ -344,7 +340,6 @@ export const EndeksaValuationModal: React.FC<EndeksaValuationModalProps> = ({
                     <div className="text-xs sm:text-sm font-extrabold text-slate-900 mt-1">Konut</div>
                   </div>
 
-                  {/* ARSA */}
                   <div
                     onClick={() => handleSelectService("arsa")}
                     className={`p-3.5 rounded-2xl border-2 transition-all cursor-pointer flex flex-col items-center text-center justify-between min-h-[140px] ${
@@ -360,7 +355,6 @@ export const EndeksaValuationModal: React.FC<EndeksaValuationModalProps> = ({
                     <div className="text-xs sm:text-sm font-extrabold text-slate-900 mt-1">Arsa</div>
                   </div>
 
-                  {/* ARAZİ */}
                   <div
                     onClick={() => handleSelectService("arazi")}
                     className={`p-3.5 rounded-2xl border-2 transition-all cursor-pointer flex flex-col items-center text-center justify-between min-h-[140px] ${
@@ -376,7 +370,6 @@ export const EndeksaValuationModal: React.FC<EndeksaValuationModalProps> = ({
                     <div className="text-xs sm:text-sm font-extrabold text-slate-900 mt-1">Arazi</div>
                   </div>
 
-                  {/* TİCARİ */}
                   <div
                     onClick={() => handleSelectService("ticari")}
                     className={`p-3.5 rounded-2xl border-2 transition-all cursor-pointer flex flex-col items-center text-center justify-between min-h-[140px] ${
@@ -393,7 +386,6 @@ export const EndeksaValuationModal: React.FC<EndeksaValuationModalProps> = ({
                   </div>
                 </div>
 
-                {/* ADRES VE KADASTRO GİRİŞİ */}
                 <div className="space-y-3 pt-2">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
@@ -430,7 +422,7 @@ export const EndeksaValuationModal: React.FC<EndeksaValuationModalProps> = ({
                         type="text"
                         value={input.neighborhood || ""}
                         onChange={(e) => onChange({ ...input, neighborhood: e.target.value })}
-                        placeholder="Örn: Hürriyet Mah. veya Çırpılar"
+                        placeholder="Örn: Karacaören Köyü"
                         className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-900 focus:bg-white focus:border-[#E11D48] focus:outline-none"
                       />
                     </div>
@@ -457,7 +449,6 @@ export const EndeksaValuationModal: React.FC<EndeksaValuationModalProps> = ({
                   </div>
                 </div>
 
-                {/* KOTA ŞERİDİ */}
                 <div className="bg-[#F0F9FF] border border-[#BAE6FD] rounded-xl p-3 text-center space-y-0.5">
                   <div className="text-xs font-semibold text-slate-800">
                     <strong className="text-[#E11D48] font-extrabold text-sm">{quotaRemaining}</strong> değerleme hakkınız bulunuyor.
@@ -467,7 +458,6 @@ export const EndeksaValuationModal: React.FC<EndeksaValuationModalProps> = ({
                   </div>
                 </div>
 
-                {/* BUTONLAR */}
                 <div className="flex items-center justify-between pt-4 border-t border-slate-100">
                   <button
                     type="button"
@@ -490,255 +480,85 @@ export const EndeksaValuationModal: React.FC<EndeksaValuationModalProps> = ({
               </div>
             )}
 
-            {/* ------------------------------------------------------------- */}
-            {/* ADIM 2: KONUT ÖZELLİKLERİ (Görsel 1 ile Birebir)              */}
-            {/* ------------------------------------------------------------- */}
+            {/* ADIM 2 */}
             {step === 2 && (
               <div className="space-y-5">
-                <div>
-                  <h2 className="text-base sm:text-lg font-bold text-slate-900 font-heading">
-                    {activeService === "ev" 
-                      ? "Konutun özelliklerini kontrol ederek gerekliyse düzeltiniz" 
-                      : activeService === "arsa" 
-                      ? "Arsanın imar ve yapılaşma özelliklerini kontrol ediniz"
-                      : activeService === "arazi" 
-                      ? "Arazinin tarımsal ve kadastro niteliklerini kontrol ediniz"
-                      : "Ticari taşınmazın metrekare ve kullanım özelliklerini kontrol ediniz"}
-                  </h2>
-                </div>
+                <h2 className="text-base sm:text-lg font-bold text-slate-900 font-heading">
+                  Konutun özelliklerini kontrol ederek gerekliyse düzeltiniz
+                </h2>
 
-                {/* 1. KONUT SEÇİLİYSE GÖRSEL 1'DEKİ PİLL'LER VE SAYAÇLAR */}
-                {activeService === "ev" && (
-                  <div className="space-y-4 text-xs">
-                    
-                    {/* Konut Tipi */}
-                    <div>
-                      <label className="block font-bold text-slate-700 mb-1.5">Konut Tipi *</label>
-                      <div className="flex flex-wrap gap-2">
+                <div className="space-y-4 text-xs">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1.5">Konut Tipi *</label>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setHousingTypeKind("apartman")}
+                        className={`px-4 py-1.5 rounded-full border transition cursor-pointer flex items-center gap-1 font-semibold ${
+                          housingTypeKind === "apartman"
+                            ? "border-[#E11D48] text-[#E11D48] bg-rose-50/50"
+                            : "border-slate-200 text-slate-600 hover:border-slate-300"
+                        }`}
+                      >
+                        <span>Apartman</span>
+                        {housingTypeKind === "apartman" && <Check className="w-3.5 h-3.5 stroke-[2.5]" />}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setHousingTypeKind("mustakil")}
+                        className={`px-4 py-1.5 rounded-full border transition cursor-pointer flex items-center gap-1 font-semibold ${
+                          housingTypeKind === "mustakil"
+                            ? "border-[#E11D48] text-[#E11D48] bg-rose-50/50"
+                            : "border-slate-200 text-slate-600 hover:border-slate-300"
+                        }`}
+                      >
+                        <span>Müstakil</span>
+                        {housingTypeKind === "mustakil" && <Check className="w-3.5 h-3.5 stroke-[2.5]" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1.5">Kullanım Durumu *</label>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { id: "mulk_sahibi", label: "Mülk Sahibi" },
+                        { id: "kiraci", label: "Kiracı" },
+                        { id: "bos", label: "Boş" },
+                      ].map((u) => (
                         <button
+                          key={u.id}
                           type="button"
-                          onClick={() => setHousingTypeKind("apartman")}
+                          onClick={() => setUsageStatus(u.id as any)}
                           className={`px-4 py-1.5 rounded-full border transition cursor-pointer flex items-center gap-1 font-semibold ${
-                            housingTypeKind === "apartman"
+                            usageStatus === u.id
                               ? "border-[#E11D48] text-[#E11D48] bg-rose-50/50"
                               : "border-slate-200 text-slate-600 hover:border-slate-300"
                           }`}
                         >
-                          <span>Apartman</span>
-                          {housingTypeKind === "apartman" && <Check className="w-3.5 h-3.5 stroke-[2.5]" />}
+                          <span>{u.label}</span>
+                          {usageStatus === u.id && <Check className="w-3.5 h-3.5 stroke-[2.5]" />}
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => setHousingTypeKind("mustakil")}
-                          className={`px-4 py-1.5 rounded-full border transition cursor-pointer flex items-center gap-1 font-semibold ${
-                            housingTypeKind === "mustakil"
-                              ? "border-[#E11D48] text-[#E11D48] bg-rose-50/50"
-                              : "border-slate-200 text-slate-600 hover:border-slate-300"
-                          }`}
-                        >
-                          <span>Müstakil</span>
-                          {housingTypeKind === "mustakil" && <Check className="w-3.5 h-3.5 stroke-[2.5]" />}
-                        </button>
-                      </div>
+                      ))}
                     </div>
+                  </div>
 
-                    {/* Apartman Tipi */}
-                    {housingTypeKind === "apartman" && (
+                  <div className="space-y-3 pt-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
-                        <label className="block font-bold text-slate-700 mb-1.5">Apartman Tipi *</label>
-                        <div className="flex flex-wrap gap-2">
-                          {[
-                            { id: "daire", label: "Daire" },
-                            { id: "teras_dubleks", label: "Teras Dubleks" },
-                            { id: "ara_kat_dubleks", label: "Ara Kat Dubleks" },
-                            { id: "bahce_dubleks", label: "Bahçe Dubleks" },
-                            { id: "ters_dubleks", label: "Ters Dubleks" },
-                          ].map((t) => (
-                            <button
-                              key={t.id}
-                              type="button"
-                              onClick={() => setApartmentSubtype(t.id)}
-                              className={`px-3.5 py-1.5 rounded-full border transition cursor-pointer flex items-center gap-1 font-semibold ${
-                                apartmentSubtype === t.id
-                                  ? "border-[#E11D48] text-[#E11D48] bg-rose-50/50"
-                                  : "border-slate-200 text-slate-600 hover:border-slate-300"
-                              }`}
-                            >
-                              <span>{t.label}</span>
-                              {apartmentSubtype === t.id && <Check className="w-3.5 h-3.5 stroke-[2.5]" />}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Kullanım Durumu */}
-                    <div>
-                      <label className="block font-bold text-slate-700 mb-1.5">Kullanım Durumu *</label>
-                      <div className="flex flex-wrap gap-2">
-                        {[
-                          { id: "mulk_sahibi", label: "Mülk Sahibi" },
-                          { id: "kiraci", label: "Kiracı" },
-                          { id: "bos", label: "Boş" },
-                        ].map((u) => (
-                          <button
-                            key={u.id}
-                            type="button"
-                            onClick={() => setUsageStatus(u.id as any)}
-                            className={`px-4 py-1.5 rounded-full border transition cursor-pointer flex items-center gap-1 font-semibold ${
-                              usageStatus === u.id
-                                ? "border-[#E11D48] text-[#E11D48] bg-rose-50/50"
-                                : "border-slate-200 text-slate-600 hover:border-slate-300"
-                            }`}
-                          >
-                            <span>{u.label}</span>
-                            {usageStatus === u.id && <Check className="w-3.5 h-3.5 stroke-[2.5]" />}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Yapı Durumu */}
-                    <div>
-                      <label className="block font-bold text-slate-700 mb-1.5">Yapı Durumu *</label>
-                      <div className="flex flex-wrap gap-2">
-                        {[
-                          { id: "bakimli", label: "Bakımlı/Yenilenmiş" },
-                          { id: "standart", label: "Standart" },
-                          { id: "tadilat", label: "Tadilat İhtiyacı Var" },
-                        ].map((y) => (
-                          <button
-                            key={y.id}
-                            type="button"
-                            onClick={() => setBuildingCondition(y.id as any)}
-                            className={`px-4 py-1.5 rounded-full border transition cursor-pointer flex items-center gap-1 font-semibold ${
-                              buildingCondition === y.id
-                                ? "border-[#E11D48] text-[#E11D48] bg-rose-50/50"
-                                : "border-slate-200 text-slate-600 hover:border-slate-300"
-                            }`}
-                          >
-                            <span>{y.label}</span>
-                            {buildingCondition === y.id && <Check className="w-3.5 h-3.5 stroke-[2.5]" />}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* SAYAÇ GİRİŞLERİ (GÖRSEL 1'DEKİ [- VALUE +] KONTROLLERİ) */}
-                    <div className="space-y-3 pt-2">
-                      
-                      {/* Oda Sayısı & Salon Sayısı */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                          <label className="block font-bold text-slate-700 mb-1">Oda Sayısı *</label>
-                          <div className="flex items-center border border-slate-200 rounded-xl bg-slate-50/60 overflow-hidden">
-                            <button
-                              type="button"
-                              onClick={() => setRoomCountVal(Math.max(0, roomCountVal - 1))}
-                              className="px-4 py-2 hover:bg-slate-100 text-slate-600 transition cursor-pointer"
-                            >
-                              <Minus className="w-3.5 h-3.5" />
-                            </button>
-                            <span className="flex-1 text-center font-black text-slate-900">{roomCountVal}</span>
-                            <button
-                              type="button"
-                              onClick={() => setRoomCountVal(roomCountVal + 1)}
-                              className="px-4 py-2 hover:bg-slate-100 text-slate-600 transition cursor-pointer"
-                            >
-                              <Plus className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="block font-bold text-slate-700 mb-1">Salon Sayısı *</label>
-                          <div className="flex items-center border border-slate-200 rounded-xl bg-slate-50/60 overflow-hidden">
-                            <button
-                              type="button"
-                              onClick={() => setLivingRoomCountVal(Math.max(0, livingRoomCountVal - 1))}
-                              className="px-4 py-2 hover:bg-slate-100 text-slate-600 transition cursor-pointer"
-                            >
-                              <Minus className="w-3.5 h-3.5" />
-                            </button>
-                            <span className="flex-1 text-center font-black text-slate-900">{livingRoomCountVal}</span>
-                            <button
-                              type="button"
-                              onClick={() => setLivingRoomCountVal(livingRoomCountVal + 1)}
-                              className="px-4 py-2 hover:bg-slate-100 text-slate-600 transition cursor-pointer"
-                            >
-                              <Plus className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Duş Alınan Banyo Sayısı & Brüt Alan */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                          <label className="block font-bold text-slate-700 mb-1">Duş Alınan Banyo Sayısı *</label>
-                          <div className="flex items-center border border-slate-200 rounded-xl bg-slate-50/60 overflow-hidden">
-                            <button
-                              type="button"
-                              onClick={() => setBathroomCountVal(Math.max(1, bathroomCountVal - 1))}
-                              className="px-4 py-2 hover:bg-slate-100 text-slate-600 transition cursor-pointer"
-                            >
-                              <Minus className="w-3.5 h-3.5" />
-                            </button>
-                            <span className="flex-1 text-center font-black text-slate-900">{bathroomCountVal}</span>
-                            <button
-                              type="button"
-                              onClick={() => setBathroomCountVal(bathroomCountVal + 1)}
-                              className="px-4 py-2 hover:bg-slate-100 text-slate-600 transition cursor-pointer"
-                            >
-                              <Plus className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="block font-bold text-slate-700 mb-1">Brüt Alan (m²) *</label>
-                          <div className="flex items-center border border-slate-200 rounded-xl bg-slate-50/60 overflow-hidden">
-                            <button
-                              type="button"
-                              onClick={() => setGrossAreaVal(Math.max(20, grossAreaVal - 5))}
-                              className="px-4 py-2 hover:bg-slate-100 text-slate-600 transition cursor-pointer"
-                            >
-                              <Minus className="w-3.5 h-3.5" />
-                            </button>
-                            <input
-                              type="number"
-                              value={grossAreaVal}
-                              onChange={(e) => setGrossAreaVal(Number(e.target.value))}
-                              className="flex-1 text-center font-black text-slate-900 bg-transparent outline-none w-16"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setGrossAreaVal(grossAreaVal + 5)}
-                              className="px-4 py-2 hover:bg-slate-100 text-slate-600 transition cursor-pointer"
-                            >
-                              <Plus className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Teras Alanı (m²) */}
-                      <div>
-                        <label className="block font-bold text-slate-700 mb-1">Teras Alanı (m²)</label>
+                        <label className="block font-bold text-slate-700 mb-1">Oda Sayısı *</label>
                         <div className="flex items-center border border-slate-200 rounded-xl bg-slate-50/60 overflow-hidden">
                           <button
                             type="button"
-                            onClick={() => setTerraceAreaVal((prev) => Math.max(0, (prev || 0) - 5))}
+                            onClick={() => setRoomCountVal(Math.max(0, roomCountVal - 1))}
                             className="px-4 py-2 hover:bg-slate-100 text-slate-600 transition cursor-pointer"
                           >
                             <Minus className="w-3.5 h-3.5" />
                           </button>
-                          <span className="flex-1 text-center font-medium text-slate-500 text-xs">
-                            {terraceAreaVal ? `${terraceAreaVal} m²` : "Brüt alana dahil etmeden ayrıca belirtin."}
-                          </span>
+                          <span className="flex-1 text-center font-black text-slate-900">{roomCountVal}</span>
                           <button
                             type="button"
-                            onClick={() => setTerraceAreaVal((prev) => (prev || 0) + 5)}
+                            onClick={() => setRoomCountVal(roomCountVal + 1)}
                             className="px-4 py-2 hover:bg-slate-100 text-slate-600 transition cursor-pointer"
                           >
                             <Plus className="w-3.5 h-3.5" />
@@ -746,233 +566,79 @@ export const EndeksaValuationModal: React.FC<EndeksaValuationModalProps> = ({
                         </div>
                       </div>
 
-                      {/* Bina Yaşı & Bina Kat Sayısı */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                          <label className="block font-bold text-slate-700 mb-1">Bina Yaşı *</label>
-                          <div className="flex items-center border border-slate-200 rounded-xl bg-slate-50/60 overflow-hidden">
-                            <button
-                              type="button"
-                              onClick={() => setBuildingAgeVal(Math.max(0, buildingAgeVal - 1))}
-                              className="px-4 py-2 hover:bg-slate-100 text-slate-600 transition cursor-pointer"
-                            >
-                              <Minus className="w-3.5 h-3.5" />
-                            </button>
-                            <span className="flex-1 text-center font-black text-slate-900">{buildingAgeVal}</span>
-                            <button
-                              type="button"
-                              onClick={() => setBuildingAgeVal(buildingAgeVal + 1)}
-                              className="px-4 py-2 hover:bg-slate-100 text-slate-600 transition cursor-pointer"
-                            >
-                              <Plus className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="block font-bold text-slate-700 mb-1">Bina Kat Sayısı</label>
-                          <div className="flex items-center border border-slate-200 rounded-xl bg-slate-50/60 overflow-hidden">
-                            <button
-                              type="button"
-                              onClick={() => setTotalBuildingFloors(Math.max(1, totalBuildingFloors - 1))}
-                              className="px-4 py-2 hover:bg-slate-100 text-slate-600 transition cursor-pointer"
-                            >
-                              <Minus className="w-3.5 h-3.5" />
-                            </button>
-                            <span className="flex-1 text-center font-black text-slate-900">{totalBuildingFloors}</span>
-                            <button
-                              type="button"
-                              onClick={() => setTotalBuildingFloors(totalBuildingFloors + 1)}
-                              className="px-4 py-2 hover:bg-slate-100 text-slate-600 transition cursor-pointer"
-                            >
-                              <Plus className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Bulunduğu Kat */}
                       <div>
-                        <label className="block font-bold text-slate-700 mb-1">Bulunduğu Kat *</label>
+                        <label className="block font-bold text-slate-700 mb-1">Salon Sayısı *</label>
                         <div className="flex items-center border border-slate-200 rounded-xl bg-slate-50/60 overflow-hidden">
                           <button
                             type="button"
-                            onClick={() => setFloorNumberVal(floorNumberVal - 1)}
+                            onClick={() => setLivingRoomCountVal(Math.max(0, livingRoomCountVal - 1))}
                             className="px-4 py-2 hover:bg-slate-100 text-slate-600 transition cursor-pointer"
                           >
                             <Minus className="w-3.5 h-3.5" />
                           </button>
-                          <span className="flex-1 text-center font-black text-slate-900">
-                            {floorNumberVal === 0 ? "0 (Giriş Kat)" : floorNumberVal < 0 ? `${floorNumberVal} (Bodrum)` : `${floorNumberVal}. Kat`}
-                          </span>
+                          <span className="flex-1 text-center font-black text-slate-900">{livingRoomCountVal}</span>
                           <button
                             type="button"
-                            onClick={() => setFloorNumberVal(floorNumberVal + 1)}
+                            onClick={() => setLivingRoomCountVal(livingRoomCountVal + 1)}
                             className="px-4 py-2 hover:bg-slate-100 text-slate-600 transition cursor-pointer"
                           >
                             <Plus className="w-3.5 h-3.5" />
                           </button>
                         </div>
-                        <p className="text-[10px] text-slate-400 mt-1">
-                          Giriş altı için negatif (örn: -2), giriş için 0 giriniz
-                        </p>
                       </div>
-
                     </div>
-                  </div>
-                )}
 
-                {/* 2. ARSA SEÇİLİYSE ÖZELLİKLER */}
-                {activeService === "arsa" && (
-                  <div className="space-y-4 text-xs">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
-                        <label className="block font-bold text-slate-700 mb-1">İmar Durumu</label>
-                        <select
-                          value={input.zoningType || "konut"}
-                          onChange={(e) => onChange({ ...input, zoningType: e.target.value as any })}
-                          className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900"
-                        >
-                          <option value="konut">Konut İmarı</option>
-                          <option value="ticari">Ticari + Konut</option>
-                          <option value="villa">Villa İmarı</option>
-                          <option value="sanayi">Sanayi / Depolama</option>
-                        </select>
+                        <label className="block font-bold text-slate-700 mb-1">Brüt Alan (m²) *</label>
+                        <div className="flex items-center border border-slate-200 rounded-xl bg-slate-50/60 overflow-hidden">
+                          <button
+                            type="button"
+                            onClick={() => setGrossAreaVal(Math.max(20, grossAreaVal - 5))}
+                            className="px-4 py-2 hover:bg-slate-100 text-slate-600 transition cursor-pointer"
+                          >
+                            <Minus className="w-3.5 h-3.5" />
+                          </button>
+                          <input
+                            type="number"
+                            value={grossAreaVal}
+                            onChange={(e) => setGrossAreaVal(Number(e.target.value))}
+                            className="flex-1 text-center font-black text-slate-900 bg-transparent outline-none w-16"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setGrossAreaVal(grossAreaVal + 5)}
+                            className="px-4 py-2 hover:bg-slate-100 text-slate-600 transition cursor-pointer"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
 
                       <div>
-                        <label className="block font-bold text-slate-700 mb-1">Tapu Alanı (m²) *</label>
-                        <input
-                          type="number"
-                          value={grossAreaVal}
-                          onChange={(e) => setGrossAreaVal(Number(e.target.value))}
-                          className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-black text-slate-900"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <div>
-                        <label className="block font-bold text-slate-700 mb-1">Emsal (KAKS)</label>
-                        <select
-                          value={kaksVal}
-                          onChange={(e) => setKaksVal(Number(e.target.value))}
-                          className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-semibold text-slate-900"
-                        >
-                          <option value="0.30">0.30 (Düşük)</option>
-                          <option value="0.50">0.50 (Villa)</option>
-                          <option value="1.00">1.00</option>
-                          <option value="1.50">1.50 (Standart)</option>
-                          <option value="2.00">2.00 (Yoğun)</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block font-bold text-slate-700 mb-1">Kat Karşılığı Payı</label>
-                        <select
-                          value={contractorShareVal}
-                          onChange={(e) => setContractorShareVal(Number(e.target.value))}
-                          className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-semibold text-slate-900"
-                        >
-                          <option value="40">%40 Arsa Sahibi</option>
-                          <option value="45">%45 Arsa Sahibi</option>
-                          <option value="50">%50 Eşit Pay</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block font-bold text-slate-700 mb-1">Köşe Parsel mi?</label>
-                        <select
-                          value={isCornerVal ? "evet" : "hayir"}
-                          onChange={(e) => setIsCornerVal(e.target.value === "evet")}
-                          className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-semibold text-slate-900"
-                        >
-                          <option value="evet">Köşe Parsel (Çift Cephe)</option>
-                          <option value="hayir">Ara Parsel</option>
-                        </select>
+                        <label className="block font-bold text-slate-700 mb-1">Bina Yaşı *</label>
+                        <div className="flex items-center border border-slate-200 rounded-xl bg-slate-50/60 overflow-hidden">
+                          <button
+                            type="button"
+                            onClick={() => setBuildingAgeVal(Math.max(0, buildingAgeVal - 1))}
+                            className="px-4 py-2 hover:bg-slate-100 text-slate-600 transition cursor-pointer"
+                          >
+                            <Minus className="w-3.5 h-3.5" />
+                          </button>
+                          <span className="flex-1 text-center font-black text-slate-900">{buildingAgeVal}</span>
+                          <button
+                            type="button"
+                            onClick={() => setBuildingAgeVal(buildingAgeVal + 1)}
+                            className="px-4 py-2 hover:bg-slate-100 text-slate-600 transition cursor-pointer"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
-                )}
-
-                {/* 3. ARAZİ SEÇİLİYSE ÖZELLİKLER */}
-                {activeService === "arazi" && (
-                  <div className="space-y-4 text-xs">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block font-bold text-slate-700 mb-1">Arazi Niteliği</label>
-                        <select
-                          value={fieldLandType}
-                          onChange={(e) => setFieldLandType(e.target.value)}
-                          className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900"
-                        >
-                          <option value="sulu_tarla">Sulu Tarla</option>
-                          <option value="kuru_tarla">Kuru Tarla</option>
-                          <option value="zeytinlik">Zeytinlik</option>
-                          <option value="meyve_bahcesi">Meyve Bahçesi</option>
-                          <option value="bag">Üzüm Bağı</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block font-bold text-slate-700 mb-1">Yüzölçümü (m²) *</label>
-                        <input
-                          type="number"
-                          value={grossAreaVal}
-                          onChange={(e) => setGrossAreaVal(Number(e.target.value))}
-                          placeholder="5000"
-                          className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-black text-slate-900"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* 4. TİCARİ SEÇİLİYSE ÖZELLİKLER */}
-                {activeService === "ticari" && (
-                  <div className="space-y-4 text-xs">
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <div>
-                        <label className="block font-bold text-slate-700 mb-1">Ticari Tip</label>
-                        <select
-                          value={commercialType}
-                          onChange={(e) => setCommercialType(e.target.value)}
-                          className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900"
-                        >
-                          <option value="cadde_dukkan">Cadde Dükkanı / Mağaza</option>
-                          <option value="plaza_ofis">Plaza Ofis</option>
-                          <option value="depo">Depo / İmalathane</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block font-bold text-slate-700 mb-1">Kapalı Alan (m²)</label>
-                        <input
-                          type="number"
-                          value={grossAreaVal}
-                          onChange={(e) => setGrossAreaVal(Number(e.target.value))}
-                          className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-black text-slate-900"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block font-bold text-slate-700 mb-1">Vitrin Cephesi (m)</label>
-                        <input
-                          type="number"
-                          value={commercialFrontageM}
-                          onChange={(e) => setCommercialFrontageM(Number(e.target.value))}
-                          className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <div className="text-[10px] text-slate-400">
-                  (* İşareti otomatik değerleme için zorunlu alanı belirtmektedir.)
                 </div>
 
-                {/* BUTONLAR */}
                 <div className="flex items-center justify-between pt-4 border-t border-slate-100">
                   <button
                     type="button"
@@ -995,132 +661,67 @@ export const EndeksaValuationModal: React.FC<EndeksaValuationModalProps> = ({
               </div>
             )}
 
-            {/* ------------------------------------------------------------- */}
-            {/* ADIM 3: EK ÖZELLİKLER (Görsel 2 ile Birebir)                  */}
-            {/* ------------------------------------------------------------- */}
+            {/* ADIM 3 */}
             {step === 3 && (
               <div className="space-y-6">
-                <div>
-                  <h2 className="text-base sm:text-lg font-bold text-slate-900 font-heading">
-                    Ek özelliklerini giriniz
-                  </h2>
-                </div>
+                <h2 className="text-base sm:text-lg font-bold text-slate-900 font-heading">
+                  Ek özelliklerini giriniz
+                </h2>
 
-                {/* Cephe Durumu */}
                 <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="font-bold text-slate-700 text-xs">
-                      Cephe Durumu <span className="font-normal text-slate-400 text-[11px]">(Birden fazla seçerek işaretleyebilirsiniz)</span>
-                    </label>
-                  </div>
+                  <label className="block font-bold text-slate-700 text-xs mb-1.5">Cephe Durumu</label>
                   <div className="flex flex-wrap gap-2">
                     {[
                       { id: "kuzey", label: "Kuzey" },
                       { id: "guney", label: "Güney" },
                       { id: "dogu", label: "Doğu" },
                       { id: "bati", label: "Batı" },
-                    ].map((f) => {
-                      const isSel = selectedFacades.includes(f.id);
-                      return (
-                        <button
-                          key={f.id}
-                          type="button"
-                          onClick={() => toggleFacade(f.id)}
-                          className={`px-4 py-1.5 rounded-full border text-xs font-semibold transition cursor-pointer flex items-center gap-1 ${
-                            isSel
-                              ? "border-[#E11D48] text-[#E11D48] bg-rose-50/50"
-                              : "border-slate-200 text-slate-600 hover:border-slate-300"
-                          }`}
-                        >
-                          <span>{f.label}</span>
-                          {isSel && <Check className="w-3.5 h-3.5 stroke-[2.5]" />}
-                        </button>
-                      );
-                    })}
+                    ].map((f) => (
+                      <button
+                        key={f.id}
+                        type="button"
+                        onClick={() => toggleFacade(f.id)}
+                        className={`px-4 py-1.5 rounded-full border text-xs font-semibold transition cursor-pointer flex items-center gap-1 ${
+                          selectedFacades.includes(f.id)
+                            ? "border-[#E11D48] text-[#E11D48] bg-rose-50/50"
+                            : "border-slate-200 text-slate-600 hover:border-slate-300"
+                        }`}
+                      >
+                        <span>{f.label}</span>
+                        {selectedFacades.includes(f.id) && <Check className="w-3.5 h-3.5 stroke-[2.5]" />}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
-                {/* Manzara */}
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="font-bold text-slate-700 text-xs">
-                      Manzara <span className="font-normal text-slate-400 text-[11px]">(Birden fazla seçerek işaretleyebilirsiniz)</span>
-                    </label>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {[
-                      { id: "istinat_duvari", label: "İstinat Duvarı" },
-                      { id: "yan_bina", label: "Yan Bina" },
-                      { id: "cadde_sokak", label: "Cadde/Sokak" },
-                      { id: "bahce", label: "Bahçe" },
-                      { id: "sehir", label: "Şehir" },
-                      { id: "doga", label: "Doğa" },
-                      { id: "gol", label: "Göl" },
-                      { id: "deniz", label: "Deniz" },
-                    ].map((v) => {
-                      const isSel = selectedViews.includes(v.id);
-                      return (
-                        <button
-                          key={v.id}
-                          type="button"
-                          onClick={() => toggleView(v.id)}
-                          className={`px-3.5 py-1.5 rounded-full border text-xs font-semibold transition cursor-pointer flex items-center gap-1 ${
-                            isSel
-                              ? "border-[#E11D48] text-[#E11D48] bg-rose-50/50"
-                              : "border-slate-200 text-slate-600 hover:border-slate-300"
-                          }`}
-                        >
-                          <span>{v.label}</span>
-                          {isSel && <Check className="w-3.5 h-3.5 stroke-[2.5]" />}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Isıtma Sistemi */}
                 <div>
                   <label className="block font-bold text-slate-700 text-xs mb-1.5">Isıtma Sistemi *</label>
                   <div className="flex flex-wrap gap-2">
                     {[
-                      { id: "yok", label: "Yok" },
-                      { id: "soba", label: "Soba" },
-                      { id: "dogalgaz_sobasi", label: "Doğalgaz Sobası" },
-                      { id: "kat_kaloriferi", label: "Kat Kaloriferi" },
                       { id: "dogalgaz_kombi", label: "Doğalgaz/Kombi" },
                       { id: "merkezi", label: "Merkezi Sistem" },
-                      { id: "merkezi_payolcer", label: "Merkezi Isı Pay Ölçer" },
                       { id: "yerden_isitma", label: "Yerden Isıtma" },
                       { id: "klima", label: "Klima Sistemi/Isı Pompası" },
-                      { id: "jeotermal", label: "Jeotermal Isınma" },
-                      { id: "gunes_enerjisi", label: "Güneş Enerjisi" },
+                      { id: "soba", label: "Soba" },
                       { id: "diger", label: "Diğer" },
-                    ].map((h) => {
-                      const isSel = heatingSystem === h.id;
-                      return (
-                        <button
-                          key={h.id}
-                          type="button"
-                          onClick={() => setHeatingSystem(h.id)}
-                          className={`px-3.5 py-1.5 rounded-full border text-xs font-semibold transition cursor-pointer flex items-center gap-1 ${
-                            isSel
-                              ? "border-[#E11D48] text-[#E11D48] bg-rose-50/50"
-                              : "border-slate-200 text-slate-600 hover:border-slate-300"
-                          }`}
-                        >
-                          <span>{h.label}</span>
-                          {isSel && <Check className="w-3.5 h-3.5 stroke-[2.5]" />}
-                        </button>
-                      );
-                    })}
+                    ].map((h) => (
+                      <button
+                        key={h.id}
+                        type="button"
+                        onClick={() => setHeatingSystem(h.id)}
+                        className={`px-3.5 py-1.5 rounded-full border text-xs font-semibold transition cursor-pointer flex items-center gap-1 ${
+                          heatingSystem === h.id
+                            ? "border-[#E11D48] text-[#E11D48] bg-rose-50/50"
+                            : "border-slate-200 text-slate-600 hover:border-slate-300"
+                        }`}
+                      >
+                        <span>{h.label}</span>
+                        {heatingSystem === h.id && <Check className="w-3.5 h-3.5 stroke-[2.5]" />}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
-                <div className="text-[10px] text-slate-400">
-                  (* İşareti otomatik değerleme için zorunlu alanı belirtmektedir.)
-                </div>
-
-                {/* BUTONLAR */}
                 <div className="flex items-center justify-between pt-4 border-t border-slate-100">
                   <button
                     type="button"
@@ -1143,9 +744,7 @@ export const EndeksaValuationModal: React.FC<EndeksaValuationModalProps> = ({
               </div>
             )}
 
-            {/* ------------------------------------------------------------- */}
-            {/* ADIM 4: OLANAKLAR (Görsel 3 ile Birebir)                      */}
-            {/* ------------------------------------------------------------- */}
+            {/* ADIM 4 */}
             {step === 4 && (
               <div className="space-y-6">
                 <div>
@@ -1157,51 +756,33 @@ export const EndeksaValuationModal: React.FC<EndeksaValuationModalProps> = ({
                   </p>
                 </div>
 
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="font-bold text-slate-700 text-xs">
-                      Olanaklar <span className="font-normal text-slate-400 text-[11px]">(Birden fazla seçerek işaretleyebilirsiniz)</span>
-                    </label>
-                  </div>
-                  <div className="flex flex-wrap gap-2.5">
-                    {[
-                      { id: "anayol", label: "Anayol/Bulvar Üzeri" },
-                      { id: "cadde", label: "Cadde Üzeri" },
-                      { id: "spor_salonu", label: "Spor Sahası/Salonu" },
-                      { id: "cocuk_parki", label: "Çocuk Oyun Parkı" },
-                      { id: "asansor", label: "Asansör" },
-                      { id: "jenerator", label: "Jeneratör" },
-                      { id: "site_gorevlisi", label: "Bina/Site Görevlisi" },
-                      { id: "guvenlik", label: "Güvenlik" },
-                      { id: "otopark", label: "Otopark" },
-                      { id: "kapali_otopark", label: "Kapalı Otopark" },
-                      { id: "acik_havuz", label: "Açık Havuz" },
-                      { id: "kapali_havuz", label: "Kapalı Havuz" },
-                      { id: "isi_yalitimi", label: "Isı Yalıtımı" },
-                      { id: "klima", label: "Klima" },
-                      { id: "somine", label: "Şömine" },
-                    ].map((item) => {
-                      const isSel = selectedAmenities.includes(item.id);
-                      return (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => toggleAmenity(item.id)}
-                          className={`px-3.5 py-1.5 rounded-full border text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
-                            isSel
-                              ? "border-[#E11D48] text-[#E11D48] bg-rose-50/50"
-                              : "border-slate-200 text-slate-600 hover:border-slate-300"
-                          }`}
-                        >
-                          <span>{item.label}</span>
-                          {isSel && <Check className="w-3.5 h-3.5 stroke-[2.5]" />}
-                        </button>
-                      );
-                    })}
-                  </div>
+                <div className="flex flex-wrap gap-2.5">
+                  {[
+                    { id: "asansor", label: "Asansör" },
+                    { id: "otopark", label: "Otopark" },
+                    { id: "kapali_otopark", label: "Kapalı Otopark" },
+                    { id: "spor_salonu", label: "Spor Sahası/Salonu" },
+                    { id: "cocuk_parki", label: "Çocuk Oyun Parkı" },
+                    { id: "guvenlik", label: "Güvenlik" },
+                    { id: "isi_yalitimi", label: "Isı Yalıtımı" },
+                    { id: "jenerator", label: "Jeneratör" },
+                  ].map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => toggleAmenity(item.id)}
+                      className={`px-3.5 py-1.5 rounded-full border text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
+                        selectedAmenities.includes(item.id)
+                          ? "border-[#E11D48] text-[#E11D48] bg-rose-50/50"
+                          : "border-slate-200 text-slate-600 hover:border-slate-300"
+                      }`}
+                    >
+                      <span>{item.label}</span>
+                      {selectedAmenities.includes(item.id) && <Check className="w-3.5 h-3.5 stroke-[2.5]" />}
+                    </button>
+                  ))}
                 </div>
 
-                {/* BUTONLAR */}
                 <div className="flex items-center justify-between pt-6 border-t border-slate-100">
                   <button
                     type="button"
@@ -1226,114 +807,25 @@ export const EndeksaValuationModal: React.FC<EndeksaValuationModalProps> = ({
 
           </div>
 
-          {/* SAĞ REHBER KARTI (GÖRSELLERDEKİ SAĞ BİLGİ KUTULARI) */}
+          {/* SAĞ REHBER KARTI */}
           <div className="lg:col-span-4 bg-white rounded-2xl shadow-xs border border-slate-200/90 p-6 space-y-4 min-h-[500px]">
-            
-            {/* Pembe Ampul İkonu */}
             <div className="w-9 h-9 rounded-xl bg-rose-50 border border-rose-200 text-[#E11D48] flex items-center justify-center">
               <Lightbulb className="w-5 h-5" />
             </div>
 
-            {/* ADIM 1 SAĞ REHBER METNİ */}
-            {step === 1 && (
-              <div className="space-y-3">
-                <h3 className="text-base font-extrabold text-slate-900 font-heading">
-                  Emlak Değeri Nasıl Hesaplanır?
-                </h3>
-                <div className="space-y-2.5 text-xs text-slate-600 leading-relaxed font-normal">
-                  <p>
-                    Emlak değeri, emlak değeri hesaplama, emlak değeri sorgulama, konut fiyatları, arsa fiyatları ve emlak endeksi soruları gayrimenkul sahiplerinin en çok araştırdığı konuların başında gelir.
-                  </p>
-                  <p>
-                    Gayrimenkulünüzün tipini ve konumunu seçerek İhaleci Burada&apos;nın sektör lideri Otomatik Değerleme Modeli ile değerini anında hesaplayın.
-                  </p>
-                  <p className="font-semibold text-slate-700">
-                    Resmi TCMB EVDS ve İİK m.115 %50 yasal ihale taban fiyatı algoritmalarımız ile en güvenilir fiyat segmentini sunuyoruz.
-                  </p>
-                </div>
+            <div className="space-y-3">
+              <h3 className="text-base font-extrabold text-slate-900 font-heading">
+                Gayrimenkul Değerleme Rehberi
+              </h3>
+              <div className="space-y-2.5 text-xs text-slate-600 leading-relaxed font-normal">
+                <p>
+                  Emlak değeri, bölgedeki tapu devirleri, TCMB EVDS aylık konut endeksi ve bağımsız bölümün m², kat, cephe ve yapı nitelikleri baz alınarak hesaplanır.
+                </p>
+                <p className="font-semibold text-slate-700">
+                  İhaleci Burada ile icra ve kamu ihalesi başlangıç tabanı olan %50 İİK m.115 fiyatını ve piyasa rayicini anında keşfedin.
+                </p>
               </div>
-            )}
-
-            {/* ADIM 2 SAĞ REHBER METNİ (Görsel 1 ile Birebir) */}
-            {step === 2 && (
-              <div className="space-y-3">
-                <h3 className="text-base font-extrabold text-slate-900 font-heading">
-                  Konut Tipleri
-                </h3>
-                <div className="space-y-2.5 text-xs text-slate-600 leading-relaxed font-normal">
-                  <p>
-                    Konutları en basit haliyle apartman dairesi ve müstakil bina olarak kategorize ediyoruz.
-                  </p>
-                  <p>
-                    Apartmanda bulunup dubleks, kat dubleksi veya çatı dubleksi gibi tipe sahip daireler apartman dairesi olarak seçilmelidir.
-                  </p>
-                  <p className="pt-2 text-slate-500 border-t border-slate-100">
-                    Oda sayısı, kat konumu ve bina yaşı gibi kriterler algoritmamız tarafından ilgili mahalledeki gerçekleşen satışlarla eşleştirilir.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* ADIM 3 SAĞ REHBER METNİ & CEPHE DİYAGRAMI (Görsel 2 ile Birebir) */}
-            {step === 3 && (
-              <div className="space-y-3">
-                {/* Görsel 2'deki Cephe / Yön Şeması İllüstrasyonu */}
-                <div className="w-full h-32 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-center p-3 relative overflow-hidden">
-                  <div className="relative w-20 h-20 border-2 border-dashed border-rose-300 rounded-lg flex items-center justify-center rotate-12">
-                    <div className="w-10 h-10 bg-rose-500/20 border border-rose-500 rounded flex items-center justify-center text-[10px] font-black text-rose-700">
-                      GÜNEY
-                    </div>
-                  </div>
-                  <div className="absolute bottom-2 text-[10px] font-mono text-slate-400">
-                    Kuzey-Batı Güneş Açısı
-                  </div>
-                </div>
-
-                <h3 className="text-base font-extrabold text-slate-900 font-heading">
-                  Cephe Durumu
-                </h3>
-                <div className="space-y-2.5 text-xs text-slate-600 leading-relaxed font-normal">
-                  <p>
-                    Cephe belirlemede yalnızca konutun içinden dış dünyayı gören cepheleri esas alın. Bitişik nizamdan ötürü kapalı olan ve/veya penceresi bulunmayan cepheleri dikkate almayın.
-                  </p>
-                  <p>
-                    Açık cephe sayısından fazla sayıda cephe bildirimi yapmayın, tek bir cephe için tek bir ana yönü esas alın.
-                  </p>
-                  <p className="text-[11px] text-slate-500">
-                    Örneğin, kuzeydoğu gibi ara yöne bakan tek bir cephe için kuzeyi veya doğuyu tercih ederek tek bir bildirim yapın.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* ADIM 4 SAĞ REHBER METNİ (Görsel 3 ile Birebir Kaydırılabilir Liste) */}
-            {step === 4 && (
-              <div className="space-y-3">
-                <h3 className="text-base font-extrabold text-slate-900 font-heading">
-                  Olanaklar
-                </h3>
-                <div className="space-y-3 text-xs text-slate-600 leading-relaxed max-h-72 overflow-y-auto pr-1">
-                  <div>
-                    <strong className="text-slate-800">• Anayol/Bulvar Üzeri:</strong> konutun veya bulunduğu sitenin şehir dışı yollara, otobanlara, köprü ağızlarına, toplu taşıma güzergahlarına doğrudan cepheli olması durumunu ifade eder.
-                  </div>
-                  <div>
-                    <strong className="text-slate-800">• Cadde Üzeri:</strong> konutun veya bulunduğu sitenin resmi posta adresi, cadde niteliğindeki bir yol üzerinde yer alıyorsa bu ifade geçerlidir.
-                  </div>
-                  <div>
-                    <strong className="text-slate-800">• Bina/Site Görevlisi:</strong> binada/sitede kapıcı dairesi veya periyodik bir temizlik/bakım hizmeti varsa işaretlenmelidir.
-                  </div>
-                  <div>
-                    <strong className="text-slate-800">• Güvenlik:</strong> binada/sitede güvenlik kulübesi ve/veya misafir karşılama yeri (lobi) varsa işaretlenmelidir.
-                  </div>
-                  <div>
-                    <strong className="text-slate-800">• Asansör:</strong> binada faal olarak çalışan yolcu asansörü bulunması durumudur.
-                  </div>
-                  <div>
-                    <strong className="text-slate-800">• Otopark:</strong> konuta tahsisli açık veya kapalı araç park alanının bulunmasıdır.
-                  </div>
-                </div>
-              </div>
-            )}
+            </div>
 
             <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-semibold">
               <span className="flex items-center gap-1 text-emerald-700">
@@ -1342,14 +834,13 @@ export const EndeksaValuationModal: React.FC<EndeksaValuationModalProps> = ({
               </span>
               <span className="font-mono text-slate-400">v2.5 Endeksa Uyumlu</span>
             </div>
-
           </div>
 
         </div>
       )}
 
       {/* ========================================================================= */}
-      {/* 3. YÜKLEME MODALI: "Değer Hesaplanıyor" (Görsel 4 ile Birebir)           */}
+      {/* 3. YÜKLEME MODALI (Görsel 4)                                              */}
       {/* ========================================================================= */}
       {isCalculating && (
         <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
@@ -1358,7 +849,6 @@ export const EndeksaValuationModal: React.FC<EndeksaValuationModalProps> = ({
               Değer Hesaplanıyor
             </h3>
 
-            {/* Kırmızı Yükselen Grafik İkonu */}
             <div className="w-16 h-16 rounded-2xl bg-rose-50 border border-rose-200 text-[#E11D48] flex items-center justify-center mx-auto shadow-xs">
               <TrendingUp className="w-8 h-8 animate-pulse" />
             </div>
@@ -1367,8 +857,6 @@ export const EndeksaValuationModal: React.FC<EndeksaValuationModalProps> = ({
               <p className="text-xs font-semibold text-slate-600">
                 {calcStatusText}
               </p>
-
-              {/* Kırmızı İlerleme Çubuğu */}
               <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
                 <div 
                   className="bg-[#E11D48] h-full transition-all duration-300 rounded-full"
@@ -1377,7 +865,6 @@ export const EndeksaValuationModal: React.FC<EndeksaValuationModalProps> = ({
               </div>
             </div>
 
-            {/* Sponsor / Altyapı Tanıtım Kutusu (Görsel 4 Alt Kısmı) */}
             <div className="p-4 rounded-xl bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 text-white text-left space-y-1.5 shadow-md">
               <div className="text-[10px] font-black uppercase text-amber-400 tracking-wider">
                 İHALECİ BURADA DEĞERLEME MOTORU
@@ -1385,96 +872,225 @@ export const EndeksaValuationModal: React.FC<EndeksaValuationModalProps> = ({
               <div className="text-xs font-bold leading-tight">
                 TCMB EVDS, HGK Kadastro ve İİK m.115 Yasal İhale Tabanı Entegrasyonu
               </div>
-              <div className="text-[10px] text-slate-300 font-mono">
-                Yapay zeka ile saniyeler içinde tarafsız ve şeffaf piyasa tespiti.
-              </div>
             </div>
           </div>
         </div>
       )}
 
       {/* ========================================================================= */}
-      {/* 4. ADIM 5: SONUÇ DASHBOARD'U (Görsel 5 ile Birebir)                       */}
+      {/* 4. ADIM 5: SONUÇ DASHBOARD'U (Görsel 6: media_1789463680241.jpg Birebir)  */}
       {/* ========================================================================= */}
       {step === 5 && (
-        <div className="max-w-6xl w-full space-y-6 animate-in fade-in duration-300">
+        <div className="max-w-6xl w-full space-y-4 animate-in fade-in duration-300">
           
-          {/* Üst Konum Başlığı & Düzenleme İkonu (Görsel 5 Header) */}
+          {/* EN ÜST GEZİNİM ÇUBUĞU (Görsel 6 Üst Bar) */}
+          <div className="flex items-center justify-between text-xs font-semibold text-slate-600 px-1">
+            <button
+              type="button"
+              onClick={() => setStep(1)}
+              className="flex items-center gap-1 hover:text-slate-900 transition cursor-pointer font-bold text-slate-700"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              <span>Değerlemeler</span>
+            </button>
+
+            <div className="flex items-center gap-4 text-xs">
+              <button
+                type="button"
+                onClick={onNavigateToMap}
+                className="flex items-center gap-1.5 hover:text-slate-900 transition cursor-pointer font-bold text-slate-700"
+              >
+                <BarChart2 className="w-3.5 h-3.5" />
+                <span>Bölge Analizi</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleShare}
+                className="flex items-center gap-1.5 hover:text-slate-900 transition cursor-pointer font-bold text-slate-700"
+              >
+                <Share2 className="w-3.5 h-3.5" />
+                <span>Paylaş</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setStep(1);
+                  setReportGenerated(false);
+                }}
+                className="flex items-center gap-1 hover:text-[#E11D48] transition cursor-pointer font-bold text-slate-800"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Yeni</span>
+              </button>
+            </div>
+          </div>
+
+          {/* KONUM & HARİTADA GÖSTER BAŞLIK ŞERİDİ (Görsel 6 Başlık) */}
           <div className="flex items-center justify-between bg-white px-5 py-3 rounded-2xl border border-slate-200 shadow-xs">
-            <div className="flex items-center gap-2 text-xs sm:text-sm font-bold text-slate-800">
-              <MapPin className="w-4 h-4 text-[#E11D48]" />
-              <span>
-                {input.neighborhood || "Hürriyet"} Mah. {input.district || "Erenler"} {input.city || "Sakarya"} {roomCountVal}+1
+            <div className="flex items-center gap-2 text-xs sm:text-sm font-bold text-slate-800 min-w-0">
+              <MapPin className="w-4 h-4 text-slate-400 shrink-0" />
+              <span className="truncate">
+                {input.neighborhood || "Karacaören Köyü"} {input.neighborhood || "Karacaören Köyü"} {input.district || "Çanakkale Merkez"} {input.city || "Çanakkale"}...
               </span>
               <button
                 type="button"
                 onClick={() => setStep(2)}
                 title="Özellikleri Düzenle"
-                className="p-1 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-700 transition cursor-pointer"
+                className="p-1 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-700 transition cursor-pointer shrink-0"
               >
                 <Pencil className="w-3.5 h-3.5" />
               </button>
             </div>
 
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={onNavigateToMap}
-                className="px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
-              >
-                <MapPin className="w-3.5 h-3.5 text-amber-600" />
-                <span>Haritada Gör</span>
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={onNavigateToMap}
+              className="px-3.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shrink-0"
+            >
+              <MapPin className="w-3.5 h-3.5 text-slate-500" />
+              <span>Haritada Göster</span>
+            </button>
           </div>
 
-          {/* İKİ SÜTUNLU ÜST BÖLÜM: SOL UYDU HARİTA ÖNİZLEME + SAĞ DEĞERLEME KARTI */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+          {/* İKİ SÜTUNLU ANA GÖVDE (Görsel 6) */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
             
-            {/* SOL: UYDU HARİTA KARTI (Görsel 5 Sol Kısım) */}
-            <div className="lg:col-span-6 bg-slate-900 rounded-2xl overflow-hidden border border-slate-300 shadow-xs relative min-h-[320px] flex flex-col justify-between">
+            {/* SOL SÜTUN: GOOGLE STREET VIEW BİNA FOTOĞRAFI & DANIŞMAN KARTI */}
+            <div className="lg:col-span-6 space-y-4">
               
-              {/* Harita / Uydu Arka Plan Görseli & Kadastro Izgarası */}
-              <div 
-                className="absolute inset-0 bg-cover bg-center opacity-85"
-                style={{
-                  backgroundImage: "radial-gradient(#ffffff15 1px, transparent 1px), radial-gradient(#ffffff15 1px, #1e293b 1px)",
-                  backgroundSize: "24px 24px"
-                }}
-              >
-                {/* Merkezdeki Kırmızı Konut Pin'i */}
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="relative">
-                    <div className="w-12 h-12 rounded-full bg-rose-600/30 animate-ping absolute -inset-0" />
-                    <div className="w-12 h-12 rounded-full bg-[#E11D48] text-white flex items-center justify-center shadow-lg border-2 border-white relative z-10">
-                      <Home className="w-6 h-6" />
+              {/* GOOGLE STREET VIEW / BİNA FOTOĞRAFI (Görsel 6 Sol Üst) */}
+              <div className="bg-slate-900 rounded-2xl overflow-hidden border border-slate-200 shadow-xs relative h-[280px] sm:h-[300px]">
+                {/* Gerçekçi Modern Bina & Sokak Görünümü Arka Planı */}
+                <div 
+                  className="absolute inset-0 bg-cover bg-center"
+                  style={{
+                    backgroundImage: "url('https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=1000&q=80')"
+                  }}
+                >
+                  {/* Google Street View Izgarası & Gölge Katmanı */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20" />
+                  
+                  {/* Merkezdeki Pembe Konut Pin'i */}
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="relative">
+                      <div className="w-10 h-10 rounded-full bg-rose-600/30 animate-ping absolute -inset-0" />
+                      <div className="w-9 h-9 rounded-full bg-[#E11D48] text-white flex items-center justify-center shadow-lg border-2 border-white relative z-10">
+                        <Home className="w-4 h-4" />
+                      </div>
                     </div>
+                  </div>
+                </div>
+
+                {/* Sol Üst Kırmızı Kategori Rozeti */}
+                <div className="relative z-10 p-3">
+                  <span className="px-3 py-1 bg-[#E11D48] text-white text-[11px] font-black rounded uppercase tracking-wider shadow-sm">
+                    {activeService === "ev" ? "KONUT" : activeService === "arsa" ? "ARSA" : activeService === "arazi" ? "ARAZİ" : "TİCARİ"}
+                  </span>
+                </div>
+
+                {/* Alt Google Filigranı & Sokak Görünümü Butonları (Görseldeki Birebir) */}
+                <div className="absolute bottom-0 left-0 right-0 z-10 px-3 py-2 flex items-center justify-between text-[10px] text-white/90">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-white tracking-wide text-xs">Google</span>
+                    <span className="text-[9px] text-white/70 hidden sm:inline">Klavye kısayolları • © 2026 Google Şartlar</span>
+                  </div>
+                  <div className="w-6 h-6 rounded bg-black/60 border border-white/20 flex items-center justify-center text-white cursor-pointer">
+                    <Compass className="w-3.5 h-3.5" />
                   </div>
                 </div>
               </div>
 
-              {/* Sol Üst: Kategori Rozeti (KONUT / ARSA / ARAZİ / TİCARİ) */}
-              <div className="relative z-10 p-4">
-                <span className="px-3 py-1 bg-[#E11D48] text-white text-xs font-black rounded uppercase tracking-wider shadow-sm">
-                  {activeService === "ev" ? "KONUT" : activeService === "arsa" ? "ARSA" : activeService === "arazi" ? "ARAZİ" : "TİCARİ"}
-                </span>
+              {/* "Satmayı mı düşünüyorsunuz?" DANIŞMAN KARTI (Görsel 6 Sol Alt) */}
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-5 space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-rose-50 border border-rose-200 text-[#E11D48] flex items-center justify-center shrink-0">
+                    <Users className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-slate-900 font-heading leading-tight">
+                      Satmayı mı düşünüyorsunuz?
+                    </h3>
+                    <p className="text-xs text-slate-500 font-medium">
+                      En iyi danışman size yardımcı olabilir
+                    </p>
+                  </div>
+                </div>
+
+                {/* Danışman Detay Kutusu */}
+                <div className="p-4 rounded-xl bg-slate-50/70 border border-slate-200 space-y-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-full overflow-hidden bg-slate-200 border border-slate-300 shrink-0">
+                      <img 
+                        src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=150&q=80" 
+                        alt="Gülçin Nazlı" 
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <div>
+                      <div className="font-extrabold text-sm text-slate-900">Gülçin Nazlı</div>
+                      <div className="text-[11px] text-slate-500 font-medium">SPK Lisanslı Değerleme & Satış Uzmanı</div>
+                      <div className="flex items-center gap-1 text-[10px] text-amber-600 font-bold mt-0.5">
+                        <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                        <span>5.0 (48 Başarılı İşlem)</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Metrikler (Hesaplanıyor & 60-90 gün) */}
+                  <div className="grid grid-cols-2 gap-2 text-center pt-2 border-t border-slate-200">
+                    <div className="p-2 bg-white rounded-lg border border-slate-200 flex items-center justify-center gap-1.5 text-xs text-slate-500 font-medium">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
+                      <span>Hesaplanıyor...</span>
+                    </div>
+                    <div className="p-2 bg-white rounded-lg border border-slate-200">
+                      <div className="text-[10px] text-slate-500 font-medium">Danışmanın Ortalama Satış Süresi</div>
+                      <div className="text-xs font-black text-[#E11D48] mt-0.5">60-90 gün</div>
+                    </div>
+                  </div>
+
+                  {/* 3 Buton: Güvenle Sat | Rapor Al | Profili Gör */}
+                  <div className="grid grid-cols-3 gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => alert("Güvenle Sat talebiniz bölge danışmanına iletildi.")}
+                      className="py-2 px-1 rounded-xl bg-[#E11D48] hover:bg-[#BE123C] text-white font-extrabold text-[11px] transition cursor-pointer flex items-center justify-center gap-1 shadow-2xs"
+                    >
+                      <Star className="w-3 h-3" />
+                      <span>Güvenle Sat</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveResultTab("raporlar");
+                        setReportGenerated(true);
+                      }}
+                      className="py-2 px-1 rounded-xl bg-[#38BDF8] hover:bg-[#0EA5E9] text-white font-extrabold text-[11px] transition cursor-pointer flex items-center justify-center gap-1 shadow-2xs"
+                    >
+                      <FileText className="w-3 h-3" />
+                      <span>Rapor Al</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setActiveResultTab("danismanlar")}
+                      className="py-2 px-1 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-700 font-bold text-[11px] transition cursor-pointer flex items-center justify-center"
+                    >
+                      <span>Profili Gör</span>
+                    </button>
+                  </div>
+                </div>
               </div>
 
-              {/* Alt Bilgi Şeridi */}
-              <div className="relative z-10 p-4 bg-gradient-to-t from-black/80 via-black/40 to-transparent text-white flex items-center justify-between text-xs">
-                <div className="flex items-center gap-1.5 font-semibold">
-                  <MapPin className="w-3.5 h-3.5 text-rose-400" />
-                  <span>{input.neighborhood || "Hürriyet"} Mah. {input.district || "Erenler"} {input.city || "Sakarya"}</span>
-                </div>
-                <span className="text-[10px] text-slate-300 font-mono">TKGM / HGK Uyumlu</span>
-              </div>
             </div>
 
-            {/* SAĞ: DEĞERLEME VE FİYAT KARTI (Görsel 5 Sağ Kısım) */}
-            <div className="lg:col-span-6 bg-white rounded-2xl shadow-xs border border-slate-200 p-6 flex flex-col justify-between space-y-4">
+            {/* SAĞ SÜTUN: DEĞERLEME KARTI & FİYAT TAHMİNİ (Görsel 6 Sağ Kısım) */}
+            <div className="lg:col-span-6 bg-white rounded-2xl border border-slate-200 shadow-xs p-6 space-y-5">
               
-              {/* Üst Link ve İşlemler Menüsü */}
-              <div className="flex items-center justify-between text-xs text-slate-500 font-semibold border-b border-slate-100 pb-2">
+              {/* Üst Bilgi Linki & İşlemler */}
+              <div className="flex items-center justify-between text-xs text-slate-500 font-semibold border-b border-slate-100 pb-2.5">
                 <button
                   type="button"
                   onClick={() => setShowHowItWorksModal(true)}
@@ -1484,10 +1100,17 @@ export const EndeksaValuationModal: React.FC<EndeksaValuationModalProps> = ({
                   <span>Nasıl hesaplıyoruz?</span>
                 </button>
 
-                <span className="text-slate-400 font-mono text-[11px]">İşlemler ...</span>
+                <button 
+                  type="button"
+                  onClick={() => alert("Değerleme Raporu / Emsal İşlemleri")}
+                  className="text-slate-400 hover:text-slate-700 font-mono text-xs flex items-center gap-0.5 cursor-pointer"
+                >
+                  <span>İşlemler</span>
+                  <MoreVertical className="w-3.5 h-3.5" />
+                </button>
               </div>
 
-              {/* Satış Değeri / Kira Değeri Sekme Düğmesi (Görsel 5 Toggle) */}
+              {/* Satış Değeri / Kira Değeri Toggle */}
               <div className="flex items-center justify-center gap-2">
                 <button
                   type="button"
@@ -1513,51 +1136,97 @@ export const EndeksaValuationModal: React.FC<EndeksaValuationModalProps> = ({
                 </button>
               </div>
 
-              {/* DEĞER GÖSTERGE ALANI */}
-              <div className="text-center py-2 space-y-2">
-                <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">
-                  {resultValuationMode === "satis" ? "Tahmini Satış Değeri" : "Tahmini Aylık Kira Değeri"}
-                </div>
-                
-                <div className="text-3xl sm:text-4xl font-black text-slate-900 font-heading tracking-tight">
-                  ₺ {resultValuationMode === "satis" 
-                    ? totalMarketValueTL.toLocaleString("tr-TR") 
-                    : estimatedRentTL.toLocaleString("tr-TR")
+              {/* BÜYÜK FİYAT GÖSTERGESİ (Görsel 6: 8.700.000 ₺ / 60.000 ₺/m²) */}
+              <div className="text-center py-2 space-y-1">
+                <div className="text-4xl sm:text-5xl font-black text-slate-900 font-heading tracking-tight">
+                  {resultValuationMode === "satis" 
+                    ? `${totalMarketValueTL.toLocaleString("tr-TR")} ₺` 
+                    : `${estimatedRentTL.toLocaleString("tr-TR")} ₺`
                   }
                 </div>
 
-                <div className="text-xs text-slate-500 font-medium">
-                  {resultValuationMode === "satis" ? (
-                    <>Güven Değer Aralığı: <strong>₺ {Math.round(totalMarketValueTL * 0.92).toLocaleString("tr-TR")} - ₺ {Math.round(totalMarketValueTL * 1.08).toLocaleString("tr-TR")}</strong></>
-                  ) : (
-                    <>Kira Değer Aralığı: <strong>₺ {Math.round(estimatedRentTL * 0.9).toLocaleString("tr-TR")} - ₺ {Math.round(estimatedRentTL * 1.1).toLocaleString("tr-TR")}</strong></>
-                  )}
+                <div className="text-xs font-bold text-slate-500 pt-0.5">
+                  {resultValuationMode === "satis" ? "3 Aydan Kısa Süre Beklenirse" : "Tahmini Aylık Net Kira"}
                 </div>
 
-                {/* İİK m.115 %50 İhale Tabanı Rozeti */}
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold mt-1">
-                  <Gavel className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>İİK m.115 İcra Tabanı: ₺ {tenderStartPriceTL.toLocaleString("tr-TR")}</span>
+                <div className="text-sm font-extrabold text-slate-700">
+                  {resultValuationMode === "satis" 
+                    ? `${unitPriceEstimate.toLocaleString("tr-TR")} ₺/m²`
+                    : `${Math.round(unitPriceEstimate / 225).toLocaleString("tr-TR")} ₺/m² (Kira)`
+                  }
+                </div>
+
+                <div className="text-[11px] text-slate-400 flex items-center justify-center gap-1 pt-1 font-medium">
+                  <Calendar className="w-3.5 h-3.5" />
+                  <span>15 Eyl 2026 12:10</span>
                 </div>
               </div>
 
-              {/* Danışman Butonu (Görsel 5 Mavi Outline Buton) */}
-              <button
-                type="button"
-                onClick={() => setActiveResultTab("danismanlar")}
-                className="w-full py-2.5 rounded-xl border border-sky-400 text-sky-600 hover:bg-sky-50 font-bold text-xs transition flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <Users className="w-4 h-4" />
-                <span>En İyi Emlak Danışmanları İhaleci Burada&apos;da</span>
-              </button>
+              {/* 3 SÜTUNLU ZAMAN & AMORTİSMAN TAHMİN KUTULARI (Görsel 6 Birebir) */}
+              <div className="grid grid-cols-3 gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200 text-center">
+                <div className="p-1">
+                  <div className="text-[9px] font-bold text-slate-500 uppercase tracking-tight">
+                    3 - 6 AY ARASI BEKLENİRSE
+                  </div>
+                  <div className="text-xs sm:text-sm font-black text-slate-900 mt-1">
+                    {Math.round(totalMarketValueTL * 1.09).toLocaleString("tr-TR")} ₺
+                  </div>
+                </div>
 
-              {/* GERÇEKLEŞEN DEĞERİ KUTUSU (Görsel 5 Mavi Kutu) */}
+                <div className="p-1 border-x border-slate-200">
+                  <div className="text-[9px] font-bold text-slate-500 uppercase tracking-tight">
+                    YATIRIM GERİ DÖNÜŞ SÜRESİ
+                  </div>
+                  <div className="text-xs sm:text-sm font-black text-slate-900 mt-1">
+                    15 - 18 yıl
+                  </div>
+                </div>
+
+                <div className="p-1">
+                  <div className="text-[9px] font-bold text-slate-500 uppercase tracking-tight">
+                    6 - 12 AY ARASI BEKLENİRSE
+                  </div>
+                  <div className="text-xs sm:text-sm font-black text-slate-900 mt-1">
+                    {Math.round(totalMarketValueTL * 1.15).toLocaleString("tr-TR")} ₺
+                  </div>
+                </div>
+              </div>
+
+              {/* HESAP PUANI & BÖLGESEL DEPREM RİSKİ (Görsel 6) */}
+              <div className="flex flex-wrap items-center justify-center gap-2 text-xs font-bold pt-1">
+                <span className="px-3 py-1 bg-[#E11D48] text-white rounded-full text-[11px] font-black shadow-2xs">
+                  Hesap Puanı: 75/100
+                </span>
+                
+                <span className="text-slate-300">|</span>
+
+                <div className="flex items-center gap-1 text-[11px] text-slate-700">
+                  <span>Bölgesel Deprem Tehlikesi (PGA):</span>
+                  <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500 inline-block" />
+                  <span className="font-mono font-bold text-slate-900">0.302g</span>
+                </div>
+              </div>
+
+              {/* İİK m.115 %50 İHALE TABAN ROZETİ */}
+              <div className="flex items-center justify-center">
+                <div className="px-3.5 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center gap-1.5">
+                  <Gavel className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>İİK m.115 İhale Başlangıç Tabanı (%50): ₺ {tenderStartPriceTL.toLocaleString("tr-TR")}</span>
+                </div>
+              </div>
+
+              {/* YASAL DİSCLAİMER */}
+              <p className="text-[10px] text-slate-400 text-center leading-relaxed italic">
+                * Bu değerler yasal durum bilgisi olmadan, bilgisayar algoritmaları kullanılarak hesaplanmıştır ve herhangi bir yasal yükümlülük taşımamaktadır.
+              </p>
+
+              {/* "GERÇEKLEŞEN DEĞERİ" MAVİ KUTUSU (Görsel 6 Birebir) */}
               <div className="bg-[#38BDF8] text-white p-4 rounded-xl space-y-2">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="text-xs font-black">Gerçekleşen Değeri</div>
                     <div className="text-[10px] text-white/90 leading-tight mt-0.5">
-                      Tespit ettiğiniz değeri ve tarihini bizimle paylaşarak İhaleci Burada&apos;nın sizin için daha doğru sonuçlar üretmesini sağlayabilirsiniz.
+                      Tespit ettiğiniz değeri ve tarihini bizimle paylaşarak Endeksa&apos;nın sizin için daha doğru sonuçlar üretmesini sağlayabilirsiniz.
                     </div>
                   </div>
                   
@@ -1579,9 +1248,9 @@ export const EndeksaValuationModal: React.FC<EndeksaValuationModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setActualPriceSaved(true)}
-                    className="w-full py-1 bg-white text-sky-700 hover:bg-sky-50 font-bold text-[11px] rounded-lg transition cursor-pointer"
+                    className="w-full py-1.5 bg-white text-sky-700 hover:bg-sky-50 font-black text-[11px] rounded-lg transition cursor-pointer"
                   >
-                    {actualPriceSaved ? "✓ Değer Kaydedildi" : "Bu Değeri Doğrula ve Kaydet"}
+                    {actualPriceSaved ? "✓ Gerçekleşen Değer Doğrulandı ve Kaydedildi" : "Bu Değeri Doğrula ve Kaydet"}
                   </button>
                 )}
               </div>
@@ -1591,18 +1260,18 @@ export const EndeksaValuationModal: React.FC<EndeksaValuationModalProps> = ({
           </div>
 
           {/* ========================================================================= */}
-          {/* 8'Lİ ALT SEKME MENÜSÜ (Görsel 5 ile Birebir)                              */}
+          {/* 8'Lİ ALT SEKME BAR & BÖLGENİZDEKİ DANIŞMANLAR (Görsel 6)                  */}
           {/* ========================================================================= */}
-          <div className="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden mt-6">
             
-            {/* Sekme Butonları Çubuğu */}
+            {/* Sekme Butonları Çubuğu (Görsel 6: DANIŞMANLAR Aktif) */}
             <div className="flex items-center overflow-x-auto border-b border-slate-200 scrollbar-none px-2 text-xs font-extrabold">
               {[
                 { id: "danismanlar", label: "DANIŞMANLAR" },
                 { id: "raporlar", label: "RAPORLAR" },
                 { id: "ozellikler", label: "ÖZELLİKLER" },
+                { id: "yatirim_skoru", label: "YATIRIM SKORU" },
                 { id: "deger_degisimi", label: "DEĞER DEĞİŞİMİ" },
-                { id: "analiz_emsaller", label: "ANALİZ VE EMSALLER" },
                 { id: "kredi_yatirim", label: "KREDİ VE YATIRIM" },
                 { id: "notlar", label: "NOTLAR" },
                 { id: "ekler", label: "EKLER" },
@@ -1625,108 +1294,264 @@ export const EndeksaValuationModal: React.FC<EndeksaValuationModalProps> = ({
             {/* SEKME İÇERİKLERİ */}
             <div className="p-6">
               
-              {/* 1. RAPORLAR SEKMESİ (Görsel 5'te Varsayılan Açık Olan Ekran) */}
-              {activeResultTab === "raporlar" && (
-                <div className="space-y-5">
-                  {/* Rapor Alma Şeridi */}
-                  <div className="p-5 rounded-2xl border border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2 text-slate-900 font-extrabold text-sm">
-                        <FileText className="w-4 h-4 text-[#E11D48]" />
-                        <span>Raporlar</span>
-                      </div>
-                      <p className="text-xs text-slate-600">
-                        Rapor alarak gayrimenkulünüzün değerini, emsal bilgilerini, bölgedeki gayrimenkul trendlerini ve demografik yapıyı öğrenin.
-                      </p>
-                    </div>
+              {/* 1. DANIŞMANLAR SEKMESİ (Görsel 6'da Birebir Gösterilen Ekran) */}
+              {activeResultTab === "danismanlar" && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <h3 className="text-base font-black text-slate-900 font-heading">
+                      Bölgenizdeki Danışmanlar
+                    </h3>
 
-                    <div className="flex items-center gap-3 shrink-0">
-                      <div className="px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center gap-1.5">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                        <span>Mevcut {reportQuota} rapor hakkınızdan kullanarak hemen rapor oluşturabilirsiniz.</span>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setReportGenerated(true);
-                          setReportQuota(0);
-                        }}
-                        className="px-5 py-2 rounded-xl bg-[#E11D48] hover:bg-[#BE123C] text-white font-extrabold text-xs shadow-xs transition cursor-pointer active:scale-95"
-                      >
-                        Rapor Al
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => alert("Güvenle Sat talebiniz bölgedeki en yüksek puanlı danışmana iletildi.")}
+                      className="px-4 py-2 rounded-xl bg-[#38BDF8] hover:bg-[#0EA5E9] text-white text-xs font-black transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+                    >
+                      <Star className="w-3.5 h-3.5" />
+                      <span>Güvenle Sat</span>
+                    </button>
                   </div>
 
-                  {/* Rapor Durum Kartı */}
-                  {!reportGenerated ? (
-                    <div className="p-12 text-center space-y-2 border border-dashed border-slate-200 rounded-2xl">
-                      <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
-                        <Info className="w-5 h-5" />
-                      </div>
-                      <div className="text-xs font-bold text-slate-600">Henüz rapor üretilmedi.</div>
-                      <p className="text-[11px] text-slate-400">Yukarıdaki &apos;Rapor Al&apos; butonuna basarak resmi değerleme çıktısını hemen görüntüleyebilirsiniz.</p>
-                    </div>
-                  ) : (
-                    <div className="p-6 rounded-2xl border border-emerald-200 bg-white space-y-4 shadow-sm animate-in fade-in duration-200">
-                      <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                        <div className="flex items-center gap-2">
-                          <Award className="w-5 h-5 text-amber-500" />
-                          <span className="font-extrabold text-sm text-slate-900">
-                            Resmi Ekspertiz & İhale Fizibilite Raporu Hazırlandı
-                          </span>
+                  {/* 4 ADET DANIŞMAN KARTI IZGARASI */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-1">
+                    
+                    {/* Danışman 1: Gülçin Nazlı */}
+                    <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-white hover:shadow-md transition space-y-3 flex flex-col justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-full overflow-hidden border border-slate-300 shrink-0">
+                          <img 
+                            src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=150&q=80" 
+                            alt="Gülçin Nazlı" 
+                            className="w-full h-full object-cover"
+                          />
                         </div>
-                        <span className="text-[11px] font-mono text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                          Sertifika No: IB-2026-9842
-                        </span>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                        <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
-                          <div className="text-[10px] text-slate-500 font-bold">Kıymet Takdir Değeri</div>
-                          <div className="text-base font-black text-slate-900 mt-0.5">₺ {totalMarketValueTL.toLocaleString("tr-TR")}</div>
-                        </div>
-                        <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200">
-                          <div className="text-[10px] text-emerald-800 font-bold">İİK m.115 %50 İhale Tabanı</div>
-                          <div className="text-base font-black text-emerald-700 mt-0.5">₺ {tenderStartPriceTL.toLocaleString("tr-TR")}</div>
-                        </div>
-                        <div className="p-3 rounded-xl bg-amber-50 border border-amber-200">
-                          <div className="text-[10px] text-amber-800 font-bold">Yıllık Brüt Kira Getirisi</div>
-                          <div className="text-base font-black text-amber-900 mt-0.5">₺ {(estimatedRentTL * 12).toLocaleString("tr-TR")}</div>
+                        <div>
+                          <div className="font-extrabold text-sm text-slate-900">Gülçin Nazlı</div>
+                          <div className="text-[11px] text-slate-500">Remax Troia - Merkez</div>
+                          <div className="flex items-center gap-1 text-[10px] text-amber-600 font-bold mt-0.5">
+                            <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                            <span>5.0 (48 İşlem)</span>
+                          </div>
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-end gap-2 pt-2">
+                      <div className="text-[11px] text-slate-600 space-y-1 py-1 border-y border-slate-200/60">
+                        <div className="flex justify-between">
+                          <span className="text-slate-400">Ort. Satış Süresi:</span>
+                          <strong className="text-[#E11D48]">60-90 gün</strong>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-400">Aktif Portföy:</span>
+                          <strong className="text-slate-800">14 İlan</strong>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 pt-1">
                         <button
                           type="button"
-                          onClick={() => window.print()}
-                          className="px-4 py-2 rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                          onClick={() => alert("Gülçin Nazlı ile iletişim: 0850 304 12 34")}
+                          className="flex-1 py-1.5 rounded-lg bg-slate-900 text-white font-bold text-xs hover:bg-slate-800 transition flex items-center justify-center gap-1 cursor-pointer"
                         >
-                          <Printer className="w-3.5 h-3.5" />
-                          <span>Yazdır</span>
+                          <Phone className="w-3 h-3" />
+                          <span>İletişim</span>
                         </button>
                         <button
                           type="button"
-                          onClick={() => alert("PDF Raporu İndirildi (İhaleci Burada Değerleme Motoru)")}
-                          className="px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-extrabold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                          onClick={() => alert("Portföyler yükleniyor...")}
+                          className="px-2.5 py-1.5 rounded-lg border border-slate-300 text-slate-700 font-bold text-xs hover:bg-slate-100 transition cursor-pointer"
                         >
-                          <Download className="w-3.5 h-3.5" />
-                          <span>PDF Rapor İndir</span>
+                          Portföy
                         </button>
                       </div>
                     </div>
-                  )}
+
+                    {/* Danışman 2: Ali Turan */}
+                    <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-white hover:shadow-md transition space-y-3 flex flex-col justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-full overflow-hidden border border-slate-300 bg-slate-900 text-white flex items-center justify-center font-black text-sm shrink-0">
+                          AT
+                        </div>
+                        <div>
+                          <div className="font-extrabold text-sm text-slate-900">Ali Turan</div>
+                          <div className="text-[11px] text-slate-500">İhaleci Burada - SPK Lisanslı</div>
+                          <div className="flex items-center gap-1 text-[10px] text-amber-600 font-bold mt-0.5">
+                            <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                            <span>5.0 (92 Değerleme)</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="text-[11px] text-slate-600 space-y-1 py-1 border-y border-slate-200/60">
+                        <div className="flex justify-between">
+                          <span className="text-slate-400">İhale Başarı Oranı:</span>
+                          <strong className="text-emerald-700">%94</strong>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-400">Uzmanlık:</span>
+                          <strong className="text-slate-800">İcra & İhale</strong>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => alert("Ali Turan ile görüşme başlatılıyor...")}
+                          className="flex-1 py-1.5 rounded-lg bg-[#E11D48] text-white font-bold text-xs hover:bg-[#BE123C] transition flex items-center justify-center gap-1 cursor-pointer"
+                        >
+                          <MessageSquare className="w-3 h-3" />
+                          <span>Görüş</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => alert("İhale portföyleri listeleniyor...")}
+                          className="px-2.5 py-1.5 rounded-lg border border-slate-300 text-slate-700 font-bold text-xs hover:bg-slate-100 transition cursor-pointer"
+                        >
+                          İhaleler
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Danışman 3: Mehmet Demir */}
+                    <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-white hover:shadow-md transition space-y-3 flex flex-col justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-full overflow-hidden border border-slate-300 shrink-0">
+                          <img 
+                            src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80" 
+                            alt="Mehmet Demir" 
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <div>
+                          <div className="font-extrabold text-sm text-slate-900">Mehmet Demir</div>
+                          <div className="text-[11px] text-slate-500">Coldwell Banker 1915</div>
+                          <div className="flex items-center gap-1 text-[10px] text-amber-600 font-bold mt-0.5">
+                            <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                            <span>4.9 (35 İşlem)</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="text-[11px] text-slate-600 space-y-1 py-1 border-y border-slate-200/60">
+                        <div className="flex justify-between">
+                          <span className="text-slate-400">Ort. Satış Süresi:</span>
+                          <strong className="text-[#E11D48]">75 gün</strong>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-400">Bölge:</span>
+                          <strong className="text-slate-800">Çanakkale Boğazı</strong>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => alert("Mehmet Demir ile iletişim kuruluyor...")}
+                          className="flex-1 py-1.5 rounded-lg bg-slate-900 text-white font-bold text-xs hover:bg-slate-800 transition flex items-center justify-center gap-1 cursor-pointer"
+                        >
+                          <Phone className="w-3 h-3" />
+                          <span>İletişim</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => alert("Portföyler yükleniyor...")}
+                          className="px-2.5 py-1.5 rounded-lg border border-slate-300 text-slate-700 font-bold text-xs hover:bg-slate-100 transition cursor-pointer"
+                        >
+                          Portföy
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Danışman 4: Zeynep Kaya */}
+                    <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-white hover:shadow-md transition space-y-3 flex flex-col justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-full overflow-hidden border border-slate-300 shrink-0">
+                          <img 
+                            src="https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=150&q=80" 
+                            alt="Zeynep Kaya" 
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <div>
+                          <div className="font-extrabold text-sm text-slate-900">Zeynep Kaya</div>
+                          <div className="text-[11px] text-slate-500">Turyap Çanakkale Temsilciliği</div>
+                          <div className="flex items-center gap-1 text-[10px] text-amber-600 font-bold mt-0.5">
+                            <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                            <span>4.8 (29 İşlem)</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="text-[11px] text-slate-600 space-y-1 py-1 border-y border-slate-200/60">
+                        <div className="flex justify-between">
+                          <span className="text-slate-400">Ort. Satış Süresi:</span>
+                          <strong className="text-[#E11D48]">60 gün</strong>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-400">Aktif Portföy:</span>
+                          <strong className="text-slate-800">9 İlan</strong>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => alert("Zeynep Kaya ile iletişim kuruluyor...")}
+                          className="flex-1 py-1.5 rounded-lg bg-slate-900 text-white font-bold text-xs hover:bg-slate-800 transition flex items-center justify-center gap-1 cursor-pointer"
+                        >
+                          <Phone className="w-3 h-3" />
+                          <span>İletişim</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => alert("Portföyler yükleniyor...")}
+                          className="px-2.5 py-1.5 rounded-lg border border-slate-300 text-slate-700 font-bold text-xs hover:bg-slate-100 transition cursor-pointer"
+                        >
+                          Portföy
+                        </button>
+                      </div>
+                    </div>
+
+                  </div>
                 </div>
               )}
 
-              {/* 2. ÖZELLİKLER SEKMESİ */}
+              {/* 2. RAPORLAR SEKMESİ */}
+              {activeResultTab === "raporlar" && (
+                <div className="space-y-4">
+                  <div className="p-5 rounded-2xl border border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div>
+                      <div className="font-extrabold text-sm text-slate-900">Resmi Ekspertiz Raporu</div>
+                      <p className="text-xs text-slate-600">Gayrimenkulün resmi SPK & TCMB onaylı kıymet takdir özetini indirin.</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => window.print()}
+                        className="px-4 py-2 rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Printer className="w-3.5 h-3.5" />
+                        <span>Yazdır</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => alert("PDF Raporu indirildi.")}
+                        className="px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-extrabold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>PDF İndir</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 3. ÖZELLİKLER SEKMESİ */}
               {activeResultTab === "ozellikler" && (
                 <div className="space-y-4 text-xs">
                   <h4 className="font-bold text-slate-900 text-sm">Gayrimenkulün Girilen Tüm Nitelikleri</h4>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
-                      <span className="text-slate-400 text-[10px] block">Konut / Gayrimenkul Tipi</span>
+                      <span className="text-slate-400 text-[10px] block">Konut Tipi</span>
                       <strong className="text-slate-800 uppercase">{housingTypeKind} / {apartmentSubtype}</strong>
                     </div>
                     <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
@@ -1741,119 +1566,65 @@ export const EndeksaValuationModal: React.FC<EndeksaValuationModalProps> = ({
                       <span className="text-slate-400 text-[10px] block">Bina Yaşı / Kat</span>
                       <strong className="text-slate-800">{buildingAgeVal} Yaş / {floorNumberVal}. Kat</strong>
                     </div>
-                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
-                      <span className="text-slate-400 text-[10px] block">Isıtma</span>
-                      <strong className="text-slate-800 uppercase">{heatingSystem.replace("_", " ")}</strong>
-                    </div>
-                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
-                      <span className="text-slate-400 text-[10px] block">Cepheler</span>
-                      <strong className="text-slate-800 uppercase">{selectedFacades.join(", ")}</strong>
-                    </div>
-                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
-                      <span className="text-slate-400 text-[10px] block">Kullanım Durumu</span>
-                      <strong className="text-slate-800 uppercase">{usageStatus.replace("_", " ")}</strong>
-                    </div>
-                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
-                      <span className="text-slate-400 text-[10px] block">Ada / Parsel</span>
-                      <strong className="text-slate-800">{input.ada || "101"} / {input.parsel || "15"}</strong>
-                    </div>
                   </div>
                 </div>
               )}
 
-              {/* 3. DEĞER DEĞİŞİMİ SEKMESİ */}
-              {activeResultTab === "deger_degisimi" && (
+              {/* 4. YATIRIM SKORU SEKMESİ (Görsel 6'daki Özel Başlık) */}
+              {activeResultTab === "yatirim_skoru" && (
                 <div className="space-y-4 text-xs">
                   <div className="flex items-center justify-between">
-                    <h4 className="font-bold text-slate-900 text-sm">TCMB EVDS Endeks Değişimi & Yıllık Artış</h4>
-                    <span className="text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                      Yıllık Değer Artışı: +%68.4
+                    <h4 className="font-bold text-slate-900 text-sm">Yatırım ve İhale Fırsat Skoru</h4>
+                    <span className="px-3 py-1 bg-emerald-100 text-emerald-800 font-extrabold rounded-full text-xs">
+                      Skor: 92/100 (Yüksek Fırsat)
                     </span>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200">
+                      <div className="text-[10px] font-bold text-emerald-800">İhale Kazanç Marjı</div>
+                      <div className="text-xl font-black text-emerald-700 mt-1">%50 İndirim</div>
+                      <p className="text-[10px] text-emerald-600 mt-0.5">İcra satışında ₺ {tenderStartPriceTL.toLocaleString("tr-TR")} tabanından girme fırsatı.</p>
+                    </div>
+                    <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                      <div className="text-[10px] font-bold text-slate-600">Amortisman Süresi</div>
+                      <div className="text-xl font-black text-slate-900 mt-1">15 - 18 Yıl</div>
+                      <p className="text-[10px] text-slate-500 mt-0.5">Bölgesel ortalamanın 3 yıl altında geri dönüş.</p>
+                    </div>
+                    <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                      <div className="text-[10px] font-bold text-slate-600">Kira Getiri Oranı</div>
+                      <div className="text-xl font-black text-slate-900 mt-1">%5.3 / Yıllık</div>
+                      <p className="text-[10px] text-slate-500 mt-0.5">Aylık net ₺ {estimatedRentTL.toLocaleString("tr-TR")} getiri.</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 5. DEĞER DEĞİŞİMİ SEKMESİ */}
+              {activeResultTab === "deger_degisimi" && (
+                <div className="space-y-4 text-xs">
+                  <h4 className="font-bold text-slate-900 text-sm">TCMB EVDS Endeks Değişimi</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-center">
                       <div className="text-[10px] text-slate-500 font-bold">1 Yıl Önceki Ortalama m²</div>
-                      <div className="text-lg font-black text-slate-700 mt-1">₺ {Math.round(unitPriceEstimate * 0.59).toLocaleString("tr-TR")}</div>
+                      <div className="text-lg font-black text-slate-700 mt-1">36.000 ₺/m²</div>
                     </div>
                     <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-center">
                       <div className="text-[10px] text-slate-500 font-bold">Bugünkü Güncel m²</div>
-                      <div className="text-lg font-black text-rose-600 mt-1">₺ {unitPriceEstimate.toLocaleString("tr-TR")}</div>
+                      <div className="text-lg font-black text-rose-600 mt-1">60.000 ₺/m²</div>
                     </div>
                     <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-center">
-                      <div className="text-[10px] text-slate-500 font-bold">1 Yıl Sonraki Tahmin (TCMB Trendi)</div>
-                      <div className="text-lg font-black text-emerald-600 mt-1">₺ {Math.round(unitPriceEstimate * 1.35).toLocaleString("tr-TR")}</div>
+                      <div className="text-[10px] text-slate-500 font-bold">1 Yıl Sonraki Tahmin</div>
+                      <div className="text-lg font-black text-emerald-600 mt-1">82.000 ₺/m²</div>
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* 4. ANALİZ VE EMSALLER SEKMESİ */}
-              {activeResultTab === "analiz_emsaller" && (
-                <div className="space-y-3 text-xs">
-                  <h4 className="font-bold text-slate-900 text-sm">Bölgedeki En Yakın Gerçek Emsaller</h4>
-                  <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
-                    {[
-                      { title: `${input.neighborhood || "Hürriyet"} Mah. 3+1 Daire`, m2: 125, price: totalMarketValueTL * 0.98, dist: "150m", source: "İcra İhalesi" },
-                      { title: `${input.neighborhood || "Hürriyet"} Mah. 3+1 Ara Kat`, m2: 130, price: totalMarketValueTL * 1.04, dist: "320m", source: "Piyasa Satışı" },
-                      { title: `${input.district || "Erenler"} Merkez 2+1 Daire`, m2: 95, price: totalMarketValueTL * 0.78, dist: "600m", source: "Banka Teminatı" },
-                    ].map((emsal, idx) => (
-                      <div key={idx} className="p-3 bg-white hover:bg-slate-50 flex items-center justify-between">
-                        <div>
-                          <div className="font-bold text-slate-900">{emsal.title}</div>
-                          <div className="text-[11px] text-slate-500">{emsal.m2} m² • Mesafe: {emsal.dist} • Kaynak: {emsal.source}</div>
-                        </div>
-                        <div className="text-right">
-                          <div className="font-black text-slate-900">₺ {Math.round(emsal.price).toLocaleString("tr-TR")}</div>
-                          <div className="text-[10px] text-slate-400 font-mono">₺ {Math.round(emsal.price / emsal.m2).toLocaleString("tr-TR")} / m²</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* 5. KREDİ VE YATIRIM SEKMESİ */}
+              {/* 6. KREDİ VE YATIRIM SEKMESİ */}
               {activeResultTab === "kredi_yatirim" && (
-                <div className="space-y-4 text-xs">
-                  <h4 className="font-bold text-slate-900 text-sm">İhale Fırsatı & Amortisman Analizi</h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200">
-                      <div className="text-[10px] font-bold text-emerald-800">İhale Alım Kazanç Marjı</div>
-                      <div className="text-xl font-black text-emerald-700 mt-1">%50 İndirim</div>
-                      <p className="text-[10px] text-emerald-600 mt-0.5">İcra satışında ₺ {tenderStartPriceTL.toLocaleString("tr-TR")} tabanından girme imkanı.</p>
-                    </div>
-                    <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
-                      <div className="text-[10px] font-bold text-slate-600">Amortisman (Geri Dönüş)</div>
-                      <div className="text-xl font-black text-slate-900 mt-1">{paybackYears} Yıl</div>
-                      <p className="text-[10px] text-slate-500 mt-0.5">Yıllık brüt kira çarpanı 1/{paybackYears}.</p>
-                    </div>
-                    <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
-                      <div className="text-[10px] font-bold text-slate-600">Kredi Kullanılabilirlik</div>
-                      <div className="text-xl font-black text-slate-900 mt-1">%80 Ekspertiz</div>
-                      <p className="text-[10px] text-slate-500 mt-0.5">Kat mülkiyetli bağımsız bölümlerde maksimum konut kredisi.</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* 6. DANIŞMANLAR SEKMESİ */}
-              {activeResultTab === "danismanlar" && (
-                <div className="space-y-3 text-xs">
-                  <h4 className="font-bold text-slate-900 text-sm">Bölgedeki SPK Lisanslı Danışmanlar</h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-bold">AT</div>
-                        <div>
-                          <div className="font-bold text-slate-900">Ali Turan</div>
-                          <div className="text-[11px] text-slate-500">SPK Lisanslı Değerleme Uzmanı</div>
-                        </div>
-                      </div>
-                      <button className="px-3 py-1.5 bg-[#0F223D] text-white rounded-lg text-xs font-bold hover:bg-slate-800 transition cursor-pointer">
-                        İletişime Geç
-                      </button>
-                    </div>
-                  </div>
+                <div className="p-6 text-xs text-slate-600 space-y-2">
+                  <h4 className="font-bold text-slate-900 text-sm">Konut Kredisi ve İhale Finansmanı</h4>
+                  <p>Bu konut için bankaların azami kredi limiti ekspertiz değerinin %80&apos;i olan <strong>₺ {Math.round(totalMarketValueTL * 0.8).toLocaleString("tr-TR")}</strong> tutarındadır.</p>
                 </div>
               )}
 
@@ -1868,7 +1639,7 @@ export const EndeksaValuationModal: React.FC<EndeksaValuationModalProps> = ({
 
           </div>
 
-          {/* ALT GEZİNİM: YENİ DEĞERLEME & HARİTAYA GEÇİŞ */}
+          {/* ALT GEZİNİM BUTONLARI */}
           <div className="flex items-center justify-between pt-2">
             <button
               type="button"
@@ -1927,6 +1698,14 @@ export const EndeksaValuationModal: React.FC<EndeksaValuationModalProps> = ({
               Anladım, Kapat
             </button>
           </div>
+        </div>
+      )}
+
+      {/* PAYLAŞ TOAST BİLDİRİMİ */}
+      {shareToast && (
+        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-xl border border-slate-700 text-xs font-bold flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2">
+          <Check className="w-4 h-4 text-emerald-400" />
+          <span>Değerleme linki panoya kopyalandı!</span>
         </div>
       )}
 
