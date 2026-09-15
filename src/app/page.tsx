@@ -425,33 +425,33 @@ export default function Home() {
             )}
           </div>
 
-          {/* Sağ Kısım: Endeksa Üst Menü & Kullanıcı Rozeti (Görseldeki Birebir Header) */}
+          {/* Sağ Kısım: İhaleciBurada Üst Menü & Kullanıcı Rozeti */}
           <div className="flex items-center gap-2 sm:gap-4 text-xs font-bold">
             
-            {/* 1. Değerini Öğren Sekmesi */}
+            {/* 1. Değerleme Sekmesi */}
             <button
               type="button"
               onClick={() => setActiveTab("degerleme")}
               className={`py-1.5 px-2.5 transition relative cursor-pointer font-heading font-extrabold ${
                 activeTab === "degerleme"
-                  ? "text-rose-600 after:absolute after:bottom-[-16px] after:left-0 after:right-0 after:h-[2.5px] after:bg-rose-600 after:rounded-full"
+                  ? "text-blue-600 after:absolute after:bottom-[-16px] after:left-0 after:right-0 after:h-[2.5px] after:bg-blue-600 after:rounded-full"
                   : "text-slate-600 hover:text-slate-900"
               }`}
             >
-              Değerini Öğren
+              Akıllı Değerleme
             </button>
 
-            {/* 2. Bölgeyi İncele Sekmesi */}
+            {/* 2. Harita & Bölge Sekmesi */}
             <button
               type="button"
               onClick={() => setActiveTab("endeks")}
               className={`py-1.5 px-2.5 transition relative cursor-pointer font-heading font-extrabold ${
                 activeTab === "endeks"
-                  ? "text-rose-600 after:absolute after:bottom-[-16px] after:left-0 after:right-0 after:h-[2.5px] after:bg-rose-600 after:rounded-full"
+                  ? "text-blue-600 after:absolute after:bottom-[-16px] after:left-0 after:right-0 after:h-[2.5px] after:bg-blue-600 after:rounded-full"
                   : "text-slate-600 hover:text-slate-900"
               }`}
             >
-              Bölgeyi İncele
+              Harita & Bölge İncele
             </button>
 
             <span className="hidden xl:inline-block text-slate-600 hover:text-slate-900 cursor-pointer font-medium">
@@ -487,16 +487,16 @@ export default function Home() {
               </button>
             </div>
 
-            {/* Kullanıcı Profili Rozeti: Ali Turan (Ekran Görüntüsü ile Birebir) */}
+            {/* Kullanıcı Profili Rozeti: Ali Turan */}
             <div 
               onClick={() => setActiveTab("degerleme")}
-              className="flex items-center gap-2 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white pl-1.5 pr-3 py-1 rounded-full shadow-xs cursor-pointer select-none transition active:scale-95"
-              title="Kullanıcı: Ali Turan (4 Kalan Değerleme)"
+              className="flex items-center gap-2 bg-[#0B1E3B] hover:bg-slate-900 text-amber-400 border border-amber-500/30 pl-1.5 pr-3 py-1 rounded-full shadow-xs cursor-pointer select-none transition active:scale-95"
+              title="Kullanıcı: Ali Turan (İhaleciBurada Pro Hesap)"
             >
-              <div className="w-6 h-6 rounded-full bg-white/25 flex items-center justify-center text-[10px] font-black">
+              <div className="w-6 h-6 rounded-full bg-amber-500 text-slate-950 flex items-center justify-center text-[10px] font-black">
                 AT
               </div>
-              <span className="text-xs font-extrabold whitespace-nowrap">Ali Turan</span>
+              <span className="text-xs font-extrabold whitespace-nowrap text-white">Ali Turan</span>
             </div>
           </div>
         </div>

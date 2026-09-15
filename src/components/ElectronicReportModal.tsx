@@ -62,14 +62,14 @@ export const ElectronicReportModal: React.FC<ElectronicReportModalProps> = ({
         {/* MODAL ÜST ÇUBUĞU */}
         <div className="px-5 py-3.5 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-[#E11D48] flex items-center justify-center font-bold text-white shadow-xs">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-[#0B1E3B] to-slate-900 border border-amber-500/30 flex items-center justify-center font-bold text-amber-400 shadow-xs">
               <FileText className="w-4 h-4" />
             </div>
             <div>
               <div className="text-xs sm:text-sm font-black tracking-tight flex items-center gap-2">
-                <span>Elektronik Değerleme Raporu</span>
-                <span className="px-2 py-0.5 rounded-full bg-rose-500/30 text-rose-300 text-[10px] font-mono border border-rose-500/40">
-                  SPK & TCMB Uyumlu
+                <span>İhaleciBurada Lisanslı Elektronik Ekspertiz Raporu</span>
+                <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-mono border border-amber-500/30">
+                  SPK & İİK m.115 Uyumlu
                 </span>
               </div>
               <div className="text-[11px] text-slate-400 font-medium">

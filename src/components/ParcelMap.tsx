@@ -16,7 +16,17 @@ import {
   TrendingUp,
   Gavel,
   ShieldCheck,
-  RefreshCw
+  RefreshCw,
+  Plus,
+  Minus,
+  Lock,
+  Unlock,
+  Maximize2,
+  Minimize2,
+  Crosshair,
+  Filter,
+  SlidersHorizontal,
+  AlertCircle
 } from "lucide-react";
 
 interface ParcelMapProps {
@@ -108,6 +118,30 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
   const [mahalleData, setMahalleData] = useState<any>(null);
   const [isLoadingMahalle, setIsLoadingMahalle] = useState<boolean>(false);
   const [mahalleCount, setMahalleCount] = useState<number>(0);
+
+  // Floating Harita Kontrolleri & Bildirimleri (Görsel 1789487723574 İle Birebir)
+  const [currentZoom, setCurrentZoom] = useState<number>(7);
+  const [mapLayerType, setMapLayerType] = useState<"uydu" | "hibrit" | "sokak">("uydu");
+  const [isLocked, setIsLocked] = useState<boolean>(true);
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+  const [showLayerMenu, setShowLayerMenu] = useState<boolean>(false);
+  const [parcelNotice, setParcelNotice] = useState<string | null>("Parsel bilgisi bulunamadı.");
+
+  const handleZoomIn = () => {
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.zoomIn();
+    }
+  };
+
+  const handleZoomOut = () => {
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.zoomOut();
+    }
+  };
+
+  const toggleFullscreen = () => {
+    setIsFullscreen((prev) => !prev);
+  };
 
   // Sync prop changes
   useEffect(() => {
@@ -325,14 +359,31 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
       const map = L.map(mapContainerRef.current, {
         center: [lat, lng],
         zoom: initialZoom,
-        zoomControl: true,
-        scrollWheelZoom: false,
+        zoomControl: false,
+        scrollWheelZoom: !isLocked,
       });
       mapInstanceRef.current = map;
+      setCurrentZoom(initialZoom);
 
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      map.on("zoomend", () => {
+        if (mapInstanceRef.current) {
+          setCurrentZoom(mapInstanceRef.current.getZoom());
+        }
+      });
+
+      map.on("click", () => {
+        setParcelNotice("Parsel bilgisi bulunamadı.");
+      });
+
+      const tileUrl = mapLayerType === "uydu"
+        ? "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+        : mapLayerType === "hibrit"
+        ? "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"
+        : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+
+      L.tileLayer(tileUrl, {
         maxZoom: 19,
-        attribution: '© OpenStreetMap contributors',
+        attribution: '© Harita Katmanı • İhaleciBurada GIS',
       }).addTo(map);
 
       // =========================================================================
@@ -689,7 +740,9 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
     elevationMeters,
     unitM2Price,
     isEndeksaSplitView,
-    viewMode
+    viewMode,
+    mapLayerType,
+    isLocked
   ]);
 
   const handleSelectComp = (comp: ComparableListing) => {
@@ -829,12 +882,167 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
       </div>
 
       {/* 2. ETKİLEŞİMLİ LEAFLET HARİTA ALANI */}
-      <div className={`relative w-full bg-slate-100 z-10 ${
-        isEndeksaSplitView 
+      <div className={`relative w-full bg-slate-100 z-10 transition-all duration-300 ${
+        isFullscreen
+          ? "fixed inset-0 z-50 h-screen w-screen"
+          : isEndeksaSplitView 
           ? "h-full min-h-[540px] sm:min-h-[680px] lg:min-h-[820px]" 
           : "h-72 sm:h-80"
       }`}>
         <div ref={mapContainerRef} className="w-full h-full" />
+
+        {/* SOL ÜST YÜZEN PARSEL / UYARI BİLDİRİMİ (GÖRSEL 1789487723574 BİREBİR) */}
+        {parcelNotice && (
+          <div className="absolute top-3 left-3 z-[450] bg-white border-2 border-red-500 text-slate-900 font-extrabold px-3.5 py-2 rounded-xl text-xs shadow-xl flex items-center gap-2 animate-in fade-in duration-200 select-none">
+            <span className="w-2 h-2 rounded-full bg-red-600 animate-ping shrink-0" />
+            <span>{parcelNotice}</span>
+            <button
+              type="button"
+              onClick={() => setParcelNotice(null)}
+              className="text-slate-400 hover:text-slate-700 ml-1 text-xs"
+            >
+              ×
+            </button>
+          </div>
+        )}
+
+        {/* SAĞ KENAR DİKEY YÜZEN ARAÇ ÇUBUĞU (GÖRSEL 1789487723574 BİREBİR) */}
+        <div className="absolute top-4 right-3 z-[450] flex flex-col items-center gap-1.5 select-none">
+          {/* Katmanlar */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowLayerMenu(!showLayerMenu)}
+              className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shadow-lg border transition cursor-pointer ${
+                showLayerMenu ? "bg-[#0B1E3B] text-amber-400 border-amber-500/40" : "bg-white hover:bg-slate-50 text-slate-700 border-slate-200"
+              }`}
+              title="Harita Katmanları (Uydu, Hibrit, Sokak)"
+            >
+              <Layers className="w-4 h-4" />
+            </button>
+
+            {showLayerMenu && (
+              <div className="absolute right-12 top-0 bg-slate-900 text-white border border-slate-700 rounded-xl shadow-2xl p-2 w-36 space-y-1 z-50 text-xs font-bold">
+                <div className="text-[10px] text-slate-400 px-2 py-0.5 uppercase tracking-wider font-mono">
+                  Katman Seçimi
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setMapLayerType("uydu"); setShowLayerMenu(false); }}
+                  className={`w-full text-left px-2.5 py-1.5 rounded-lg transition flex items-center justify-between cursor-pointer ${
+                    mapLayerType === "uydu" ? "bg-amber-500 text-slate-950 font-black" : "hover:bg-slate-800 text-slate-200"
+                  }`}
+                >
+                  <span>🛰️ Esri Uydu</span>
+                  {mapLayerType === "uydu" && <span className="text-[10px]">✓</span>}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setMapLayerType("hibrit"); setShowLayerMenu(false); }}
+                  className={`w-full text-left px-2.5 py-1.5 rounded-lg transition flex items-center justify-between cursor-pointer ${
+                    mapLayerType === "hibrit" ? "bg-amber-500 text-slate-950 font-black" : "hover:bg-slate-800 text-slate-200"
+                  }`}
+                >
+                  <span>🗺️ Hibrit</span>
+                  {mapLayerType === "hibrit" && <span className="text-[10px]">✓</span>}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setMapLayerType("sokak"); setShowLayerMenu(false); }}
+                  className={`w-full text-left px-2.5 py-1.5 rounded-lg transition flex items-center justify-between cursor-pointer ${
+                    mapLayerType === "sokak" ? "bg-amber-500 text-slate-950 font-black" : "hover:bg-slate-800 text-slate-200"
+                  }`}
+                >
+                  <span>🛣️ Sokak</span>
+                  {mapLayerType === "sokak" && <span className="text-[10px]">✓</span>}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Filtreler */}
+          <button
+            type="button"
+            onClick={() => setFilter(filter === "all" ? "satilik" : filter === "satilik" ? "kiralik" : "all")}
+            className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white hover:bg-slate-50 text-slate-700 flex items-center justify-center shadow-lg border border-slate-200 transition cursor-pointer ${
+              filter !== "all" ? "ring-2 ring-blue-500 text-blue-600 font-black" : ""
+            }`}
+            title={`Filtre: ${filter.toUpperCase()}`}
+          >
+            <Filter className="w-4 h-4" />
+          </button>
+
+          {/* Görünüm / Yoğunluk Ayarı */}
+          <button
+            type="button"
+            onClick={() => setViewMode(viewMode === "mahalleler" ? "ilceler" : "mahalleler")}
+            className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white hover:bg-slate-50 text-slate-700 flex items-center justify-center shadow-lg border border-slate-200 transition cursor-pointer"
+            title="Görünüm Düzeyi (İlçe / Mahalle)"
+          >
+            <SlidersHorizontal className="w-4 h-4" />
+          </button>
+
+          {/* GPS Konumumu Bul */}
+          <button
+            type="button"
+            onClick={handleGetLiveLocation}
+            className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white hover:bg-slate-50 text-slate-700 flex items-center justify-center shadow-lg border border-slate-200 transition cursor-pointer ${
+              isLocating ? "animate-spin text-blue-600" : ""
+            }`}
+            title="Konumumu Bul (GPS)"
+          >
+            <Crosshair className="w-4 h-4" />
+          </button>
+
+          {/* Yakınlaş (+) */}
+          <button
+            type="button"
+            onClick={handleZoomIn}
+            className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white hover:bg-slate-50 text-slate-900 font-black text-base flex items-center justify-center shadow-lg border border-slate-200 transition cursor-pointer active:scale-95"
+            title="Yakınlaştır (+)"
+          >
+            <Plus className="w-4 h-4" />
+          </button>
+
+          {/* Canlı Zoom Seviyesi Rozeti (Görseldeki 7) */}
+          <div className="w-9 sm:w-10 h-7 rounded-lg bg-white font-mono font-black text-xs text-slate-800 flex items-center justify-center shadow-md border border-slate-200">
+            {currentZoom}
+          </div>
+
+          {/* Uzaklaş (-) */}
+          <button
+            type="button"
+            onClick={handleZoomOut}
+            className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white hover:bg-slate-50 text-slate-900 font-black text-base flex items-center justify-center shadow-lg border border-slate-200 transition cursor-pointer active:scale-95"
+            title="Uzaklaştır (-)"
+          >
+            <Minus className="w-4 h-4" />
+          </button>
+
+          {/* Kırmızı Kilit Butonu (Görseldeki 🔒) */}
+          <button
+            type="button"
+            onClick={() => setIsLocked(!isLocked)}
+            className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center shadow-xl transition cursor-pointer active:scale-95 ${
+              isLocked
+                ? "bg-red-600 hover:bg-red-700 text-white ring-2 ring-red-400 shadow-red-600/40"
+                : "bg-white hover:bg-slate-50 text-slate-700 border border-slate-200"
+            }`}
+            title={isLocked ? "Parsel Kilidi Aktif (Tıklayınca Seç)" : "Serbest Gezinim"}
+          >
+            <Lock className="w-4 h-4" />
+          </button>
+
+          {/* Tam Ekran Toggle */}
+          <button
+            type="button"
+            onClick={toggleFullscreen}
+            className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white hover:bg-slate-50 text-slate-700 flex items-center justify-center shadow-lg border border-slate-200 transition cursor-pointer"
+            title={isFullscreen ? "Küçült" : "Tam Ekran Harita"}
+          >
+            {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+          </button>
+        </div>
 
         {/* Global Tooltip Stili */}
         <style jsx global>{`
