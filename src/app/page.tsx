@@ -11,6 +11,7 @@ import { EndeksaSidebar } from "@/components/EndeksaSidebar";
 import { PriceTrendChart } from "@/components/PriceTrendChart";
 import { InvestmentScoreCard } from "@/components/InvestmentScoreCard";
 import { ParcelMap } from "@/components/ParcelMap";
+import { EndeksaValuationModal } from "@/components/EndeksaValuationModal";
 import { ParcelInput } from "@/types";
 import { SAMPLE_SCENARIOS, formatTL, formatNumber } from "@/lib/constants";
 import { calculateFeasibility } from "@/lib/calculator";
@@ -37,7 +38,10 @@ import {
   Flame,
   Loader2,
   Trees,
-  Compass
+  Compass,
+  Bell,
+  Moon,
+  Globe
 } from "lucide-react";
 
 export default function Home() {
@@ -421,25 +425,79 @@ export default function Home() {
             )}
           </div>
 
-          {/* Sağ Kısım: Hızlı İşlemler */}
-          <div className="flex items-center gap-2">
+          {/* Sağ Kısım: Endeksa Üst Menü & Kullanıcı Rozeti (Görseldeki Birebir Header) */}
+          <div className="flex items-center gap-2 sm:gap-4 text-xs font-bold">
+            
+            {/* 1. Değerini Öğren Sekmesi */}
             <button
               type="button"
-              onClick={() => setShareModalOpen(true)}
-              className="p-2 rounded-xl text-slate-600 hover:bg-slate-100 hover:text-emerald-600 transition cursor-pointer"
-              title="WhatsApp İle Paylaş"
+              onClick={() => setActiveTab("degerleme")}
+              className={`py-1.5 px-2.5 transition relative cursor-pointer font-heading font-extrabold ${
+                activeTab === "degerleme"
+                  ? "text-rose-600 after:absolute after:bottom-[-16px] after:left-0 after:right-0 after:h-[2.5px] after:bg-rose-600 after:rounded-full"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
             >
-              <Share2 className="w-4 h-4" />
+              Değerini Öğren
             </button>
 
+            {/* 2. Bölgeyi İncele Sekmesi */}
             <button
               type="button"
-              onClick={() => setActiveTab("rapor")}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-xs transition cursor-pointer"
+              onClick={() => setActiveTab("endeks")}
+              className={`py-1.5 px-2.5 transition relative cursor-pointer font-heading font-extrabold ${
+                activeTab === "endeks"
+                  ? "text-rose-600 after:absolute after:bottom-[-16px] after:left-0 after:right-0 after:h-[2.5px] after:bg-rose-600 after:rounded-full"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
             >
-              <Printer className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Rapor Al</span>
+              Bölgeyi İncele
             </button>
+
+            <span className="hidden xl:inline-block text-slate-600 hover:text-slate-900 cursor-pointer font-medium">
+              Profesyoneller
+            </span>
+
+            <span className="hidden xl:inline-block text-slate-600 hover:text-slate-900 cursor-pointer font-medium">
+              Blog
+            </span>
+
+            {/* Hızlı İkonlar: 🔔, 🌙, 🌐 */}
+            <div className="hidden sm:flex items-center gap-1 text-slate-400 pl-1 border-l border-slate-200">
+              <button 
+                type="button" 
+                aria-label="Bildirimler"
+                className="p-1.5 hover:text-slate-700 transition cursor-pointer"
+              >
+                <Bell className="w-3.5 h-3.5" />
+              </button>
+              <button 
+                type="button" 
+                aria-label="Karanlık Mod"
+                className="p-1.5 hover:text-slate-700 transition cursor-pointer"
+              >
+                <Moon className="w-3.5 h-3.5" />
+              </button>
+              <button 
+                type="button" 
+                aria-label="Dil Seçimi"
+                className="p-1.5 hover:text-slate-700 transition cursor-pointer"
+              >
+                <Globe className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* Kullanıcı Profili Rozeti: Ali Turan (Ekran Görüntüsü ile Birebir) */}
+            <div 
+              onClick={() => setActiveTab("degerleme")}
+              className="flex items-center gap-2 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white pl-1.5 pr-3 py-1 rounded-full shadow-xs cursor-pointer select-none transition active:scale-95"
+              title="Kullanıcı: Ali Turan (4 Kalan Değerleme)"
+            >
+              <div className="w-6 h-6 rounded-full bg-white/25 flex items-center justify-center text-[10px] font-black">
+                AT
+              </div>
+              <span className="text-xs font-extrabold whitespace-nowrap">Ali Turan</span>
+            </div>
           </div>
         </div>
       </header>
@@ -454,8 +512,16 @@ export default function Home() {
             onOpenShareModal={() => setShareModalOpen(true)}
           />
         </main>
+      ) : activeTab === "degerleme" ? (
+        /* 3. DEĞERİNİ ÖĞREN EKRANI (GÖRSELDEKİ BİREBİR ENDEKSA SİHİRBAZI) */
+        <EndeksaValuationModal
+          input={parcelData}
+          onChange={setParcelData}
+          onClose={() => setActiveTab("endeks")}
+          onNavigateToMap={() => setActiveTab("endeks")}
+        />
       ) : (
-        /* 3. ENDEKSA İKİYE BÖLÜNMÜŞ (SPLIT-SCREEN) ANA ÇALIŞMA ALANI */
+        /* 4. ENDEKSA İKİYE BÖLÜNMÜŞ (SPLIT-SCREEN) BÖLGEYİ İNCELE ALANI */
         <div className="flex-1 flex flex-row overflow-hidden">
           
           {/* Sol Kenar Çubuğu (Icon Sidebar) */}
@@ -506,8 +572,8 @@ export default function Home() {
                 )}
               </div>
 
-              {/* ÇALIŞMA SEKMELERİ: [PİYASA ANALİZİ] | [KADASTRO & DEĞERLEME] | [İHALE & PEY SİMÜLATÖRÜ] */}
-              <div className="grid grid-cols-3 gap-1 p-1 bg-slate-100 rounded-xl text-xs font-bold">
+              {/* ÇALIŞMA SEKMELERİ: [PİYASA ANALİZİ] | [İHALE & PEY SİMÜLATÖRÜ] */}
+              <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-100 rounded-xl text-xs font-bold">
                 <button
                   type="button"
                   onClick={() => setActiveTab("endeks")}
@@ -519,19 +585,6 @@ export default function Home() {
                 >
                   <TrendingUp className="w-3.5 h-3.5 text-amber-600" />
                   <span>Piyasa Analizi</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("degerleme")}
-                  className={`py-2 rounded-lg transition flex items-center justify-center gap-1.5 cursor-pointer ${
-                    activeTab === "degerleme"
-                      ? "bg-white text-blue-700 shadow-xs"
-                      : "text-slate-600 hover:text-slate-900"
-                  }`}
-                >
-                  <FileSpreadsheet className="w-3.5 h-3.5 text-blue-600" />
-                  <span>Kadastro & Değerleme</span>
                 </button>
 
                 <button
@@ -596,17 +649,6 @@ export default function Home() {
                       <span>WhatsApp Yatırımcı Brifi</span>
                     </button>
                   </div>
-                </div>
-              )}
-
-              {/* SEKME 2: DEĞERLEME SİHİRBAZI */}
-              {activeTab === "degerleme" && (
-                <div className="space-y-4">
-                  <ValuationWizard
-                    input={parcelData}
-                    onChange={setParcelData}
-                    onReset={() => handleCategorySwitch(parcelData.category)}
-                  />
                 </div>
               )}
 
