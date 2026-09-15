@@ -12,11 +12,14 @@ import { PriceTrendChart } from "@/components/PriceTrendChart";
 import { InvestmentScoreCard } from "@/components/InvestmentScoreCard";
 import { ParcelMap } from "@/components/ParcelMap";
 import { EndeksaValuationModal } from "@/components/EndeksaValuationModal";
+import { ElectronicReportModal } from "@/components/ElectronicReportModal";
+import { ReportSelectionModal, ReportPackageType } from "@/components/ReportSelectionModal";
 import { ParcelInput } from "@/types";
 import { SAMPLE_SCENARIOS, formatTL, formatNumber } from "@/lib/constants";
 import { calculateFeasibility } from "@/lib/calculator";
 import { 
   Building, 
+  FileText,
   FileSpreadsheet, 
   Sparkles, 
   ShieldCheck, 
@@ -48,6 +51,8 @@ export default function Home() {
   const [parcelData, setParcelData] = useState<ParcelInput>(SAMPLE_SCENARIOS[0].data);
   const [activeTab, setActiveTab] = useState<"endeks" | "degerleme" | "ihale" | "rapor">("endeks");
   const [shareModalOpen, setShareModalOpen] = useState<boolean>(false);
+  const [showElectronicReportModal, setShowElectronicReportModal] = useState<boolean>(false);
+  const [showReportSelectionModal, setShowReportSelectionModal] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>("Çanakkale, Bayramiç");
   const [isSearching, setIsSearching] = useState<boolean>(false);
 
@@ -535,8 +540,8 @@ export default function Home() {
           {/* İkili Çalışma Alanı: Sol Analitik (%50) + Sağ Harita (%50) */}
           <div className="flex-1 flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden">
             
-            {/* SOL ANALİTİK & VERİ PANELİ (Scroll Edilebilir) */}
-            <div className="w-full lg:w-[50%] lg:h-[calc(100vh-64px)] overflow-y-auto p-3 sm:p-5 space-y-5 border-r border-slate-200">
+            {/* SOL ANALİTİK & VERİ PANELİ (Tapusor Genişliği %32) */}
+            <div className="w-full lg:w-[38%] xl:w-[32%] min-w-[360px] lg:h-[calc(100vh-64px)] overflow-y-auto p-3 sm:p-5 space-y-5 border-r border-slate-200 bg-white">
               
               {/* İHALECİ BURADA FİLTRE HAPLARI */}
               <div className="flex flex-wrap items-center gap-2 pb-1 border-b border-slate-200/80">
@@ -570,6 +575,52 @@ export default function Home() {
                     Emsal: <strong className="text-slate-900">KAKS {parcelData.kaks || 1.5}</strong>
                   </span>
                 )}
+              </div>
+
+              {/* TAPUSOR ESİNTİLİ OTOMATİK DEĞERLEME & FİNANS ANALİZ KARTI */}
+              <div className="bg-gradient-to-br from-slate-900 via-[#0B1E3B] to-slate-950 text-white rounded-2xl p-4 sm:p-5 border border-slate-800 shadow-md space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-400 text-[10px] font-black border border-amber-500/30 flex items-center gap-1">
+                    <Sparkles className="w-3 h-3 text-amber-400" />
+                    Otomatik Değerleme • Finans Analiz
+                  </span>
+                  <span className="text-[11px] font-mono text-emerald-400 font-bold">
+                    TKGM Doğrulandı
+                  </span>
+                </div>
+
+                <div className="flex items-baseline justify-between pt-1">
+                  <div>
+                    <div className="text-2xl sm:text-3xl font-black text-white font-heading tracking-tight">
+                      {isResidential 
+                        ? `${(parcelData.estimatedUnitSaleM2PriceTL || 54085).toLocaleString("tr-TR")} ₺`
+                        : `${(parcelData.estimatedLandM2PriceTL || 18500).toLocaleString("tr-TR")} ₺`
+                      } <span className="text-xs font-semibold text-slate-400">/ m²</span>
+                    </div>
+                    <div className="text-[11px] text-slate-400 mt-0.5">
+                      Bölgesel Emsal Birim Fiyatı
+                    </div>
+                  </div>
+
+                  <div className="text-right">
+                    <div className="text-[10px] font-extrabold text-amber-400 uppercase tracking-tight">
+                      İİK m.115 %50 Tabanı
+                    </div>
+                    <div className="text-xs font-black text-emerald-400 font-mono">
+                      {Math.round((isResidential ? (parcelData.estimatedUnitSaleM2PriceTL || 54085) * (parcelData.areaM2 || 110) : (parcelData.estimatedLandM2PriceTL || 18500) * (parcelData.areaM2 || 850)) * 0.5).toLocaleString("tr-TR")} ₺
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tapusor Stili Sarı/Kehribar "Hemen Rapor Al" Butonu */}
+                <button
+                  type="button"
+                  onClick={() => setShowReportSelectionModal(true)}
+                  className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-black text-xs shadow-md transition cursor-pointer flex items-center justify-center gap-2 active:scale-95"
+                >
+                  <FileText className="w-4 h-4 text-slate-950" />
+                  <span>Hemen Ekspertiz Raporu Al (13 Sayfa PDF)</span>
+                </button>
               </div>
 
               {/* ÇALIŞMA SEKMELERİ: [PİYASA ANALİZİ] | [İHALE & PEY SİMÜLATÖRÜ] */}
@@ -633,7 +684,7 @@ export default function Home() {
                   <div className="grid grid-cols-2 gap-3 pt-2">
                     <button
                       type="button"
-                      onClick={() => setActiveTab("rapor")}
+                      onClick={() => setShowElectronicReportModal(true)}
                       className="py-3 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-sm flex items-center justify-center gap-2 transition cursor-pointer"
                     >
                       <Printer className="w-4 h-4" />
@@ -658,14 +709,14 @@ export default function Home() {
                   <FeasibilityPreview
                     input={parcelData}
                     calc={calculation}
-                    onViewReport={() => setActiveTab("rapor")}
+                    onViewReport={() => setShowElectronicReportModal(true)}
                   />
                 </div>
               )}
             </div>
 
-            {/* SAĞ HARİTA PANELİ (%50 Genişlik - Endeksa Tam Ekran Haritası) */}
-            <div className="w-full lg:w-[50%] lg:h-[calc(100vh-64px)] relative bg-slate-100 flex flex-col">
+            {/* SAĞ HARİTA PANELİ (Geniş Tapusor & GIS Uydu Haritası %68) */}
+            <div className="w-full lg:w-[62%] xl:w-[68%] lg:h-[calc(100vh-64px)] relative bg-slate-100 flex flex-col">
               <ParcelMap
                 city={parcelData.city}
                 district={parcelData.district}
@@ -710,6 +761,36 @@ export default function Home() {
         onClose={() => setShareModalOpen(false)}
         input={parcelData}
         calc={calculation}
+      />
+
+      {/* Tapusor Stili 5 Adımlı Emlak Muayenesi & Rapor Seçim Modalı */}
+      <ReportSelectionModal
+        isOpen={showReportSelectionModal}
+        onClose={() => setShowReportSelectionModal(false)}
+        onOpenReportPreview={() => {
+          setShowReportSelectionModal(false);
+          setShowElectronicReportModal(true);
+        }}
+        city={parcelData.city}
+        district={parcelData.district}
+        neighborhood={parcelData.neighborhood || "Merkez"}
+        ada={parcelData.ada || "48507"}
+        parsel={parcelData.parsel || "1"}
+        areaM2={parcelData.areaM2 || 110}
+        category={parcelData.category === "konut" ? "konut" : "arsa"}
+        nitelik={parcelData.category === "konut" ? "Betonarme Mesken ve Müştemilatı" : "Bağ & Tarla Vasfında İmar Parseli"}
+      />
+
+      {/* 13 Sayfalık Resmi Elektronik Ekspertiz Raporu Modalı */}
+      <ElectronicReportModal
+        isOpen={showElectronicReportModal}
+        onClose={() => setShowElectronicReportModal(false)}
+        propertyTitle={`${parcelData.city} / ${parcelData.district} / ${parcelData.neighborhood || "Merkez"}`}
+        category={parcelData.category === "konut" ? "konut" : "arsa"}
+        locationText={`${parcelData.neighborhood || "Merkez"}, ${parcelData.district}, ${parcelData.city}`}
+        parcelText={`${parcelData.city}, ${parcelData.district}, ${parcelData.neighborhood || "Merkez"}, ${parcelData.ada || "48507"} Ada, ${parcelData.parsel || "1"} Parsel`}
+        marketValueTL={calculation.fairMarketValueTL || 7900000}
+        areaM2={parcelData.areaM2 || 110}
       />
     </div>
   );

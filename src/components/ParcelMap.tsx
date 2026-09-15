@@ -616,16 +616,36 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
 
       // =========================================================================
       // KATMAN 3: PARSEL VE EMSALLER GÖRÜNÜMÜ (Nano Seviye - 500m Etki Çemberi)
-      // =========================================================================
       if (viewMode === "parsel") {
+        // Tapusor Çoklu Etki Alanı / Tampon Halkaları (Concentric Buffer Rings - 250m, 500m, 1000m)
+        L.circle([lat, lng], {
+          radius: 250,
+          color: "#2563EB",
+          weight: 2,
+          opacity: 0.85,
+          fillColor: "#3B82F6",
+          fillOpacity: 0.18,
+          dashArray: "3, 4",
+        }).addTo(map);
+
         L.circle([lat, lng], {
           radius: 500,
           color: "#2563EB",
-          weight: 1.8,
-          opacity: 0.90,
+          weight: 1.5,
+          opacity: 0.65,
           fillColor: "#3B82F6",
-          fillOpacity: 0.08,
+          fillOpacity: 0.10,
           dashArray: "5, 6",
+        }).addTo(map);
+
+        L.circle([lat, lng], {
+          radius: 1000,
+          color: "#2563EB",
+          weight: 1,
+          opacity: 0.40,
+          fillColor: "#3B82F6",
+          fillOpacity: 0.04,
+          dashArray: "6, 8",
         }).addTo(map);
 
         // Hedef Taşınmaz Pin
