@@ -646,6 +646,15 @@ export default function Home() {
                     coordinates: coords,
                   }));
                 }}
+                onSelectDistrict={(dist) => {
+                  handleSelectDistrict(dist);
+                }}
+                onSelectNeighborhood={(neigh) => {
+                  setParcelData((prev) => ({
+                    ...prev,
+                    neighborhood: neigh,
+                  }));
+                }}
               />
             </div>
 
