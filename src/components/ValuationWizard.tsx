@@ -39,7 +39,18 @@ import {
   Calculator
 } from "lucide-react";
 import { formatTL, formatNumber } from "@/lib/constants";
-import { ParcelMap } from "@/components/ParcelMap";
+import dynamic from "next/dynamic";
+const ParcelMap = dynamic(
+  () => import("@/components/ParcelMap").then((mod) => mod.ParcelMap),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="w-full h-[380px] flex items-center justify-center bg-slate-100 rounded-xl text-slate-400 text-xs font-bold">
+        Harita Yükleniyor...
+      </div>
+    ),
+  }
+);
 import { ALL_PROVINCES, getDistrictsByProvince } from "@/lib/turkeyLocations";
 
 interface ValuationWizardProps {

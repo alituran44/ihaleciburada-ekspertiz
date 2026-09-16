@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { 
   searchDistrictsAndProvinces, 
-  TURKEY_PROVINCES_AND_DISTRICTS 
+  TURKEY_PROVINCES_AND_DISTRICTS,
+  findFastLocationFromCoords
 } from "@/lib/turkeyLocations";
 
 // 81 İl Merkez Koordinatları
@@ -139,6 +140,7 @@ export async function GET(request: NextRequest) {
             headers: {
               "User-Agent": "IhaleciBurada-Ekspertiz-Reverse/1.0 (info@ihaleciburada.com)",
             },
+            signal: AbortSignal.timeout(1200),
           }
         );
 
@@ -165,21 +167,21 @@ export async function GET(request: NextRequest) {
           return NextResponse.json({ success: true, location: locObj });
         }
       } catch (e) {
-        console.warn("Reverse lookup error:", e);
+        // Hızlı yerel Türkiye koordinat eşlemesi (0ms yanıt)
       }
 
-      // Fallback: Türkiye 81 il merkez koordinatlarından en yakın ili hesapla
-      const fallbackProv = findClosestProvince(lat, lng);
-      const fallbackDist = TURKEY_PROVINCES_AND_DISTRICTS[fallbackProv]?.districts?.[0] || "Merkez";
+      // Fallback: 973 ilçe koordinat havuzundan en yakın il ve ilçeyi 0ms'de tespit et
+      const fast = findFastLocationFromCoords(lat, lng);
       const fallbackObj = {
-        province: fallbackProv,
-        district: fallbackDist,
-        neighborhood: "Merkez",
+        province: fast.city,
+        district: fast.district,
+        neighborhood: fast.neighborhood || "Merkez",
         road: "",
-        displayName: `${fallbackDist}, ${fallbackProv}`,
+        displayName: `${fast.district}, ${fast.city}`,
         lat,
         lng,
       };
+      reverseCache.set(revCacheKey, fallbackObj);
       return NextResponse.json({ success: true, location: fallbackObj });
     }
   }

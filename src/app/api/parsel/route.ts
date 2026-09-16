@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { queryTKGMParcel } from "@/lib/api/tkgm";
 import { fetchMarketValuation } from "@/lib/api/valuation";
 import { performMarketResearch } from "@/lib/api/marketResearch";
+import { getProvinceCoordinates } from "@/lib/turkeyLocations";
 import { 
   fetchLiveCurrencyRates, 
   fetchEarthquakeRisk, 
@@ -35,8 +36,9 @@ export async function GET(request: NextRequest) {
     });
 
     // Koordinatlar
-    const lat = parcelData?.coordinates?.lat || 40.1553;
-    const lng = parcelData?.coordinates?.lng || 26.4142;
+    const provCoords = getProvinceCoordinates(il);
+    const lat = parcelData?.coordinates?.lat || provCoords?.lat || 39.9334;
+    const lng = parcelData?.coordinates?.lng || provCoords?.lng || 32.8597;
 
     // 2. Paralel Veri Çekme (Piyasa, Emsal, Döviz, Deprem, Güneşlenme)
     const [marketData, researchData, currencyData, earthquakeData, solarData] = await Promise.all([

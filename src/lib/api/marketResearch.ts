@@ -7,6 +7,7 @@ import { MarketResearchResult, ComparableListing } from "@/types";
 import { TURKEY_81_PROVINCES } from "./valuation";
 import { fetchTcmbHousingMetrics } from "./tcmbEvds";
 import { calculateBuildingAndArchitecturalCost } from "./moEnAzBedel";
+import { getProvinceCoordinates } from "../turkeyLocations";
 
 interface DistrictBenchmark {
   landM2: number;
@@ -356,9 +357,10 @@ export async function performMarketResearch(params: {
 
   const queryLocation = `${cityRaw} / ${districtRaw}${neighborhoodRaw ? " / " + neighborhoodRaw : ""}`;
 
-  const coords = params.coordinates || {
-    lat: 40.1553,
-    lng: 26.4142,
+  const provCoords = getProvinceCoordinates(cityRaw);
+  const coords = params.coordinates || provCoords || {
+    lat: 39.9334,
+    lng: 32.8597, // Ankara / Türkiye merkezi
   };
 
   const comparables = generateSurroundingComparables({
@@ -405,6 +407,7 @@ export async function performMarketResearch(params: {
       "ÇŞB & Mimarlar Odası 2026 Maliyetleri"
     ],
     summaryNote,
+    coordinates: coords,
     comparables,
     tcmbOfficialData,
     buildingCostEstimate,

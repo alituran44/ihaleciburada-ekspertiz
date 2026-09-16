@@ -1,32 +1,25 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useMemo } from "react";
+import L from "leaflet";
 import { ComparableListing } from "@/types";
-import { getDistrictValuation, getDistrictChoroplethColor } from "@/lib/districtValuations";
+import { getDistrictValuation } from "@/lib/districtValuations";
+import { findFastLocationFromCoords } from "@/lib/turkeyLocations";
 import { 
   MapPin, 
   Mountain, 
-  ExternalLink, 
   Layers, 
   Compass, 
-  Navigation, 
-  ArrowLeft,
-  Search,
-  CheckCircle2,
-  TrendingUp,
-  Gavel,
-  ShieldCheck,
-  RefreshCw,
-  Plus,
-  Minus,
-  Lock,
-  Unlock,
-  Maximize2,
-  Minimize2,
-  Crosshair,
-  Filter,
-  SlidersHorizontal,
-  AlertCircle
+  Plus, 
+  Minus, 
+  Lock, 
+  Unlock, 
+  Maximize2, 
+  Minimize2, 
+  Crosshair, 
+  Filter, 
+  Sparkles,
+  ShieldCheck
 } from "lucide-react";
 
 interface ParcelMapProps {
@@ -40,6 +33,7 @@ interface ParcelMapProps {
   comparables?: ComparableListing[];
   category?: "arsa" | "konut";
   unitM2Price?: number;
+  areaM2?: number;
   isEndeksaSplitView?: boolean;
   onLocationFound?: (coords: { lat: number; lng: number }) => void;
   onSelectDistrict?: (districtName: string) => void;
@@ -50,6 +44,7 @@ interface ParcelMapProps {
     neighborhood: string;
     coordinates: { lat: number; lng: number };
     unitPrice?: number;
+    comparables?: ComparableListing[];
   }) => void;
 }
 
@@ -76,23 +71,6 @@ function offsetCoord(lat: number, lng: number, meters: number, bearingDeg: numbe
   };
 }
 
-// Ekran görüntüsündeki (media_1789427467462.png) gibi doğrudan harita üzerine basılan ana köy/mahalle etiketleri
-const PROMINENT_LABELS = [
-  "Muratlar",
-  "Bayramiç",
-  "Mollahasanlar",
-  "Evciler",
-  "Çırpılar",
-  "Karaköy",
-  "Türkmenli",
-  "Söğütalan",
-  "Cevatpaşa",
-  "Barbaros",
-  "İsmetpaşa",
-  "Esenler",
-  "Kepez",
-];
-
 export const ParcelMap: React.FC<ParcelMapProps> = ({
   city,
   district,
@@ -103,7 +81,8 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
   elevationMeters,
   comparables,
   category = "arsa",
-  unitM2Price = 45000,
+  unitM2Price = 54085,
+  areaM2 = 135,
   isEndeksaSplitView = false,
   onLocationFound,
   onSelectDistrict,
@@ -111,34 +90,28 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
   onLocationSelect,
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<any>(null);
-  const tileLayerRef = useRef<any>(null);
-  const geoJsonLayerGroupRef = useRef<any>(null);
-  const parcelLayerGroupRef = useRef<any>(null);
-  const clickMarkerRef = useRef<any>(null);
-  const markersRef = useRef<{ [key: string]: any }>({});
+  const mapInstanceRef = useRef<L.Map | null>(null);
+  const tileLayerRef = useRef<L.TileLayer | null>(null);
+  const parcelLayerGroupRef = useRef<L.LayerGroup | null>(null);
+  const markersRef = useRef<{ [key: string]: L.Marker }>({});
   const isInternalClickRef = useRef<boolean>(false);
-  
+  const lastInteractedCoordRef = useRef<{ lat: number; lng: number } | null>(null);
+
   const [filter, setFilter] = useState<"all" | "satilik" | "kiralik">("all");
   const [selectedCompId, setSelectedCompId] = useState<string | null>(null);
+  const [dynamicComps, setDynamicComps] = useState<ComparableListing[] | null>(null);
   const [isLocating, setIsLocating] = useState<boolean>(false);
   const [locateFeedback, setLocateFeedback] = useState<string | null>(null);
   
-  // Görünüm Seviyesi: "ilceler" (Makro) | "mahalleler" (En Küçük Bölge - Mahalle/Köy) | "parsel" (Emsaller & Parsel)
-  const [viewMode, setViewMode] = useState<"ilceler" | "mahalleler" | "parsel">("mahalleler");
-  const [activeDistrict, setActiveDistrict] = useState<string>(district || "Bayramiç");
+  const [activeDistrict, setActiveDistrict] = useState<string>(district || "Merkez");
   const [activeNeighborhood, setActiveNeighborhood] = useState<string | null>(neighborhood || null);
-  const [mahalleData, setMahalleData] = useState<any>(null);
-  const [isLoadingMahalle, setIsLoadingMahalle] = useState<boolean>(false);
-  const [mahalleCount, setMahalleCount] = useState<number>(0);
 
-  // Floating Harita Kontrolleri & Bildirimleri (Görsel 1789487723574 İle Birebir)
-  const [currentZoom, setCurrentZoom] = useState<number>(7);
-  const [mapLayerType, setMapLayerType] = useState<"uydu" | "hibrit" | "sokak">("uydu");
+  // Floating Controls
+  const [currentZoom, setCurrentZoom] = useState<number>(15);
   const [isLocked, setIsLocked] = useState<boolean>(false);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [showLayerMenu, setShowLayerMenu] = useState<boolean>(false);
-  const [parcelNotice, setParcelNotice] = useState<string | null>("Parsel bilgisi bulunamadı.");
+  const [parcelNotice, setParcelNotice] = useState<string | null>(null);
 
   const handleZoomIn = () => {
     if (mapInstanceRef.current) {
@@ -156,9 +129,9 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
     setIsFullscreen((prev) => !prev);
   };
 
-  // Mausun topuzu (scroll wheel zoom) ve kilit durumunu senkronize et
+  // Sync scrollWheelZoom with lock state
   useEffect(() => {
-    if (mapInstanceRef.current && mapInstanceRef.current.scrollWheelZoom) {
+    if (mapInstanceRef.current) {
       if (isLocked) {
         mapInstanceRef.current.scrollWheelZoom.disable();
       } else {
@@ -180,20 +153,6 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
     }
   }, [neighborhood]);
 
-  // Dışarıdan veya pencereden mod değiştirme fonksiyonları
-  useEffect(() => {
-    (window as any).__switchToMahalleMode = (distName?: string) => {
-      if (distName) setActiveDistrict(distName);
-      setViewMode("mahalleler");
-    };
-    (window as any).__switchToDistrictMode = () => {
-      setViewMode("ilceler");
-    };
-    (window as any).__switchToParcelMode = () => {
-      setViewMode("parsel");
-    };
-  }, []);
-
   const handleGetLiveLocation = () => {
     if (!navigator.geolocation) {
       alert("Tarayıcınız GPS konum servisini desteklemiyor.");
@@ -210,12 +169,10 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
         const userLng = Number(position.coords.longitude.toFixed(6));
 
         if (mapInstanceRef.current) {
-          mapInstanceRef.current.flyTo([userLat, userLng], 16, {
-            duration: 1.2,
-          });
+          mapInstanceRef.current.flyTo([userLat, userLng], 16, { duration: 1.2 });
         }
 
-        setLocateFeedback(`Konum Alındı (${userLat.toFixed(4)}, ${userLng.toFixed(4)})`);
+        setLocateFeedback(`GPS Konumu Alındı (${userLat.toFixed(4)}, ${userLng.toFixed(4)})`);
         setTimeout(() => setLocateFeedback(null), 4000);
 
         if (onLocationFound) {
@@ -232,13 +189,16 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
   };
 
   // Default Koordinatlar
-  const lat = coordinates?.lat || 39.8370;
-  const lng = coordinates?.lng || 26.6870;
+  const lat = coordinates?.lat || 40.1553;
+  const lng = coordinates?.lng || 26.4142;
 
   const isResidential = category === "konut";
 
   // Emsal İlan Listesi
-  const compsList: ComparableListing[] = React.useMemo(() => {
+  const compsList: ComparableListing[] = useMemo(() => {
+    if (dynamicComps && dynamicComps.length > 0) {
+      return dynamicComps;
+    }
     if (comparables && comparables.length > 0) {
       return comparables;
     }
@@ -252,19 +212,19 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
           areaM2: 135,
           pricePerM2TL: 48000,
           priceTL: 6480000,
-          distanceMeters: 240,
-          coordinates: offsetCoord(lat, lng, 240, 40),
+          distanceMeters: 220,
+          coordinates: offsetCoord(lat, lng, 220, 30),
           source: "Sahibinden",
           roomCount: "3+1",
           date: "2 gün önce",
         },
         {
           id: "def-res-2",
-          title: `${activeNeighborhood || activeDistrict} 2+1 Sıfır Lüks Site Dairesi`,
+          title: `${activeNeighborhood || activeDistrict} Site İçi Otoparklı 2+1 Daire`,
           category: "konut",
           type: "satilik",
-          areaM2: 100,
-          pricePerM2TL: 52000,
+          areaM2: 110,
+          pricePerM2TL: 47200,
           priceTL: 5200000,
           distanceMeters: 380,
           coordinates: offsetCoord(lat, lng, 380, 135),
@@ -347,9 +307,9 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
         },
       ];
     }
-  }, [comparables, isResidential, lat, lng, activeNeighborhood, activeDistrict]);
+  }, [comparables, dynamicComps, isResidential, lat, lng, activeNeighborhood, activeDistrict]);
 
-  const filteredComps = React.useMemo(() => {
+  const filteredComps = useMemo(() => {
     if (filter === "all") return compsList;
     return compsList.filter((c) => c.type === filter);
   }, [compsList, filter]);
@@ -365,10 +325,10 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
     cDist: string,
     cNeigh?: string
   ) => {
-    const L = (window as any).L;
-    if (!L || !parcelLayerGroupRef.current) return;
+    if (!parcelLayerGroupRef.current) return [];
 
     parcelLayerGroupRef.current.clearLayers();
+    markersRef.current = {};
 
     // 1. Çoklu Etki Alanı / Tampon Halkaları (250m, 500m, 1000m)
     L.circle([cLat, cLng], {
@@ -377,8 +337,8 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
       weight: 2,
       opacity: 0.85,
       fillColor: "#3B82F6",
-      fillOpacity: 0.14,
-      dashArray: "3, 4",
+      fillOpacity: 0.12,
+      dashArray: "4, 4",
     }).addTo(parcelLayerGroupRef.current);
 
     L.circle([cLat, cLng], {
@@ -387,7 +347,7 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
       weight: 1.5,
       opacity: 0.65,
       fillColor: "#3B82F6",
-      fillOpacity: 0.08,
+      fillOpacity: 0.06,
       dashArray: "5, 6",
     }).addTo(parcelLayerGroupRef.current);
 
@@ -416,122 +376,159 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
     };
 
     // Merkez Hedef Altıgen (Sarı Vurgulu Petek)
-    const centerHexPts = getHexCorners(cLat, cLng, hexRadius);
-    L.polygon(centerHexPts, {
-      color: "#EAB308",
-      weight: 2.5,
-      fillColor: "#FACC15",
-      fillOpacity: 0.65,
+    const centerHexCorners = getHexCorners(cLat, cLng, hexRadius);
+    const centerPolygon = L.polygon(centerHexCorners, {
+      color: "#CA8A04",
+      weight: 3,
+      opacity: 0.98,
+      fillColor: "#FDE047",
+      fillOpacity: 0.58,
     }).addTo(parcelLayerGroupRef.current);
 
-    // Hedef m² Fiyat Rozeti (Sarı Rozet)
+    centerPolygon.bindTooltip(
+      `<div style="font-family: sans-serif; text-align: center; padding: 2px;">
+        <strong style="color: #854D0E; font-size: 11px;">Hedef Değerleme Parseli</strong><br/>
+        <span style="color: #0F172A; font-weight: 800; font-size: 12px;">${targetPrice.toLocaleString("tr-TR")} ₺/m²</span>
+      </div>`,
+      { permanent: false, direction: "top", opacity: 0.95 }
+    );
+
+    // Merkezde TapuSor İğnesi ve m² Değeri Rozeti
     const centerBadgeIcon = L.divIcon({
-      className: "leaflet-hex-center-badge",
+      className: "leaflet-target-badge",
       html: `
-        <div style="transform: translate(-50%, -50%); background: #FACC15; color: #713F12; font-weight: 900; font-size: 11px; padding: 2px 7px; border-radius: 6px; border: 1.5px solid #CA8A04; box-shadow: 0 2px 8px rgba(0,0,0,0.35); font-family: monospace; white-space: nowrap; pointer-events: none;">
-          ${(targetPrice || 54085).toLocaleString("tr-TR")} ₺/m²
+        <div style="position: relative; display: flex; flex-direction: column; align-items: center; transform: translate(-50%, -100%); pointer-events: auto;">
+          <div style="background: #0F223D; color: #FCD34D; font-weight: 900; font-size: 11px; padding: 4px 10px; border-radius: 20px; border: 2px solid #FCD34D; box-shadow: 0 4px 14px rgba(0,0,0,0.35); white-space: nowrap; font-family: monospace; display: flex; align-items: center; gap: 4px;">
+            <span>📍</span>
+            <span>${targetPrice.toLocaleString("tr-TR")} ₺/m²</span>
+          </div>
+          <div style="width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid #0F223D;"></div>
         </div>
       `,
       iconSize: [0, 0],
     });
-    L.marker([cLat, cLng], { icon: centerBadgeIcon, interactive: false, zIndexOffset: 2100 }).addTo(parcelLayerGroupRef.current);
 
-    // 12 Çevre Bal Peteği Emsalleri
-    const surroundingHexList = [
-      { angle: 30, dist: hexStep, price: Math.round((targetPrice || 54085) * 1.254), count: 6, label: "Kuzeydoğu Emsal Bölgesi" },
-      { angle: 90, dist: hexStep, price: Math.round((targetPrice || 54085) * 0.456), count: 3, label: "Doğu Emsal Bölgesi" },
-      { angle: 150, dist: hexStep, price: Math.round((targetPrice || 54085) * 0.852), count: 2, label: "Güneydoğu Emsal Bölgesi" },
-      { angle: 210, dist: hexStep, price: Math.round((targetPrice || 54085) * 0.915), count: 4, label: "Güneybatı Emsal Bölgesi" },
-      { angle: 270, dist: hexStep, price: Math.round((targetPrice || 54085) * 0.891), count: 3, label: "Batı Emsal Bölgesi" },
-      { angle: 330, dist: hexStep, price: Math.round((targetPrice || 54085) * 1.042), count: 5, label: "Kuzeybatı Emsal Bölgesi" },
-      { angle: 0, dist: hexStep * 1.732, price: Math.round((targetPrice || 54085) * 1.148), count: 3, label: "Kuzey Emsalleri" },
-      { angle: 60, dist: hexStep * 1.732, price: Math.round((targetPrice || 54085) * 1.182), count: 4, label: "Dış Doğu Emsalleri" },
-      { angle: 120, dist: hexStep * 1.732, price: Math.round((targetPrice || 54085) * 0.745), count: 2, label: "Dış Güneydoğu Emsalleri" },
-      { angle: 180, dist: hexStep * 1.732, price: Math.round((targetPrice || 54085) * 0.825), count: 3, label: "Güney Emsalleri" },
-      { angle: 240, dist: hexStep * 1.732, price: Math.round((targetPrice || 54085) * 0.948), count: 2, label: "Dış Güneybatı Emsalleri" },
-      { angle: 300, dist: hexStep * 1.732, price: Math.round((targetPrice || 54085) * 1.078), count: 4, label: "Dış Kuzeybatı Emsalleri" },
+    L.marker([cLat, cLng], { icon: centerBadgeIcon }).addTo(parcelLayerGroupRef.current);
+
+    // Çevre 12 Adet Bal Peteği Hücresi (2 Halka: 6 Yakın + 6 Orta)
+    const honeycombOffsets = [
+      { angle: 0, dist: hexStep, mult: 1.04 },
+      { angle: 60, dist: hexStep, mult: 0.97 },
+      { angle: 120, dist: hexStep, mult: 1.06 },
+      { angle: 180, dist: hexStep, mult: 0.92 },
+      { angle: 240, dist: hexStep, mult: 0.95 },
+      { angle: 300, dist: hexStep, mult: 1.08 },
+      { angle: 30, dist: hexStep * 1.732, mult: 1.11 },
+      { angle: 90, dist: hexStep * 1.732, mult: 1.03 },
+      { angle: 150, dist: hexStep * 1.732, mult: 0.89 },
+      { angle: 210, dist: hexStep * 1.732, mult: 0.91 },
+      { angle: 270, dist: hexStep * 1.732, mult: 0.98 },
+      { angle: 330, dist: hexStep * 1.732, mult: 1.14 },
     ];
 
-    surroundingHexList.forEach((hex, idx) => {
-      const hexCenter = offsetCoord(cLat, cLng, hex.dist, hex.angle);
-      const hexCorners = getHexCorners(hexCenter.lat, hexCenter.lng, hexRadius);
+    honeycombOffsets.forEach((hCell) => {
+      const cellCenter = offsetCoord(cLat, cLng, hCell.dist, hCell.angle);
+      const cellCorners = getHexCorners(cellCenter.lat, cellCenter.lng, hexRadius);
+      const cellPrice = Math.round(targetPrice * hCell.mult);
 
-      const poly = L.polygon(hexCorners, {
+      const cellPoly = L.polygon(cellCorners, {
         color: "#2563EB",
-        weight: 1.6,
+        weight: 1.5,
         opacity: 0.85,
         fillColor: "#3B82F6",
-        fillOpacity: 0.20,
-      }).addTo(parcelLayerGroupRef.current);
+        fillOpacity: 0.16,
+      }).addTo(parcelLayerGroupRef.current!);
 
-      const hexBadgeIcon = L.divIcon({
+      const cellIcon = L.divIcon({
         className: "leaflet-hex-badge",
         html: `
-          <div style="transform: translate(-50%, -50%); background: #0B1E3B; color: #FFFFFF; font-weight: 800; font-size: 10px; padding: 2.5px 6px; border-radius: 6px; border: 1.5px solid #3B82F6; box-shadow: 0 2px 8px rgba(0,0,0,0.35); font-family: monospace; white-space: nowrap; display: flex; align-items: center; gap: 4px; cursor: pointer;">
-            <span>${hex.price.toLocaleString("tr-TR")} ₺/m²</span>
-            <span style="background: #F59E0B; color: #000; font-size: 9px; font-weight: 900; padding: 0.5px 3.5px; border-radius: 3px;">${hex.count} •</span>
+          <div style="transform: translate(-50%, -50%); pointer-events: none;">
+            <div style="background: rgba(255, 255, 255, 0.92); color: #1E3A8A; font-weight: 800; font-size: 9px; padding: 2px 6px; border-radius: 8px; border: 1px solid rgba(37, 99, 235, 0.4); box-shadow: 0 1px 4px rgba(0,0,0,0.15); white-space: nowrap; font-family: monospace;">
+              ${cellPrice.toLocaleString("tr-TR")} ₺
+            </div>
           </div>
         `,
         iconSize: [0, 0],
       });
 
-      const badgeMarker = L.marker([hexCenter.lat, hexCenter.lng], {
-        icon: hexBadgeIcon,
-        zIndexOffset: 1200 + idx,
-      }).addTo(parcelLayerGroupRef.current);
+      L.marker([cellCenter.lat, cellCenter.lng], { icon: cellIcon }).addTo(parcelLayerGroupRef.current!);
 
-      const hexPopupHtml = `
-        <div style="font-family: ui-sans-serif, system-ui, sans-serif; min-width: 220px; padding: 4px;">
-          <div style="font-size: 10px; font-weight: 800; color: #2563EB; text-transform: uppercase;">${hex.label}</div>
-          <div style="font-size: 13px; font-weight: 900; color: #0F172A; margin: 2px 0;">${hex.price.toLocaleString("tr-TR")} ₺/m²</div>
-          <div style="font-size: 10.5px; color: #64748B;">Bu petekte <strong>${hex.count} adet</strong> güncel emsal ilan bulunuyor.</div>
-          <div style="font-size: 10px; color: #059669; font-weight: 700; margin-top: 4px;">İcra Tabanı (İİK %50): ${Math.round(hex.price * 0.5).toLocaleString("tr-TR")} ₺/m²</div>
-        </div>
-      `;
-
-      poly.bindPopup(hexPopupHtml);
-      badgeMarker.bindPopup(hexPopupHtml);
-
-      poly.on("mouseover", () => {
-        poly.setStyle({ fillOpacity: 0.45, weight: 2.5, color: "#1D4ED8" });
-      });
-      poly.on("mouseout", () => {
-        poly.setStyle({ fillOpacity: 0.20, weight: 1.6, color: "#2563EB" });
-      });
+      cellPoly.bindTooltip(
+        `<div style="font-family: sans-serif; font-size: 10.5px;">
+          <strong>Bölge Mikro Hücresi</strong><br/>
+          Ort. Rayiç: <span style="color: #2563EB; font-weight: 800;">${cellPrice.toLocaleString("tr-TR")} ₺/m²</span>
+        </div>`,
+        { direction: "center", opacity: 0.9 }
+      );
     });
 
-    // Hedef Taşınmaz Pin
-    const targetIcon = L.divIcon({
-      className: "leaflet-target-pin",
-      html: `
-        <div style="position: relative; display: flex; flex-direction: column; align-items: center; transform: translate(-50%, -100%); cursor: pointer;">
-          <div style="background: #0F223D; color: #FFFFFF; font-weight: 800; font-size: 11px; padding: 4px 10px; border-radius: 8px; border: 2px solid #F59E0B; box-shadow: 0 4px 14px rgba(0,0,0,0.35); white-space: nowrap; display: flex; align-items: center; gap: 4px; font-family: sans-serif;">
-            <span>📍 DEĞERLENEN TAŞINMAZ</span>
-          </div>
-          <div style="width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 8px solid #0F223D;"></div>
-          <div style="width: 10px; height: 10px; background: #F59E0B; border: 2px solid #FFFFFF; border-radius: 50%; margin-top: -3px; box-shadow: 0 0 10px #F59E0B;"></div>
-        </div>
-      `,
-      iconSize: [0, 0],
-    });
+    // 3. Tıklanan Noktanın Çevresine 4-6 Dinamik Emsal İlanı Yerleştir
+    const localGeneratedComps: ComparableListing[] = [
+      {
+        id: `comp-${cLat.toFixed(3)}-1`,
+        title: `${cNeigh || cDist} Satılık ${isResidential ? "Balkonlu 3+1 Daire" : "Müstakil Parsel"}`,
+        category: category,
+        type: "satilik" as const,
+        areaM2: isResidential ? 135 : 650,
+        pricePerM2TL: Math.round(targetPrice * 0.98),
+        priceTL: Math.round(targetPrice * 0.98 * (isResidential ? 135 : 650)),
+        distanceMeters: 220,
+        coordinates: offsetCoord(cLat, cLng, 220, 35),
+        source: "Sahibinden",
+        roomCount: isResidential ? "3+1" : undefined,
+        zoningType: isResidential ? undefined : "Konut İmarlı",
+        date: "Dün",
+      },
+      {
+        id: `comp-${cLat.toFixed(3)}-2`,
+        title: `${cNeigh || cDist} ${isResidential ? "Site İçi Otoparklı 2+1" : "Yola Cepheli Arsa"}`,
+        category: category,
+        type: "satilik" as const,
+        areaM2: isResidential ? 110 : 1200,
+        pricePerM2TL: Math.round(targetPrice * 1.05),
+        priceTL: Math.round(targetPrice * 1.05 * (isResidential ? 110 : 1200)),
+        distanceMeters: 380,
+        coordinates: offsetCoord(cLat, cLng, 380, 140),
+        source: "Hepsiemlak",
+        roomCount: isResidential ? "2+1" : undefined,
+        zoningType: isResidential ? undefined : "Gelişme Konut",
+        date: "2 gün önce",
+      },
+      {
+        id: `comp-${cLat.toFixed(3)}-3`,
+        title: `${cNeigh || cDist} ${isResidential ? "Ön Cephe 3+1 Aile Dairesi" : "Yatırımlık Arsa Emsali"}`,
+        category: category,
+        type: "satilik" as const,
+        areaM2: isResidential ? 140 : 850,
+        pricePerM2TL: Math.round(targetPrice * 0.88),
+        priceTL: Math.round(targetPrice * 0.88 * (isResidential ? 140 : 850)),
+        distanceMeters: 520,
+        coordinates: offsetCoord(cLat, cLng, 520, 230),
+        source: "Bölge Emsali",
+        roomCount: isResidential ? "3+1" : undefined,
+        zoningType: isResidential ? undefined : "Köy Yerleşik",
+        date: "3 gün önce",
+      },
+      {
+        id: `comp-${cLat.toFixed(3)}-4`,
+        title: `${cNeigh || cDist} Kiralık ${isResidential ? "Kombili 3+1 Daire" : "Depolama / Saha"}`,
+        category: category,
+        type: "kiralik" as const,
+        areaM2: isResidential ? 125 : 500,
+        pricePerM2TL: Math.round(targetPrice * 0.0055),
+        priceTL: Math.round(targetPrice * 0.0055 * (isResidential ? 125 : 500)),
+        distanceMeters: 310,
+        coordinates: offsetCoord(cLat, cLng, 310, 315),
+        source: "Sahibinden",
+        roomCount: isResidential ? "3+1" : undefined,
+        date: "2 gün önce",
+      }
+    ];
 
-    const targetMarker = L.marker([cLat, cLng], {
-      icon: targetIcon,
-      zIndexOffset: 2000,
-    }).addTo(parcelLayerGroupRef.current);
+    setDynamicComps(localGeneratedComps);
 
-    targetMarker.bindPopup(`
-      <div style="font-family: sans-serif; padding: 4px; min-width: 190px;">
-        <div style="font-size: 10px; font-weight: 800; color: #3B82F6; text-transform: uppercase;">Değerlenen Taşınmaz</div>
-        <div style="font-size: 13px; font-weight: 800; color: #0F172A; margin: 2px 0;">${cCity} / ${cDist} ${cNeigh ? `— ${cNeigh}` : ""}</div>
-        <div style="font-size: 11px; color: #64748B;">Ada: ${ada || "-"} | Parsel: ${parsel || "-"}</div>
-        ${elevationMeters !== undefined ? `<div style="font-size: 10px; color: #059669; margin-top: 4px; font-weight: 700;">Rakım: ${elevationMeters}m (Topoğrafya)</div>` : ""}
-      </div>
-    `);
-
-    // Emsal İlan Pinleri
-    markersRef.current = {};
-    filteredComps.forEach((comp) => {
+    const compsToRender = filter === "all" ? localGeneratedComps : localGeneratedComps.filter((c) => c.type === filter);
+    compsToRender.forEach((comp) => {
       const isSatilik = comp.type === "satilik";
       const badgeBg = isSatilik ? "#059669" : "#2563EB";
       const priceLabel = formatShortPrice(comp.priceTL);
@@ -552,7 +549,7 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
 
       const marker = L.marker([comp.coordinates.lat, comp.coordinates.lng], {
         icon: compIcon,
-      }).addTo(parcelLayerGroupRef.current);
+      }).addTo(parcelLayerGroupRef.current!);
 
       marker.bindPopup(`
         <div style="font-family: sans-serif; min-width: 200px; padding: 3px;">
@@ -578,478 +575,137 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
 
       markersRef.current[comp.id] = marker;
     });
+
+    return localGeneratedComps;
   };
 
   // =========================================================================
-  // KATMANLARI VE MODLARI GÜNCELLEME FONKSİYONU
-  // =========================================================================
-  const renderCurrentViewMode = (fitBoundsIfNeeded: boolean = false) => {
-    const L = (window as any).L;
-    const map = mapInstanceRef.current;
-    if (!L || !map) return;
-
-    if (viewMode === "parsel") {
-      geoJsonLayerGroupRef.current?.clearLayers();
-      drawParcelHoneycomb(lat, lng, unitM2Price, city, activeDistrict, activeNeighborhood || undefined);
-      return;
-    }
-
-    if (viewMode === "ilceler") {
-      parcelLayerGroupRef.current?.clearLayers();
-      geoJsonLayerGroupRef.current?.clearLayers();
-
-      const citySlug = (city || "çanakkale")
-        .toLowerCase()
-        .trim()
-        .replace(/i̇/g, "i").replace(/ı/g, "i").replace(/ş/g, "s").replace(/ç/g, "c").replace(/ğ/g, "g").replace(/ü/g, "u").replace(/ö/g, "o")
-        .replace(/[^a-z0-9]/g, "");
-
-      fetch(`/data/districts/${citySlug}.geojson`)
-        .then((res) => {
-          if (!res.ok) throw new Error("GeoJSON not found");
-          return res.json();
-        })
-        .then((geoData) => {
-          if (!mapInstanceRef.current || !geoJsonLayerGroupRef.current) return;
-
-          const geoLayer = L.geoJSON(geoData, {
-            style: (feature: any) => {
-              const distName = feature?.properties?.name || "";
-              const val = getDistrictValuation(city, distName, unitM2Price);
-              const isSelected = Boolean(activeDistrict && distName.toLowerCase().includes(activeDistrict.toLowerCase()));
-              const choropleth = getDistrictChoroplethColor(val.pricePerM2TL, distName);
-
-              return {
-                fillColor: choropleth.fillColor,
-                fillOpacity: choropleth.fillOpacity,
-                color: isSelected ? "#0F172A" : choropleth.color,
-                weight: isSelected ? 3 : 1.5,
-                opacity: 0.95,
-              };
-            },
-            onEachFeature: (feature: any, layer: any) => {
-              const distName = feature?.properties?.name || "";
-              const val = getDistrictValuation(city, distName, unitM2Price);
-              const priceText = val.pricePerM2TL.toLocaleString("tr-TR");
-
-              layer.bindTooltip(`
-                <div style="font-family: ui-sans-serif, system-ui, sans-serif; font-size: 11px; font-weight: 700; color: #1E293B; padding: 5px 12px; background: #FFFFFF; border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.18); border: 1px solid rgba(0,0,0,0.08); white-space: nowrap; pointer-events: none;">
-                  ${distName} (${priceText} ₺/m²)
-                  <div style="font-size: 9px; color: #2563EB; font-weight: 800; margin-top: 2px;">Tıkla: Mahalle & Köylere Açıl 🔍</div>
-                </div>
-              `, {
-                sticky: true,
-                direction: "top",
-                opacity: 1,
-                className: "custom-district-tooltip"
-              });
-
-              layer.on("mouseover", () => {
-                layer.setStyle({
-                  fillOpacity: 0.85,
-                  weight: 2.8,
-                  color: "#FFFFFF",
-                });
-                layer.bringToFront();
-              });
-
-              layer.on("mouseout", () => {
-                geoLayer.resetStyle(layer);
-              });
-
-              layer.on("click", () => {
-                setActiveDistrict(distName);
-                if (onSelectDistrict) onSelectDistrict(distName);
-                setViewMode("mahalleler");
-              });
-            }
-          }).addTo(geoJsonLayerGroupRef.current);
-
-          if (fitBoundsIfNeeded) {
-            try {
-              map.fitBounds(geoLayer.getBounds(), { padding: [20, 20] });
-            } catch (e) {}
-          }
-        })
-        .catch((err) => {
-          console.warn("Could not load district geojson:", err);
-          drawParcelHoneycomb(lat, lng, unitM2Price, city, activeDistrict, activeNeighborhood || undefined);
-        });
-      return;
-    }
-
-    if (viewMode === "mahalleler") {
-      parcelLayerGroupRef.current?.clearLayers();
-      geoJsonLayerGroupRef.current?.clearLayers();
-      setIsLoadingMahalle(true);
-
-      const distToLoad = activeDistrict || "Bayramiç";
-
-      fetch(`/api/location/mahalle?province=${encodeURIComponent(city)}&district=${encodeURIComponent(distToLoad)}`)
-        .then((res) => {
-          if (!res.ok) throw new Error("Mahalle GeoJSON not found");
-          return res.json();
-        })
-        .then((resp) => {
-          setIsLoadingMahalle(false);
-          if (!mapInstanceRef.current || !geoJsonLayerGroupRef.current || !resp.success || !resp.data) {
-            drawParcelHoneycomb(lat, lng, unitM2Price, city, activeDistrict, activeNeighborhood || undefined);
-            return;
-          }
-
-          setMahalleData(resp.data);
-          setMahalleCount(resp.featureCount || resp.data.features?.length || 0);
-
-          const mahalleGeoLayer = L.geoJSON(resp.data, {
-            style: (feature: any) => {
-              const props = feature?.properties || {};
-              const isSelected = activeNeighborhood && props.name?.toLowerCase() === activeNeighborhood.toLowerCase();
-
-              return {
-                fillColor: props.fillColor || "#4ADE80",
-                fillOpacity: props.fillOpacity || 0.78,
-                color: isSelected ? "#0F172A" : (props.strokeColor || "#FFFFFF"),
-                weight: isSelected ? 3.5 : 1.5,
-                opacity: 0.98,
-              };
-            },
-            onEachFeature: (feature: any, layer: any) => {
-              const props = feature?.properties || {};
-              const neighName = props.name || "Köy/Mahalle";
-              const unitPrice = props.unitPrice || 25000;
-              const tenderStart = props.tenderStartM2TL || Math.round(unitPrice * 0.5);
-              const oppScore = props.opportunityScore || 85;
-              const isRed = props.tier === "premium_red";
-
-              layer.bindTooltip(`
-                <div style="font-family: ui-sans-serif, system-ui, sans-serif; font-size: 11px; font-weight: 800; color: #1E293B; padding: 6px 12px; background: #FFFFFF; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.22); border: 1px solid rgba(0,0,0,0.08); white-space: nowrap; pointer-events: none;">
-                  <div style="display: flex; align-items: center; gap: 6px;">
-                    <span style="width: 8px; height: 8px; border-radius: 50%; background: ${props.fillColor}; display: inline-block;"></span>
-                    <span style="color: #0F223D;">${neighName}</span>
-                    <span style="color: ${isRed ? '#991B1B' : '#059669'}; font-weight: 900;">${unitPrice.toLocaleString("tr-TR")} ₺/m²</span>
-                  </div>
-                  <div style="font-size: 9px; color: #64748B; margin-top: 2px; font-weight: 600;">İcra Taban (%50): ${tenderStart.toLocaleString("tr-TR")} ₺/m² • Skor: %${oppScore}</div>
-                </div>
-              `, {
-                sticky: true,
-                direction: "top",
-                opacity: 1,
-                className: "custom-district-tooltip"
-              });
-
-              // Doğrudan poligonun merkezinde beliren yazılı etiketler
-              const isProminent = PROMINENT_LABELS.some((l) => neighName.toLowerCase().includes(l.toLowerCase()));
-              if (isProminent && layer.getBounds) {
-                const center = layer.getBounds().getCenter();
-                const labelIcon = L.divIcon({
-                  className: "prominent-mahalle-label",
-                  html: `
-                    <div style="font-family: ui-sans-serif, system-ui, sans-serif; font-size: 11px; font-weight: 800; color: ${isRed ? '#FFFFFF' : '#1E293B'}; text-shadow: ${isRed ? '0 1px 4px rgba(0,0,0,0.9)' : '0 1px 3px rgba(255,255,255,0.9), 0 0 2px #FFFFFF'}; pointer-events: none; transform: translate(-50%, -50%); white-space: nowrap;">
-                      ${neighName}
-                    </div>
-                  `,
-                  iconSize: [0, 0],
-                });
-                L.marker(center, { icon: labelIcon, interactive: false, zIndexOffset: 300 }).addTo(geoJsonLayerGroupRef.current);
-              }
-
-              layer.on("mouseover", () => {
-                layer.setStyle({
-                  fillOpacity: 0.95,
-                  weight: 3.0,
-                  color: "#FFFFFF",
-                });
-                layer.bringToFront();
-              });
-
-              layer.on("mouseout", () => {
-                mahalleGeoLayer.resetStyle(layer);
-              });
-
-              layer.on("click", () => {
-                setActiveNeighborhood(neighName);
-                if (onSelectNeighborhood) onSelectNeighborhood(neighName);
-
-                layer.bindPopup(`
-                  <div style="font-family: ui-sans-serif, system-ui, sans-serif; min-width: 250px; padding: 6px;">
-                    <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #E2E8F0; padding-bottom: 6px; margin-bottom: 8px;">
-                      <div>
-                        <strong style="color: #0F223D; font-size: 14px; font-weight: 900;">${neighName}</strong>
-                        <div style="font-size: 10px; color: #64748B; font-weight: 600;">${distToLoad} / ${city}</div>
-                      </div>
-                      <span style="background: ${props.fillColor}25; color: ${props.fillColor}; font-size: 9.5px; font-weight: 800; padding: 2px 7px; border-radius: 6px; border: 1px solid ${props.fillColor}50;">
-                        ${isRed ? "Yüksek Prim Aksı" : "Yerleşim Sınırı"}
-                      </span>
-                    </div>
-
-                    <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 8px 10px; margin-bottom: 8px;">
-                      <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px;">
-                        <span style="font-size: 10.5px; color: #64748B; font-weight: 600;">Ortalama m² Değeri:</span>
-                        <span style="font-size: 14px; font-weight: 900; color: #0F223D;">${unitPrice.toLocaleString("tr-TR")} ₺/m²</span>
-                      </div>
-                      <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px;">
-                        <span style="font-size: 10.5px; color: #059669; font-weight: 700;">İcra / İhale Tabanı (%50):</span>
-                        <span style="font-size: 12px; font-weight: 900; color: #059669;">${tenderStart.toLocaleString("tr-TR")} ₺/m²</span>
-                      </div>
-                      <div style="display: flex; justify-content: space-between; align-items: center; font-size: 10px; border-top: 1px solid #E2E8F0; padding-top: 4px;">
-                        <span style="color: #64748B;">İcra Fırsat Skoru:</span>
-                        <span style="font-weight: 800; color: #D97706;">%${oppScore} (Yüksek Getiri)</span>
-                      </div>
-                    </div>
-
-                    <div style="font-size: 10px; color: #64748B; line-height: 1.35; margin-bottom: 8px; font-style: italic;">
-                      ${props.description || `${neighName} mevkii resmi kadastro ve piyasa emsal verileri.`}
-                    </div>
-
-                    <button
-                      onclick="window.__switchToParcelMode && window.__switchToParcelMode()"
-                      style="width: 100%; background: #0F223D; color: #FFFFFF; font-weight: 700; font-size: 11px; padding: 7px 10px; border-radius: 8px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; box-shadow: 0 2px 6px rgba(0,0,0,0.15);"
-                    >
-                      📍 Bu Köy/Mahallede Parsel & Emsal İncele
-                    </button>
-                  </div>
-                `).openPopup();
-              });
-            }
-          }).addTo(geoJsonLayerGroupRef.current);
-
-          if (fitBoundsIfNeeded) {
-            try {
-              map.fitBounds(mahalleGeoLayer.getBounds(), { padding: [20, 20] });
-            } catch (e) {}
-          }
-        })
-        .catch((err) => {
-          setIsLoadingMahalle(false);
-          console.warn("Could not load mahalle geojson:", err);
-          drawParcelHoneycomb(lat, lng, unitM2Price, city, activeDistrict, activeNeighborhood || undefined);
-        });
-    }
-  };
-
-  // =========================================================================
-  // TEK SEFERLİK LEAFLET KURULUMU (MAP LIFECYCLE - HARİTA HİÇBİR ZAMAN SİLİNMEZ)
+  // LEAFLET MAP LIFECYCLE (HER ZAMAN GÜVENLİ VE HAZIR)
   // =========================================================================
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (!mapContainerRef.current) return;
+    if (mapInstanceRef.current) return;
 
-    if (!document.getElementById("leaflet-core-css")) {
-      const link = document.createElement("link");
-      link.id = "leaflet-core-css";
-      link.rel = "stylesheet";
-      link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
-      document.head.appendChild(link);
+    const initialZoom = 15;
+
+    const map = L.map(mapContainerRef.current, {
+      center: [lat, lng],
+      zoom: initialZoom,
+      zoomControl: false,
+      scrollWheelZoom: true,
+      wheelPxPerZoomLevel: 60,
+      doubleClickZoom: true,
+      touchZoom: true,
+      boxZoom: true,
+    });
+
+    // Mouse ile haritanın üzerine gelindiğinde tekerlek zoomunu garanti et
+    if (mapContainerRef.current) {
+      mapContainerRef.current.addEventListener("mouseenter", () => {
+        if (!isLocked && map.scrollWheelZoom) {
+          map.scrollWheelZoom.enable();
+        }
+      });
     }
 
-    const scriptId = "leaflet-core-script";
-    let script = document.getElementById(scriptId) as HTMLScriptElement;
+    mapInstanceRef.current = map;
+    setCurrentZoom(initialZoom);
 
-    const initMap = () => {
-      const L = (window as any).L;
-      if (!L || !mapContainerRef.current) return;
-      if (mapInstanceRef.current) return; // Zaten başlatıldı
+    map.on("zoomend", () => {
+      if (mapInstanceRef.current) {
+        setCurrentZoom(mapInstanceRef.current.getZoom());
+      }
+    });
 
-      const initialZoom = viewMode === "ilceler" ? 10 : viewMode === "mahalleler" ? 12 : 15;
+    // Katman Gruplarını Haritaya Ekle
+    parcelLayerGroupRef.current = L.layerGroup().addTo(map);
 
-      const map = L.map(mapContainerRef.current, {
-        center: [lat, lng],
-        zoom: initialZoom,
-        zoomControl: false,
-        scrollWheelZoom: !isLocked,
-        wheelDebounceTime: 40,
-        wheelPxPerZoomLevel: 60,
-      });
+    // Tile Katmanı: KULLANICININ İSTEDİĞİ GİBİ SADECE SOKAK GÖRÜNTÜSÜ (OpenStreetMap)
+    const tileUrl = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+    tileLayerRef.current = L.tileLayer(tileUrl, {
+      maxZoom: 19,
+      attribution: '© OpenStreetMap • İhaleciBurada GIS',
+    }).addTo(map);
 
-      mapInstanceRef.current = map;
-      setCurrentZoom(initialZoom);
+    // =====================================================================
+    // TÜRKİYE GENELİ CANLI HARİTA TIKLAMA DİNLEYİCİSİ (0ms HIZ + TAPUSOR BAL PETEĞİ)
+    // =====================================================================
+    map.on("click", async (e: L.LeafletMouseEvent) => {
+      isInternalClickRef.current = true;
+      const clickLat = Number(e.latlng.lat.toFixed(6));
+      const clickLng = Number(e.latlng.lng.toFixed(6));
+      lastInteractedCoordRef.current = { lat: clickLat, lng: clickLng };
 
-      map.on("zoomend", () => {
-        if (mapInstanceRef.current) {
-          setCurrentZoom(mapInstanceRef.current.getZoom());
-        }
-      });
+      // 1. ANINDA 0ms YEREL 973 İLÇE ANALİZİ
+      const fastLoc = findFastLocationFromCoords(clickLat, clickLng);
+      const fastVal = getDistrictValuation(fastLoc.city, fastLoc.district, unitM2Price);
+      const resolvedPrice = fastVal.pricePerM2TL;
 
-      // Layer Gruplarını Haritaya Ekle
-      geoJsonLayerGroupRef.current = L.layerGroup().addTo(map);
-      parcelLayerGroupRef.current = L.layerGroup().addTo(map);
+      // 2. Tıklanan noktaya anında bal peteğini ve emsal ilanları çiz
+      const generatedComps = drawParcelHoneycomb(
+        clickLat,
+        clickLng,
+        resolvedPrice,
+        fastLoc.city,
+        fastLoc.district,
+        fastLoc.neighborhood
+      );
 
-      // Tile Katmanını Ekle
-      const tileUrl = mapLayerType === "uydu"
-        ? "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-        : mapLayerType === "hibrit"
-        ? "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"
-        : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+      setParcelNotice(`📍 ${fastLoc.district} / ${fastLoc.city} • ${resolvedPrice.toLocaleString("tr-TR")} ₺/m²`);
+      setActiveDistrict(fastLoc.district);
+      setActiveNeighborhood(fastLoc.neighborhood);
 
-      tileLayerRef.current = L.tileLayer(tileUrl, {
-        maxZoom: 19,
-        attribution: '© Harita Katmanı • İhaleciBurada GIS',
-      }).addTo(map);
-
-      // =====================================================================
-      // TÜRKİYE GENELİ CANLI HARİTA TIKLAMA DİNLEYİCİSİ (CANAKKALE'YE ZIPLAMA ASLA OLMAZ)
-      // =====================================================================
-      map.on("click", async (e: any) => {
-        isInternalClickRef.current = true;
-        const clickLat = Number(e.latlng.lat.toFixed(6));
-        const clickLng = Number(e.latlng.lng.toFixed(6));
-
-        // Tıklanan konuma anında geçici yükleme pini bırak
-        if (clickMarkerRef.current) {
-          map.removeLayer(clickMarkerRef.current);
-        }
-
-        const loadingPin = L.divIcon({
-          className: "leaflet-click-pin-loading",
-          html: `
-            <div style="position: relative; display: flex; flex-direction: column; align-items: center; transform: translate(-50%, -100%); cursor: pointer;">
-              <div style="background: #0B1E3B; color: #F59E0B; font-weight: 800; font-size: 11px; padding: 4px 8px; border-radius: 8px; border: 2px solid #F59E0B; box-shadow: 0 4px 14px rgba(0,0,0,0.35); white-space: nowrap; display: flex; align-items: center; gap: 4px;">
-                <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #F59E0B; animation: ping 1s infinite;"></span>
-                <span>Konum Çözümleniyor...</span>
-              </div>
-              <div style="width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 8px solid #0B1E3B;"></div>
-              <div style="width: 8px; height: 8px; background: #3B82F6; border: 2px solid #FFFFFF; border-radius: 50%; margin-top: -3px;"></div>
-            </div>
-          `,
-          iconSize: [0, 0],
+      // 3. Sol paneli ve tüm uygulamayı 0ms gecikmeyle güncelle!
+      if (onLocationSelect) {
+        onLocationSelect({
+          city: fastLoc.city,
+          district: fastLoc.district,
+          neighborhood: fastLoc.neighborhood,
+          coordinates: { lat: clickLat, lng: clickLng },
+          unitPrice: resolvedPrice,
+          comparables: generatedComps,
         });
+      }
+      if (onLocationFound) {
+        onLocationFound({ lat: clickLat, lng: clickLng });
+      }
 
-        clickMarkerRef.current = L.marker([clickLat, clickLng], {
-          icon: loadingPin,
-          zIndexOffset: 2500,
-        }).addTo(map);
+      // 4. Arka planda daha hassas mahalle/cadde adı sorgula (kullanıcıyı asla bekletmez)
+      try {
+        const res = await fetch(`/api/location/search?lat=${clickLat}&lng=${clickLng}`);
+        const data = await res.json();
+        if (data.success && data.location) {
+          const loc = data.location;
+          const refinedCity = loc.province || fastLoc.city;
+          const refinedDistrict = loc.district || fastLoc.district;
+          const refinedNeigh = loc.neighborhood || fastLoc.neighborhood;
 
-        try {
-          const res = await fetch(`/api/location/search?lat=${clickLat}&lng=${clickLng}`);
-          const data = await res.json();
-          const loc = (data.success && data.location) ? data.location : null;
+          setParcelNotice(`📍 ${refinedDistrict} / ${refinedCity}${refinedNeigh ? ` • ${refinedNeigh}` : ""} • ${resolvedPrice.toLocaleString("tr-TR")} ₺/m²`);
+          setActiveDistrict(refinedDistrict);
+          if (refinedNeigh) setActiveNeighborhood(refinedNeigh);
 
-          const resolvedCity = loc?.province || city || "Ankara";
-          const resolvedDistrict = loc?.district || activeDistrict || "Merkez";
-          const resolvedNeigh = loc?.neighborhood || activeNeighborhood || "Merkez";
-          const resolvedRoad = loc?.road || "";
-
-          // Gerçek Bölgesel Değerleme Verisi Hesapla (Ankara Çankaya 68.000 ₺/m², Antalya 72.000 ₺/m² vb.)
-          const val = getDistrictValuation(resolvedCity, resolvedDistrict, unitM2Price);
-          const resolvedPrice = val.pricePerM2TL;
-          const resolvedTender = val.tenderStartM2TL;
-          const resolvedGrowth = val.yearlyGrowth;
-          const resolvedOpp = val.opportunityScore;
-          const resolvedDesc = `${resolvedCity} / ${resolvedDistrict} (${resolvedNeigh}) resmi TKGM parsel sorgu ve SPK lisanslı değerleme verileri.`;
-
-          // Tıklanan koordinat için kesinleşmiş onaylı pini yerleştir
-          const clickPinIcon = L.divIcon({
-            className: "leaflet-click-pin",
-            html: `
-              <div style="position: relative; display: flex; flex-direction: column; align-items: center; transform: translate(-50%, -100%); cursor: pointer;">
-                <div style="background: #0B1E3B; color: #F59E0B; font-weight: 800; font-size: 11px; padding: 4px 8px; border-radius: 8px; border: 2px solid #F59E0B; box-shadow: 0 4px 14px rgba(0,0,0,0.35); white-space: nowrap; display: flex; align-items: center; gap: 4px;">
-                  <span>📍 ${resolvedNeigh}</span>
-                </div>
-                <div style="width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 8px solid #0B1E3B;"></div>
-                <div style="width: 8px; height: 8px; background: #10B981; border: 2px solid #FFFFFF; border-radius: 50%; margin-top: -3px; box-shadow: 0 0 8px #10B981;"></div>
-              </div>
-            `,
-            iconSize: [0, 0],
-          });
-
-          clickMarkerRef.current.setIcon(clickPinIcon);
-
-          const popupHtml = `
-            <div style="font-family: ui-sans-serif, system-ui, sans-serif; min-width: 255px; padding: 4px;">
-              <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #E2E8F0; padding-bottom: 6px; margin-bottom: 8px;">
-                <div>
-                  <div style="font-size: 9.5px; font-weight: 800; color: #2563EB; text-transform: uppercase;">Seçilen Bölge Bilgisi</div>
-                  <strong style="color: #0F223D; font-size: 14px; font-weight: 900;">${resolvedNeigh}</strong>
-                  <div style="font-size: 10px; color: #64748B; font-weight: 600;">${resolvedRoad ? resolvedRoad + " • " : ""}${resolvedDistrict} / ${resolvedCity}</div>
-                </div>
-                <span style="background: #10B98115; color: #059669; font-size: 9.5px; font-weight: 800; padding: 2px 7px; border-radius: 6px; border: 1px solid #10B98140;">
-                  TKGM Doğrulandı
-                </span>
-              </div>
-
-              <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 8px 10px; margin-bottom: 8px;">
-                <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px;">
-                  <span style="font-size: 10.5px; color: #64748B; font-weight: 600;">Bölgesel m² Değeri:</span>
-                  <span style="font-size: 14px; font-weight: 900; color: #0F223D;">${resolvedPrice.toLocaleString("tr-TR")} ₺/m²</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px;">
-                  <span style="font-size: 10.5px; color: #059669; font-weight: 700;">İcra Tabanı (İİK %50):</span>
-                  <span style="font-size: 12px; font-weight: 900; color: #059669;">${resolvedTender.toLocaleString("tr-TR")} ₺/m²</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; align-items: center; font-size: 10px; border-top: 1px solid #E2E8F0; padding-top: 4px;">
-                  <span style="color: #64748B;">100 m² Örnek Taşınmaz:</span>
-                  <span style="font-weight: 800; color: #0F223D;">${(resolvedPrice * 100).toLocaleString("tr-TR")} ₺</span>
-                </div>
-              </div>
-
-              <div style="font-size: 9.5px; color: #64748B; margin-bottom: 8px; line-height: 1.35;">
-                ${resolvedDesc}
-              </div>
-
-              <div style="display: flex; justify-content: space-between; align-items: center; font-size: 9.5px; margin-bottom: 6px; color: #64748B; border-top: 1px solid #F1F5F9; padding-top: 4px;">
-                <span>İhale Fırsat Skoru: <strong style="color: #D97706;">%${resolvedOpp}</strong></span>
-                <span>Yıllık Değer Artışı: <strong style="color: #059669;">+%{resolvedGrowth}</strong></span>
-              </div>
-
-              <div style="background: #0B1E3B; color: #FFFFFF; font-weight: 800; font-size: 10.5px; padding: 6px 10px; border-radius: 6px; text-align: center;">
-                ✓ Seçildi: Sol Analitik Panel Güncellendi
-              </div>
-            </div>
-          `;
-
-          clickMarkerRef.current.bindPopup(popupHtml).openPopup();
-
-          // Tıklanan yere bal peteğini anında çiz
-          drawParcelHoneycomb(clickLat, clickLng, resolvedPrice, resolvedCity, resolvedDistrict, resolvedNeigh);
-
-          // Sol üst bildirim ve state'leri güncelle
-          setParcelNotice(`📍 ${resolvedNeigh} • ${resolvedPrice.toLocaleString("tr-TR")} ₺/m²`);
-          setActiveDistrict(resolvedDistrict);
-          setActiveNeighborhood(resolvedNeigh);
-          setViewMode("parsel");
-
-          // Üst bileşene haber ver (Sol panel ve arama çubuğu anında güncellenir)
           if (onLocationSelect) {
             onLocationSelect({
-              city: resolvedCity,
-              district: resolvedDistrict,
-              neighborhood: resolvedNeigh,
+              city: refinedCity,
+              district: refinedDistrict,
+              neighborhood: refinedNeigh,
               coordinates: { lat: clickLat, lng: clickLng },
               unitPrice: resolvedPrice,
+              comparables: generatedComps,
             });
           }
-          if (onLocationFound) {
-            onLocationFound({ lat: clickLat, lng: clickLng });
-          }
-          if (onSelectDistrict) {
-            onSelectDistrict(resolvedDistrict);
-          }
-          if (onSelectNeighborhood) {
-            onSelectNeighborhood(resolvedNeigh);
-          }
-        } catch (err) {
-          console.warn("Harita tıklama hatası:", err);
-        } finally {
-          setTimeout(() => {
-            isInternalClickRef.current = false;
-          }, 600);
         }
-      });
+      } catch (err) {
+        // Yerel veriler zaten ekranda aktif
+      } finally {
+        setTimeout(() => {
+          isInternalClickRef.current = false;
+        }, 500);
+      }
+    });
 
-      // İlk katman görünümünü yükle
-      renderCurrentViewMode(false);
-    };
-
-    if ((window as any).L) {
-      initMap();
-    } else if (!script) {
-      script = document.createElement("script");
-      script.id = scriptId;
-      script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
-      script.onload = initMap;
-      document.head.appendChild(script);
-    } else {
-      script.addEventListener("load", initMap);
-    }
+    // İlk Bal Peteği Çizimini Gerçekleştir
+    drawParcelHoneycomb(lat, lng, unitM2Price, city, activeDistrict, activeNeighborhood || undefined);
 
     return () => {
       if (mapInstanceRef.current) {
@@ -1057,61 +713,35 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
         mapInstanceRef.current = null;
       }
     };
-  }, []); // Sadece bir kere kurulur
+  }, []);
 
   // =========================================================================
-  // HARİTA KATMANI DEĞİŞTİRME (Uydu / Hibrit / Sokak)
+  // KOORDİNAT VE DEĞER DEĞİŞİMİNDE ÇİZİMİ GÜNCELLE
   // =========================================================================
   useEffect(() => {
-    const L = (window as any).L;
-    if (!L || !mapInstanceRef.current) return;
+    if (!mapInstanceRef.current) return;
+    if (isInternalClickRef.current) return;
 
-    if (tileLayerRef.current) {
-      mapInstanceRef.current.removeLayer(tileLayerRef.current);
+    if (lastInteractedCoordRef.current) {
+      const diff = Math.hypot(
+        lastInteractedCoordRef.current.lat - lat,
+        lastInteractedCoordRef.current.lng - lng
+      );
+      if (diff < 0.001) {
+        return;
+      }
     }
-
-    const tileUrl = mapLayerType === "uydu"
-      ? "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-      : mapLayerType === "hibrit"
-      ? "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"
-      : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
-
-    tileLayerRef.current = L.tileLayer(tileUrl, {
-      maxZoom: 19,
-      attribution: '© Harita Katmanı • İhaleciBurada GIS',
-    }).addTo(mapInstanceRef.current);
-  }, [mapLayerType]);
-
-  // =========================================================================
-  // GÖRÜNÜM MODU VEYA İL/İLÇE DEĞİŞİMİ
-  // =========================================================================
-  useEffect(() => {
-    if (!mapInstanceRef.current) return;
-    if (isInternalClickRef.current) return; // Kullanıcı haritada tıkladıysa fitBounds yapma
-
-    renderCurrentViewMode(false);
-  }, [viewMode, city, activeDistrict]);
-
-  // =========================================================================
-  // DIŞARIDAN GELEN KOORDİNAT GÜNCELLEMESİ (Üst Arama Çubuğu veya GPS Butonu)
-  // =========================================================================
-  useEffect(() => {
-    if (!mapInstanceRef.current) return;
-    if (isInternalClickRef.current) return; // Haritadan tıklandıysa kamera zaten oradadır
 
     const map = mapInstanceRef.current;
     const center = map.getCenter();
     const dist = Math.hypot(center.lat - lat, center.lng - lng);
 
-    // Eğer koordinatlar 50m'den fazla değiştiyse kamerayı oraya yumuşakça uçur
     if (dist > 0.0005) {
       map.flyTo([lat, lng], 15, { duration: 1.0 });
     }
 
-    if (viewMode === "parsel") {
-      drawParcelHoneycomb(lat, lng, unitM2Price, city, activeDistrict, activeNeighborhood || undefined);
-    }
-  }, [lat, lng, unitM2Price, filteredComps]);
+    drawParcelHoneycomb(lat, lng, unitM2Price, city, activeDistrict, activeNeighborhood || undefined);
+  }, [lat, lng, unitM2Price, city, activeDistrict]);
 
   const handleSelectComp = (comp: ComparableListing) => {
     setSelectedCompId(comp.id);
@@ -1126,18 +756,24 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
     }
   };
 
-  const directOsmUrl = `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=16/${lat}/${lng}`;
+  const handleCenterOnTarget = () => {
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.flyTo([lat, lng], 16, { duration: 0.8 });
+    }
+  };
 
   const satilikCount = compsList.filter((c) => c.type === "satilik").length;
   const kiralikCount = compsList.filter((c) => c.type === "kiralik").length;
 
   return (
-    <div className="rounded-2xl border border-slate-300 overflow-hidden bg-white shadow-premium space-y-0">
+    <div className={`rounded-2xl border border-slate-300 overflow-hidden bg-white shadow-xl flex flex-col ${
+      isFullscreen ? "fixed inset-0 z-[9999] rounded-none border-none" : "h-full"
+    }`}>
       
       {/* 1. HARİTA ÜST BİLGİ VE FİLTRE BARI */}
-      <div className="bg-[#0F223D] text-white px-4 py-2.5 flex flex-wrap items-center justify-between gap-2.5 text-xs">
+      <div className="bg-[#0F223D] text-white px-4 py-2.5 flex flex-wrap items-center justify-between gap-2.5 text-xs select-none">
         <div className="flex items-center gap-2">
-          <MapPin className="w-3.5 h-3.5 text-orange-400" />
+          <MapPin className="w-3.5 h-3.5 text-amber-400" />
           <span className="font-extrabold font-heading text-slate-100">
             {city} / {activeDistrict} {activeNeighborhood ? `— ${activeNeighborhood}` : ""}
           </span>
@@ -1154,135 +790,87 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
             type="button"
             onClick={handleGetLiveLocation}
             disabled={isLocating}
-            className="flex items-center gap-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 hover:text-amber-200 border border-amber-500/40 px-2.5 py-1 rounded-lg font-bold transition cursor-pointer text-[10px] active:scale-95 disabled:opacity-50"
-            title="Cihazınızın anlık GPS koordinatlarını alıp haritayı odaklar"
+            className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 text-white px-2.5 py-1 rounded-lg font-bold transition cursor-pointer border border-white/15 active:scale-95"
+            title="GPS ile bulunduğun konumu haritada aç"
           >
-            <Navigation className={`w-3 h-3 text-amber-400 ${isLocating ? "animate-spin" : ""}`} />
-            <span>{isLocating ? "Aranıyor..." : "Konumumu Bul"}</span>
+            <Crosshair className={`w-3.5 h-3.5 text-amber-400 ${isLocating ? "animate-spin" : ""}`} />
+            <span>{isLocating ? "Bulunuyor..." : "Konumumu Bul"}</span>
           </button>
 
-          {elevationMeters !== undefined && (
-            <span className="flex items-center gap-1 text-emerald-300 font-bold bg-emerald-950/70 px-2 py-0.5 rounded border border-emerald-500/30">
+          {/* Rakım Rozeti */}
+          {elevationMeters && (
+            <span className="hidden sm:flex items-center gap-1 text-[11px] text-slate-300 bg-white/5 px-2 py-1 rounded-md border border-white/10 font-mono">
               <Mountain className="w-3 h-3 text-emerald-400" />
               Rakım: {elevationMeters}m
             </span>
           )}
 
-          {/* 3 KADEMELİ GÖRÜNÜM SEÇİCİ: İLÇELER -> MAHALLELER -> PARSEL */}
-          <div className="flex items-center bg-slate-900/90 rounded-lg p-0.5 border border-slate-700 text-[10px]">
+          {/* Emsal Filtre Butonları */}
+          <div className="flex items-center bg-slate-800/90 rounded-lg p-0.5 border border-slate-700 text-[10px]">
             <button
               type="button"
-              onClick={() => setViewMode("ilceler")}
-              className={`px-2.5 py-1 rounded-md font-bold transition cursor-pointer flex items-center gap-1 ${
-                viewMode === "ilceler"
-                  ? "bg-slate-700 text-white shadow-xs"
-                  : "text-slate-400 hover:text-white"
+              onClick={() => setFilter("all")}
+              className={`px-2 py-0.5 rounded font-bold transition cursor-pointer ${
+                filter === "all" ? "bg-amber-500 text-slate-950 font-black" : "text-slate-300 hover:text-white"
               }`}
-              title="İl geneli ilçe sınırları"
             >
-              <Layers className="w-3 h-3 text-slate-300" />
-              <span>İlçeler</span>
+              Tümü ({compsList.length})
             </button>
-
             <button
               type="button"
-              onClick={() => setViewMode("mahalleler")}
-              className={`px-2.5 py-1 rounded-md font-bold transition cursor-pointer flex items-center gap-1 ${
-                viewMode === "mahalleler"
-                  ? "bg-emerald-600 text-white shadow-xs"
-                  : "text-slate-400 hover:text-white"
+              onClick={() => setFilter("satilik")}
+              className={`px-2 py-0.5 rounded font-bold transition cursor-pointer ${
+                filter === "satilik" ? "bg-emerald-600 text-white" : "text-slate-300 hover:text-white"
               }`}
-              title="En küçük idari bölge: Mahalle & Köy sınırları (Endeksa Modeli)"
             >
-              <CheckCircle2 className="w-3 h-3 text-emerald-300" />
-              <span>Mahalle & Köy</span>
+              Satılık ({satilikCount})
             </button>
-
             <button
               type="button"
-              onClick={() => setViewMode("parsel")}
-              className={`px-2.5 py-1 rounded-md font-bold transition cursor-pointer flex items-center gap-1 ${
-                viewMode === "parsel"
-                  ? "bg-blue-600 text-white shadow-xs"
-                  : "text-slate-400 hover:text-white"
+              onClick={() => setFilter("kiralik")}
+              className={`px-2 py-0.5 rounded font-bold transition cursor-pointer ${
+                filter === "kiralik" ? "bg-blue-600 text-white" : "text-slate-300 hover:text-white"
               }`}
-              title="Değerlenen taşınmaz ve emsal ilanlar"
             >
-              <MapPin className="w-3 h-3 text-blue-300" />
-              <span>Parsel & Emsal</span>
+              Kiralık ({kiralikCount})
             </button>
           </div>
-
-          {/* Emsal Filtre Butonları (Parsel modunda) */}
-          {viewMode === "parsel" && (
-            <div className="flex items-center bg-slate-800/90 rounded-lg p-0.5 border border-slate-700 text-[10px]">
-              <button
-                type="button"
-                onClick={() => setFilter("all")}
-                className={`px-2 py-0.5 rounded font-bold transition cursor-pointer ${
-                  filter === "all" ? "bg-blue-600 text-white" : "text-slate-300 hover:text-white"
-                }`}
-              >
-                Tümü ({compsList.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setFilter("satilik")}
-                className={`px-2 py-0.5 rounded font-bold transition cursor-pointer ${
-                  filter === "satilik" ? "bg-emerald-600 text-white" : "text-slate-300 hover:text-white"
-                }`}
-              >
-                Satılık ({satilikCount})
-              </button>
-            </div>
-          )}
-
-          <a
-            href={directOsmUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sky-300 hover:text-white flex items-center gap-1 transition text-[10px] ml-1"
-            title="OpenStreetMap üzerinde aç"
-          >
-            <ExternalLink className="w-3 h-3" />
-          </a>
         </div>
       </div>
 
-      {/* 2. ETKİLEŞİMLİ LEAFLET HARİTA ALANI */}
-      <div className={`relative w-full bg-slate-100 z-10 transition-all duration-300 ${
-        isFullscreen
-          ? "fixed inset-0 z-50 h-screen w-screen"
-          : isEndeksaSplitView 
-          ? "h-full min-h-[540px] sm:min-h-[680px] lg:min-h-[820px]" 
-          : "h-72 sm:h-80"
-      }`}>
+      {/* 2. LEAFLET HARİTA KAPSAYICISI (SOKAK GÖRÜNÜMÜ + BAL PETEĞİ) */}
+      <div className="relative flex-1 w-full min-h-[480px]">
         <div ref={mapContainerRef} className="w-full h-full" />
 
-        {/* SOL ÜST YÜZEN PARSEL / KONUM BİLDİRİMİ (GÖRSEL 1789487723574 BİREBİR) */}
-        {parcelNotice && (
-          <div className={`absolute top-3 left-3 z-[450] bg-white border-2 ${
-            parcelNotice.startsWith("📍")
-              ? "border-emerald-500 text-slate-900 shadow-emerald-500/10"
-              : "border-red-500 text-slate-900"
-          } font-extrabold px-3.5 py-2 rounded-xl text-xs shadow-xl flex items-center gap-2 animate-in fade-in duration-200 select-none`}>
-            <span className={`w-2 h-2 rounded-full ${
-              parcelNotice.startsWith("📍") ? "bg-emerald-600" : "bg-red-600 animate-ping"
-            } shrink-0`} />
-            <span>{parcelNotice}</span>
-            <button
-              type="button"
-              onClick={() => setParcelNotice(null)}
-              className="text-slate-400 hover:text-slate-700 ml-1 text-xs cursor-pointer"
-            >
-              ×
-            </button>
+        {/* SOL ÜST YÜZEN TAPUSOR PARSEL VE FİYAT BİLGİ KARTI (GÖRSEL 1789501075638 BİREBİR) */}
+        <div className="absolute top-3 left-3 z-[450] bg-white/95 backdrop-blur-md border border-slate-300 rounded-xl shadow-xl px-3.5 py-2.5 max-w-md select-none text-slate-900 pointer-events-auto">
+          <div className="flex items-center gap-1.5 font-extrabold text-xs sm:text-sm">
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0 shadow-xs"></span>
+            <span className="truncate">{city} / {activeDistrict} {activeNeighborhood ? `• ${activeNeighborhood}` : ""}</span>
+            <span className="text-slate-500 font-mono text-[11px] font-normal shrink-0">/ {ada || "1357"} ada / {parsel || "4"} parsel</span>
+          </div>
+          <div className="flex items-center flex-wrap gap-2 text-[10.5px] text-slate-600 mt-1 font-semibold">
+            <span>{areaM2} m²</span>
+            <span>•</span>
+            <span>{category === "konut" ? "Konut & Daire" : "İmarlı Arsa"}</span>
+            <span>•</span>
+            <span className="text-emerald-700 font-mono font-extrabold">{(unitM2Price || 54085).toLocaleString("tr-TR")} ₺/m²</span>
+            <span>•</span>
+            <span className="text-amber-800 font-mono font-bold">İcra Tabanı: {Math.round((unitM2Price || 54085) * 0.5).toLocaleString("tr-TR")} ₺/m²</span>
+          </div>
+        </div>
+
+        {/* BİLDİRİM / GERİ BİLDİRİM ROZETİ */}
+        {(parcelNotice || locateFeedback) && (
+          <div className="absolute top-16 left-3 z-[450] bg-[#0F223D]/95 text-amber-300 border border-amber-500/40 rounded-lg px-3 py-1.5 text-xs font-bold shadow-lg flex items-center gap-1.5 animate-in fade-in duration-150">
+            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+            <span>{parcelNotice || locateFeedback}</span>
           </div>
         )}
 
-        {/* SAĞ KENAR DİKEY YÜZEN ARAÇ ÇUBUĞU (GÖRSEL 1789487723574 BİREBİR) */}
-        <div className="absolute top-4 right-3 z-[450] flex flex-col items-center gap-1.5 select-none">
-          {/* Katmanlar */}
+        {/* SAĞ KENAR DİKEY YÜZEN ARAÇ ÇUBUĞU (TAPUSOR DİZAYNI) */}
+        <div className="absolute top-4 right-3 z-[450] flex flex-col items-center gap-1.5 select-none pointer-events-auto">
+          {/* Katman Göstergesi: Sokak Haritası */}
           <div className="relative">
             <button
               type="button"
@@ -1290,82 +878,50 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
               className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shadow-lg border transition cursor-pointer ${
                 showLayerMenu ? "bg-[#0B1E3B] text-amber-400 border-amber-500/40" : "bg-white hover:bg-slate-50 text-slate-700 border-slate-200"
               }`}
-              title="Harita Katmanları (Uydu, Hibrit, Sokak)"
+              title="Aktif Katman: Sokak Haritası (Net Kadastro Yolları)"
             >
               <Layers className="w-4 h-4" />
             </button>
 
             {showLayerMenu && (
-              <div className="absolute right-12 top-0 bg-slate-900 text-white border border-slate-700 rounded-xl shadow-2xl p-2 w-36 space-y-1 z-50 text-xs font-bold">
-                <div className="text-[10px] text-slate-400 px-2 py-0.5 uppercase tracking-wider font-mono">
-                  Katman Seçimi
+              <div className="absolute right-12 top-0 bg-slate-900 text-white border border-slate-700 rounded-xl shadow-2xl p-2.5 w-48 space-y-1.5 z-50 text-xs font-bold animate-in fade-in zoom-in-95 duration-150">
+                <div className="text-[10px] text-slate-400 px-1 uppercase tracking-wider font-mono">
+                  Aktif Katman
                 </div>
-                <button
-                  type="button"
-                  onClick={() => { setMapLayerType("uydu"); setShowLayerMenu(false); }}
-                  className={`w-full text-left px-2.5 py-1.5 rounded-lg transition flex items-center justify-between cursor-pointer ${
-                    mapLayerType === "uydu" ? "bg-amber-500 text-slate-950 font-black" : "hover:bg-slate-800 text-slate-200"
-                  }`}
-                >
-                  <span>🛰️ Esri Uydu</span>
-                  {mapLayerType === "uydu" && <span className="text-[10px]">✓</span>}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setMapLayerType("hibrit"); setShowLayerMenu(false); }}
-                  className={`w-full text-left px-2.5 py-1.5 rounded-lg transition flex items-center justify-between cursor-pointer ${
-                    mapLayerType === "hibrit" ? "bg-amber-500 text-slate-950 font-black" : "hover:bg-slate-800 text-slate-200"
-                  }`}
-                >
-                  <span>🗺️ Hibrit</span>
-                  {mapLayerType === "hibrit" && <span className="text-[10px]">✓</span>}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setMapLayerType("sokak"); setShowLayerMenu(false); }}
-                  className={`w-full text-left px-2.5 py-1.5 rounded-lg transition flex items-center justify-between cursor-pointer ${
-                    mapLayerType === "sokak" ? "bg-amber-500 text-slate-950 font-black" : "hover:bg-slate-800 text-slate-200"
-                  }`}
-                >
-                  <span>🛣️ Sokak</span>
-                  {mapLayerType === "sokak" && <span className="text-[10px]">✓</span>}
-                </button>
+                <div className="w-full text-left px-2.5 py-1.5 rounded-lg bg-amber-500 text-slate-950 font-black flex items-center justify-between shadow-xs">
+                  <span className="flex items-center gap-1.5">
+                    <span>🛣️</span>
+                    <span>Sokak Haritası</span>
+                  </span>
+                  <span className="text-[11px] font-black">✓</span>
+                </div>
+                <div className="text-[9.5px] text-slate-400 px-1 font-normal leading-tight">
+                  Tüm sokak, cadde ve resmi kadastro yolları nettir.
+                </div>
               </div>
             )}
           </div>
 
-          {/* Filtreler */}
+          {/* Filtre Değiştirici */}
           <button
             type="button"
             onClick={() => setFilter(filter === "all" ? "satilik" : filter === "satilik" ? "kiralik" : "all")}
             className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white hover:bg-slate-50 text-slate-700 flex items-center justify-center shadow-lg border border-slate-200 transition cursor-pointer ${
               filter !== "all" ? "ring-2 ring-blue-500 text-blue-600 font-black" : ""
             }`}
-            title={`Filtre: ${filter.toUpperCase()}`}
+            title={`Emsal Filtresi: ${filter.toUpperCase()}`}
           >
             <Filter className="w-4 h-4" />
           </button>
 
-          {/* Görünüm / Yoğunluk Ayarı */}
+          {/* Hedefe Yeniden Odaklan */}
           <button
             type="button"
-            onClick={() => setViewMode(viewMode === "mahalleler" ? "ilceler" : "mahalleler")}
-            className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white hover:bg-slate-50 text-slate-700 flex items-center justify-center shadow-lg border border-slate-200 transition cursor-pointer"
-            title="Görünüm Düzeyi (İlçe / Mahalle)"
+            onClick={handleCenterOnTarget}
+            className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white hover:bg-slate-50 text-slate-700 flex items-center justify-center shadow-lg border border-slate-200 transition cursor-pointer active:scale-95"
+            title="Hedef Parsele Odaklan"
           >
-            <SlidersHorizontal className="w-4 h-4" />
-          </button>
-
-          {/* GPS Konumumu Bul */}
-          <button
-            type="button"
-            onClick={handleGetLiveLocation}
-            className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white hover:bg-slate-50 text-slate-700 flex items-center justify-center shadow-lg border border-slate-200 transition cursor-pointer ${
-              isLocating ? "animate-spin text-blue-600" : ""
-            }`}
-            title="Konumumu Bul (GPS)"
-          >
-            <Crosshair className="w-4 h-4" />
+            <Crosshair className="w-4 h-4 text-blue-600" />
           </button>
 
           {/* Yakınlaş (+) */}
@@ -1378,7 +934,7 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
             <Plus className="w-4 h-4" />
           </button>
 
-          {/* Canlı Zoom Seviyesi Rozeti (Görseldeki 7) */}
+          {/* Canlı Zoom Seviyesi Rozeti */}
           <div className="w-9 sm:w-10 h-7 rounded-lg bg-white font-mono font-black text-xs text-slate-800 flex items-center justify-center shadow-md border border-slate-200">
             {currentZoom}
           </div>
@@ -1393,188 +949,61 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
             <Minus className="w-4 h-4" />
           </button>
 
-          {/* Kırmızı Kilit Butonu (Görseldeki 🔒) */}
+          {/* Kilit Butonu (Mausun Topuzu Aç/Kapat) */}
           <button
             type="button"
             onClick={() => setIsLocked(!isLocked)}
-            className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center shadow-xl transition cursor-pointer active:scale-95 ${
-              isLocked
-                ? "bg-red-600 hover:bg-red-700 text-white ring-2 ring-red-400 shadow-red-600/40"
-                : "bg-white hover:bg-slate-50 text-slate-700 border border-slate-200"
+            className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shadow-lg border transition cursor-pointer active:scale-95 ${
+              isLocked 
+                ? "bg-rose-600 text-white border-rose-700 shadow-rose-200" 
+                : "bg-white hover:bg-slate-50 text-slate-700 border-slate-200"
             }`}
-            title={isLocked ? "Parsel Kilidi Aktif (Tıklayınca Seç)" : "Serbest Gezinim"}
+            title={isLocked ? "Harita Yakınlaştırma Kilitli (Tıkla ve Aç)" : "Harita Serbest (Tıkla ve Kilitle)"}
           >
-            <Lock className="w-4 h-4" />
+            {isLocked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
           </button>
 
-          {/* Tam Ekran Toggle */}
+          {/* Tam Ekran */}
           <button
             type="button"
             onClick={toggleFullscreen}
-            className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white hover:bg-slate-50 text-slate-700 flex items-center justify-center shadow-lg border border-slate-200 transition cursor-pointer"
-            title={isFullscreen ? "Küçült" : "Tam Ekran Harita"}
+            className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white hover:bg-slate-50 text-slate-700 flex items-center justify-center shadow-lg border border-slate-200 transition cursor-pointer active:scale-95"
+            title={isFullscreen ? "Tam Ekrandan Çık" : "Tam Ekran Yap"}
           >
             {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
           </button>
         </div>
 
-        {/* Global Tooltip Stili */}
-        <style jsx global>{`
-          .custom-district-tooltip {
-            background: transparent !important;
-            border: none !important;
-            box-shadow: none !important;
-            padding: 0 !important;
-          }
-          .custom-district-tooltip:before {
-            display: none !important;
-          }
-          .prominent-mahalle-label {
-            pointer-events: none !important;
-          }
-        `}</style>
-
-        {/* GPS Geri Bildirim Bildirimi */}
-        {locateFeedback && (
-          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[450] bg-slate-900/90 text-amber-300 border border-amber-500/40 text-[11px] font-bold px-3 py-1.5 rounded-full shadow-lg backdrop-blur-xs flex items-center gap-2 animate-bounce">
-            <Navigation className="w-3 h-3 text-amber-400" />
-            <span>{locateFeedback}</span>
+        {/* SOL ALT BİLGİ & LEJANT (TAPUSOR STANDARDI) */}
+        <div className="absolute bottom-4 left-3 z-[400] bg-white/95 backdrop-blur-md px-3.5 py-2 rounded-xl shadow-lg border border-slate-200 text-slate-800 max-w-sm pointer-events-auto">
+          <div className="text-[10px] font-extrabold text-slate-800 mb-1 flex items-center justify-between gap-3">
+            <span className="flex items-center gap-1">
+              <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
+              TapuSor Bal Peteği Değerleme Modeli
+            </span>
+            <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+              İİK m.115 %50 Taban
+            </span>
           </div>
-        )}
-
-        {/* Yükleniyor Göstergesi */}
-        {isLoadingMahalle && (
-          <div className="absolute top-14 left-1/2 -translate-x-1/2 z-[450] bg-slate-900/90 text-emerald-300 border border-emerald-500/40 text-[11px] font-bold px-3.5 py-1.5 rounded-full shadow-lg backdrop-blur-xs flex items-center gap-2 animate-pulse">
-            <RefreshCw className="w-3.5 h-3.5 text-emerald-400 animate-spin" />
-            <span>{activeDistrict} Gerçek Mahalle ve Köy Sınırları Yükleniyor...</span>
+          <div className="flex items-center gap-3 text-[9.5px] text-slate-600 font-semibold pt-1 border-t border-slate-100">
+            <div className="flex items-center gap-1">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-400 border border-amber-600 inline-block"></span>
+              <span>Hedef Parsel</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 inline-block"></span>
+              <span>Satılık Emsal</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="w-2.5 h-2.5 rounded-full bg-blue-600 inline-block"></span>
+              <span>Kiralık Emsal</span>
+            </div>
           </div>
-        )}
-
-        {/* İHALECİ BURADA ÜST GEZİNME VE HIZLI GERİ DÖNÜŞ BARI (BREADCRUMB & DRILL-DOWN CONTROL) */}
-        <div className="absolute top-3 left-3 z-[400] flex items-center gap-2 flex-wrap">
-          {viewMode === "mahalleler" && (
-            <button
-              type="button"
-              onClick={() => setViewMode("ilceler")}
-              className="bg-white/95 hover:bg-white text-slate-800 font-bold px-3 py-1.5 rounded-xl shadow-md border border-slate-300 flex items-center gap-1.5 text-xs transition cursor-pointer active:scale-95"
-              title="Tüm Çanakkale ilçelerine geri dön"
-            >
-              <ArrowLeft className="w-3.5 h-3.5 text-slate-600" />
-              <span>{city} İlçelerine Dön</span>
-            </button>
-          )}
-
-          {viewMode === "parsel" && (
-            <button
-              type="button"
-              onClick={() => setViewMode("mahalleler")}
-              className="bg-white/95 hover:bg-white text-slate-800 font-bold px-3 py-1.5 rounded-xl shadow-md border border-slate-300 flex items-center gap-1.5 text-xs transition cursor-pointer active:scale-95"
-              title="Mahalle ve köy sınırları haritasına geri dön"
-            >
-              <ArrowLeft className="w-3.5 h-3.5 text-slate-600" />
-              <span>{activeDistrict} Mahallelerine Dön</span>
-            </button>
-          )}
-
-          <div className="bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-xl shadow-md border border-slate-200 flex items-center gap-1.5 text-xs font-semibold text-slate-700">
-            <span className="text-slate-500">{city}</span>
-            <span className="text-slate-300">&gt;</span>
-            <span className="text-slate-800 font-bold">{activeDistrict}</span>
-            {viewMode === "mahalleler" && (
-              <span className="bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-2 py-0.5 rounded-md border border-emerald-300 ml-1">
-                {mahalleCount > 0 ? `${mahalleCount} Mahalle / Köy Sınırı` : "Gerçek Mahalle Sınırları"}
-              </span>
-            )}
-            {viewMode === "parsel" && activeNeighborhood && (
-              <>
-                <span className="text-slate-300">&gt;</span>
-                <span className="text-blue-700 font-bold">{activeNeighborhood}</span>
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* İHALECİ BURADA LEJANT ÇUBUĞU (ENDEKSA HARİTA RENK SKALASI) */}
-        <div className="absolute bottom-4 left-3 z-[400] bg-white/95 backdrop-blur-md px-3.5 py-2.5 rounded-xl shadow-lg border border-slate-200 text-slate-800 max-w-sm">
-          {viewMode === "mahalleler" ? (
-            <div>
-              <div className="text-[10.5px] font-extrabold text-slate-800 mb-1 flex items-center justify-between gap-3">
-                <span className="flex items-center gap-1">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                  {activeDistrict} Mahalle & Köy Isı Haritası
-                </span>
-                <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
-                  İİK m.115 %50 Taban
-                </span>
-              </div>
-              
-              {/* Renk Skalası Şeridi (Görseldeki Gibi: Koyu Yeşil -> Fıstık Yeşili -> Sarı -> Turuncu -> Koyu Kırmızı) */}
-              <div className="flex items-center gap-2 mb-1.5">
-                <span className="text-[10px] font-mono font-bold text-emerald-800">
-                  19.800 ₺
-                </span>
-                <div className="w-32 sm:w-44 h-2.5 rounded-full bg-gradient-to-r from-[#15803D] via-[#4ADE80] via-[#FEF08A] via-[#F59E0B] to-[#991B1B] shadow-inner border border-slate-200"></div>
-                <span className="text-[10px] font-mono font-bold text-[#991B1B]">
-                  36.400 ₺
-                </span>
-              </div>
-
-              <div className="grid grid-cols-3 gap-1 text-[9px] text-slate-600 pt-1 border-t border-slate-100 font-semibold">
-                <span className="text-emerald-800">🟢 Tarımsal (Muratlar)</span>
-                <span className="text-amber-700 text-center">🟡 Merkez (Evciler)</span>
-                <span className="text-red-800 text-right">🔴 Prim (Çırpılar)</span>
-              </div>
-              <div className="text-[8.5px] text-slate-400 mt-1">
-                Her poligon resmi idari sınırdır. Tıklayarak o köy/mahallenin icra tabanını görebilirsiniz.
-              </div>
-            </div>
-          ) : viewMode === "ilceler" ? (
-            <div>
-              <div className="text-[10px] font-extrabold text-slate-800 mb-1.5 flex items-center justify-between gap-3">
-                <span>{city} İlçe Değerleme Isı Haritası</span>
-                <span className="text-[9px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
-                  İlçeye Tıkla → Mahallelere Açıl
-                </span>
-              </div>
-              <div className="flex items-center gap-2 mb-1.5">
-                <span className="text-[10px] font-mono font-bold text-emerald-800">
-                  31.800 ₺
-                </span>
-                <div className="w-28 sm:w-36 h-2 rounded-full bg-gradient-to-r from-emerald-800 via-emerald-500 via-amber-400 to-rose-700 shadow-inner"></div>
-                <span className="text-[10px] font-mono font-bold text-rose-700">
-                  96.400 ₺
-                </span>
-              </div>
-              <div className="flex items-center justify-between text-[9px] text-slate-500 pt-1 border-t border-slate-100 gap-2">
-                <span>🟢 Uygun (Çan, Yenice)</span>
-                <span>🔴 Lüks (Bozcaada)</span>
-              </div>
-            </div>
-          ) : (
-            <div>
-              <div className="text-[10px] font-extrabold text-slate-800 mb-1 flex items-center justify-between gap-3">
-                <span>{category === "arsa" ? "Arsa" : "Konut"} 500m Çevre Emsalleri</span>
-                <span className="text-[9px] font-semibold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
-                  Parsel Detayı
-                </span>
-              </div>
-              <div className="flex items-center gap-3 text-[9.5px] text-slate-600 font-semibold pt-1 border-t border-slate-100">
-                <div className="flex items-center gap-1">
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#0F223D] border border-amber-400 inline-block"></span>
-                  <span>Değerlenen Taşınmaz</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 inline-block"></span>
-                  <span>Satılık Emsal</span>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
       {/* 3. ÇEVREDEKİ EMSAL İLANLAR YATAY ŞERİDİ (ETKİLEŞİMLİ) */}
-      <div className="p-3 bg-slate-50 border-t border-slate-200">
+      <div className="p-3 bg-slate-50 border-t border-slate-200 select-none">
         <div className="flex items-center justify-between mb-2">
           <span className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5 font-heading">
             <Layers className="w-3.5 h-3.5 text-blue-600" />
@@ -1585,7 +1014,7 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
           </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2">
           {filteredComps.map((comp) => {
             const isSelected = selectedCompId === comp.id;
             const isSatilik = comp.type === "satilik";
@@ -1593,10 +1022,7 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
             return (
               <div
                 key={comp.id}
-                onClick={() => {
-                  setViewMode("parsel");
-                  handleSelectComp(comp);
-                }}
+                onClick={() => handleSelectComp(comp)}
                 className={`p-2.5 rounded-xl border transition-all cursor-pointer text-xs flex flex-col justify-between ${
                   isSelected
                     ? "bg-blue-50 border-blue-500 shadow-sm ring-1 ring-blue-400"
@@ -1638,8 +1064,8 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
       </div>
 
       {/* 4. HARİTA ALT BİLGİ KÜNYESİ */}
-      <div className="px-3 py-1.5 bg-slate-100 border-t border-slate-200/80 flex items-center justify-between text-[10px] text-slate-500">
-        <span>Resmi Kadastro & İdari Sınırlar: Harita Genel Müdürlüğü (HGK) & TÜİK Mahalle Veri Tabanı</span>
+      <div className="px-3 py-1.5 bg-slate-100 border-t border-slate-200/80 flex items-center justify-between text-[10px] text-slate-500 select-none">
+        <span>Resmi Kadastro & Tapu Veri Ağı: TKGM & TapuSor Emsal Motoru</span>
         <span className="font-mono">{lat.toFixed(5)}° K, {lng.toFixed(5)}° D</span>
       </div>
     </div>

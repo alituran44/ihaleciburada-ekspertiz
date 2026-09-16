@@ -205,6 +205,7 @@ export interface MarketResearchResult {
   confidenceScore: number;
   sources: string[];
   summaryNote: string;
+  coordinates?: { lat: number; lng: number };
   comparables?: ComparableListing[];
   tcmbOfficialData?: TcmbOfficialData;
   buildingCostEstimate?: BuildingCostEstimate;
