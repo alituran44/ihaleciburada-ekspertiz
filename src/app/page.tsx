@@ -23,7 +23,10 @@ const ParcelMap = dynamic(
     ),
   }
 );
-import { EndeksaValuationModal } from "@/components/EndeksaValuationModal";
+const EndeksaValuationModal = dynamic(
+  () => import("@/components/EndeksaValuationModal").then((mod) => mod.EndeksaValuationModal),
+  { ssr: false }
+);
 import { ElectronicReportModal } from "@/components/ElectronicReportModal";
 import { ReportSelectionModal, ReportPackageType } from "@/components/ReportSelectionModal";
 import { ParcelInput } from "@/types";

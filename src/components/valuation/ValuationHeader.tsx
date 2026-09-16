@@ -189,7 +189,7 @@ export const ValuationHeader: React.FC<ValuationHeaderProps> = ({
                     {isPassed ? <Check className="w-4 h-4" /> : <StepIcon className="w-4 h-4" />}
                   </div>
                   <span
-                    className={`text-[10px] sm:text-xs font-bold hidden sm:inline truncate max-w-[120px] ${
+                    className={`text-[10.5px] sm:text-xs font-bold text-center leading-tight whitespace-nowrap transition ${
                       isCurrent
                         ? "text-slate-900 font-extrabold"
                         : isPassed
