@@ -26,7 +26,7 @@ export const EndeksaValuationModal: React.FC<EndeksaValuationModalProps> = ({
 }) => {
   // Map ParcelInput to ValuationFormData
   const initialService: ValuationServiceType = 
-    input.category === "konut" ? "konut" : "arsa";
+    input.category === "konut" ? "konut" : input.category === "arazi" ? "arazi" : input.category === "ticari" ? "ticari" : "arsa";
 
   const [formData, setFormData] = useState<ValuationFormData>({
     ...INITIAL_VALUATION_DATA,
@@ -59,7 +59,7 @@ export const EndeksaValuationModal: React.FC<EndeksaValuationModalProps> = ({
       grossAreaM2: input.areaM2 || prev.grossAreaM2,
       arsaAreaM2: input.areaM2 || prev.arsaAreaM2,
       araziAreaM2: input.areaM2 || prev.araziAreaM2,
-      service: input.category === "konut" ? "konut" : "arsa",
+      service: input.category === "konut" ? "konut" : input.category === "arazi" ? "arazi" : input.category === "ticari" ? "ticari" : "arsa",
       searchQuery: input.neighborhood
         ? `${input.neighborhood}, ${input.district}, ${input.city}`
         : prev.searchQuery,

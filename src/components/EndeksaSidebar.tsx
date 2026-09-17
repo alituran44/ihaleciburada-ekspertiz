@@ -14,11 +14,13 @@ import {
   FileSpreadsheet
 } from "lucide-react";
 
+import { PropertyCategory } from "@/types";
+
 interface EndeksaSidebarProps {
   activeTab: "endeks" | "degerleme" | "ihale" | "rapor";
   onTabChange: (tab: "endeks" | "degerleme" | "ihale" | "rapor") => void;
-  category: "arsa" | "konut";
-  onCategoryChange: (cat: "arsa" | "konut") => void;
+  category: PropertyCategory;
+  onCategoryChange: (cat: PropertyCategory) => void;
 }
 
 export const EndeksaSidebar: React.FC<EndeksaSidebarProps> = ({

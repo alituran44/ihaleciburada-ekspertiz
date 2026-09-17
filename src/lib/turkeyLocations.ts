@@ -791,3 +791,32 @@ export function findFastLocationFromCoords(lat: number, lng: number): {
   };
 }
 
+// Türkiye 973 İlçe Koordinatını Getirme
+export function getDistrictCoordinates(province: string, district: string): { lat: number; lng: number } | null {
+  if (!district) return null;
+  const normP = normalizeTr(province || "");
+  const normD = normalizeTr(district);
+  const districts = turkeyDistrictCoords as Array<[string, string, number, number]>;
+  
+  // 1. Hem il hem ilçe eşleşmesi
+  if (normP) {
+    const exact = districts.find(
+      (item) => normalizeTr(item[0]) === normP && normalizeTr(item[1]) === normD
+    );
+    if (exact) return { lat: exact[2], lng: exact[3] };
+
+    const partial = districts.find(
+      (item) => normalizeTr(item[0]) === normP && (normalizeTr(item[1]).includes(normD) || normD.includes(normalizeTr(item[1])))
+    );
+    if (partial) return { lat: partial[2], lng: partial[3] };
+  }
+
+  // 2. Yalnızca ilçe adı eşleşmesi
+  const distOnly = districts.find(
+    (item) => normalizeTr(item[1]) === normD
+  );
+  if (distOnly) return { lat: distOnly[2], lng: distOnly[3] };
+
+  return null;
+}
+

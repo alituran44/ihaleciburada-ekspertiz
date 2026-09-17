@@ -30,7 +30,7 @@ const EndeksaValuationModal = dynamic(
 import { ElectronicReportModal } from "@/components/ElectronicReportModal";
 import { ReportSelectionModal, ReportPackageType } from "@/components/ReportSelectionModal";
 import { StartValuationModal, StartValuationPayload } from "@/components/valuation/StartValuationModal";
-import { ParcelInput } from "@/types";
+import { ParcelInput, PropertyCategory } from "@/types";
 import { SAMPLE_SCENARIOS, formatTL, formatNumber } from "@/lib/constants";
 import { calculateFeasibility } from "@/lib/calculator";
 import { parseSearchLocation } from "@/lib/turkeyLocations";
@@ -82,22 +82,48 @@ export default function Home() {
   const [isSearching, setIsSearching] = useState<boolean>(false);
 
   // Yeni Değerleme Başlat Formu Gönderildiğinde
-  const handleStartValuationSubmit = (payload: StartValuationPayload) => {
+  const handleStartValuationSubmit = async (payload: StartValuationPayload) => {
     setShowStartValuationModal(false);
     const isRes = payload.category === "konut";
+    const newCoords = payload.coordinates;
+    const cat = isRes ? "konut" : "arsa";
+
     setParcelData((prev) => ({
       ...prev,
-      category: isRes ? "konut" : "arsa",
+      category: cat,
       city: payload.city,
       district: payload.district,
       neighborhood: payload.neighborhood,
       ada: payload.ada,
       parsel: payload.parsel,
       areaM2: payload.areaM2,
-      coordinates: payload.coordinates || prev.coordinates,
+      coordinates: newCoords || prev.coordinates,
     }));
     setSearchQuery(`${payload.neighborhood}, ${payload.district}, ${payload.city}`);
     setActiveTab("degerleme");
+
+    // Arka planda girilen il, ilçe ve köy/mahalle için anlık emsal ve piyasa verisini güncelle
+    try {
+      const url = `/api/emsal?il=${encodeURIComponent(payload.city)}&ilce=${encodeURIComponent(payload.district)}&mahalle=${encodeURIComponent(payload.neighborhood)}&kategori=${cat}${newCoords ? `&lat=${newCoords.lat}&lng=${newCoords.lng}` : ""}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data.success && data.data) {
+        const resData = data.data;
+        setParcelData((prev) => ({
+          ...prev,
+          estimatedLandM2PriceTL: resData.landM2PriceTL,
+          estimatedUnitSaleM2PriceTL: resData.unitSaleM2PriceTL,
+          contractorSharePercent: resData.contractorSharePercent,
+          monthlyRentEstimateTL: isRes ? resData.estimatedMonthlyRentTL : prev.monthlyRentEstimateTL,
+          marketResearch: resData,
+          comparables: resData.comparables,
+          tcmbOfficialData: resData.tcmbOfficialData,
+          buildingCostEstimate: resData.buildingCostEstimate,
+        }));
+      }
+    } catch (e) {
+      console.warn("Emsal verisi arka planda alınırken hata:", e);
+    }
   };
 
   // Türkiye Geneli Canlı Konum Autocomplete Arama Durumu
@@ -151,7 +177,7 @@ export default function Home() {
 
   const isResidential = parcelData.category === "konut";
 
-  const handleCategorySwitch = (cat: "arsa" | "konut") => {
+  const handleCategorySwitch = (cat: PropertyCategory) => {
     if (cat === "konut") {
       setParcelData({
         ...parcelData,
@@ -174,10 +200,10 @@ export default function Home() {
     } else {
       setParcelData({
         ...parcelData,
-        category: "arsa",
-        title: "İmarlı Arsa Portföyü",
-        areaM2: 1000,
-        zoningType: "konut",
+        category: cat,
+        title: cat === "arazi" ? "Tarla & Arazi Portföyü" : cat === "ticari" ? "Ticari Mülk Portföyü" : "İmarlı Arsa Portföyü",
+        areaM2: cat === "arazi" ? 2500 : cat === "ticari" ? 200 : 1000,
+        zoningType: cat === "ticari" ? "ticari" : "konut",
         kaks: 1.5,
         taks: 0.35,
         maxFloors: 5,
@@ -986,7 +1012,7 @@ export default function Home() {
                     city={parcelData.city}
                     district={parcelData.district}
                     neighborhood={parcelData.neighborhood}
-                    category={parcelData.category}
+                    category={parcelData.category === "konut" ? "konut" : "arsa"}
                     currentUnitM2TL={
                       isResidential 
                         ? (parcelData.estimatedUnitSaleM2PriceTL || 54090) 
@@ -1001,7 +1027,7 @@ export default function Home() {
                   <InvestmentScoreCard
                     city={parcelData.city}
                     selectedDistrict={parcelData.district}
-                    category={parcelData.category}
+                    category={parcelData.category === "konut" ? "konut" : "arsa"}
                     onSelectDistrict={handleSelectDistrict}
                   />
 
@@ -1051,7 +1077,7 @@ export default function Home() {
                 coordinates={parcelData.coordinates}
                 elevationMeters={parcelData.elevationMeters}
                 comparables={parcelData.comparables}
-                category={parcelData.category}
+                category={parcelData.category === "konut" ? "konut" : "arsa"}
                 areaM2={parcelData.areaM2}
                 unitM2Price={
                   isResidential 

@@ -12,9 +12,10 @@ import {
   ShieldCheck, 
   ArrowRight, 
   Sparkles,
-  Layers
+  Layers,
+  Loader2
 } from "lucide-react";
-import { TURKEY_PROVINCES_AND_DISTRICTS, getProvinceCoordinates } from "@/lib/turkeyLocations";
+import { TURKEY_PROVINCES_AND_DISTRICTS, getProvinceCoordinates, getDistrictCoordinates } from "@/lib/turkeyLocations";
 
 export interface StartValuationPayload {
   category: "konut" | "arsa" | "arazi" | "ticari";
@@ -114,22 +115,57 @@ export const StartValuationModal: React.FC<StartValuationModalProps> = ({
     setTapuNiteligi(preset.nit);
   };
 
-  const handleFormSubmit = (e: React.FormEvent) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Koordinat tespiti (Şehir veya ilçe merkezinden)
-    const provCoords = getProvinceCoordinates(city) || { lat: 39.9334, lng: 32.8597 };
+    setIsSubmitting(true);
+
+    const cleanCity = city.trim() || "Çanakkale";
+    const cleanDistrict = district.trim() || "Merkez";
+    const cleanNeigh = neighborhood.trim() || "Merkez";
+
+    let targetCoords: { lat: number; lng: number } | null = null;
+
+    // 1. Köy / Mahalle araması (Nominatim API üzerinden tam köy/mahalle koordinatı)
+    try {
+      const searchTarget = `${cleanNeigh}, ${cleanDistrict}, ${cleanCity}`;
+      const res = await fetch(`/api/location/search?q=${encodeURIComponent(searchTarget)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.results && data.results.length > 0) {
+          const match = data.results[0];
+          if (match.lat && match.lng) {
+            targetCoords = { lat: Number(match.lat), lng: Number(match.lng) };
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("Köy araması tamamlanamadı, ilçe merkezine dönülüyor:", err);
+    }
+
+    // 2. Fallback: 973 İlçe Koordinatları
+    if (!targetCoords) {
+      targetCoords = getDistrictCoordinates(cleanCity, cleanDistrict);
+    }
+
+    // 3. Fallback: 81 İl Koordinatları
+    if (!targetCoords) {
+      targetCoords = getProvinceCoordinates(cleanCity) || { lat: 39.9334, lng: 32.8597 };
+    }
+
+    setIsSubmitting(false);
 
     onSubmit({
       category,
-      city: city.trim() || "Çanakkale",
-      district: district.trim() || "Merkez",
-      neighborhood: neighborhood.trim() || "Merkez",
+      city: cleanCity,
+      district: cleanDistrict,
+      neighborhood: cleanNeigh,
       ada: ada.trim() || "1",
       parsel: parsel.trim() || "1",
       areaM2: Number(areaM2) || (category === "konut" ? 110 : 850),
       tapuNiteligi: tapuNiteligi.trim() || "Arsa",
-      coordinates: provCoords,
+      coordinates: targetCoords,
     });
   };
 
@@ -416,10 +452,20 @@ export const StartValuationModal: React.FC<StartValuationModalProps> = ({
 
             <button
               type="submit"
-              className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-black text-xs shadow-md shadow-orange-600/20 transition cursor-pointer flex items-center gap-2 active:scale-95"
+              disabled={isSubmitting}
+              className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 disabled:opacity-60 text-white font-black text-xs shadow-md shadow-orange-600/20 transition cursor-pointer flex items-center gap-2 active:scale-95"
             >
-              <span>Kadastroyu Doğrula ve Değerlemeyi Başlat</span>
-              <ArrowRight className="w-4 h-4 text-amber-200" />
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin text-amber-200" />
+                  <span>Koordinat Çözümleniyor...</span>
+                </>
+              ) : (
+                <>
+                  <span>Kadastroyu Doğrula ve Değerlemeyi Başlat</span>
+                  <ArrowRight className="w-4 h-4 text-amber-200" />
+                </>
+              )}
             </button>
           </div>
         </form>

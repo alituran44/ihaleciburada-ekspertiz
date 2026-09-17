@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState, useMemo } from "react";
 import L from "leaflet";
-import { ComparableListing } from "@/types";
+import { ComparableListing, PropertyCategory } from "@/types";
 import { getDistrictValuation } from "@/lib/districtValuations";
 import { findFastLocationFromCoords } from "@/lib/turkeyLocations";
 import { 
@@ -31,7 +31,7 @@ interface ParcelMapProps {
   coordinates?: { lat: number; lng: number };
   elevationMeters?: number;
   comparables?: ComparableListing[];
-  category?: "arsa" | "konut";
+  category?: PropertyCategory;
   unitM2Price?: number;
   areaM2?: number;
   isEndeksaSplitView?: boolean;

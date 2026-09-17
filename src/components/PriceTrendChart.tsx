@@ -2,13 +2,14 @@
 
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import { formatTL } from "@/lib/constants";
+import { PropertyCategory } from "@/types";
 import { Calendar, ChevronDown, Info, Gavel, Building2, ShieldCheck, ArrowUpRight, ArrowDownRight } from "lucide-react";
 
 interface PriceTrendChartProps {
   city: string;
   district: string;
   neighborhood?: string;
-  category?: "arsa" | "konut";
+  category?: PropertyCategory;
   currentUnitM2TL: number;
   kfeIndex?: number;
   kfeAnnualChange?: number;

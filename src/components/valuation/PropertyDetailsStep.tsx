@@ -158,6 +158,7 @@ export const PropertyDetailsStep: React.FC<PropertyDetailsStepProps> = ({
   onNext,
   onPrev,
 }) => {
+  const [zoningMode, setZoningMode] = React.useState<"auto" | "custom">("auto");
   return (
     <div className="w-full max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
       {/* SOL ANA PANEL: Dinamik Mülk Formu */}
@@ -408,6 +409,7 @@ export const PropertyDetailsStep: React.FC<PropertyDetailsStepProps> = ({
               </div>
             </div>
 
+            {/* Arsa Alanı */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <CounterInput
                 label="Arsa Alanı"
@@ -418,41 +420,144 @@ export const PropertyDetailsStep: React.FC<PropertyDetailsStepProps> = ({
                 step={50}
                 unit="m²"
               />
-              <CounterInput
-                label="Emsal (KAKS)"
-                value={data.arsaKaks}
-                onValChange={(v) => onChange({ arsaKaks: v })}
-                min={0.1}
-                max={4.0}
-                step={0.1}
-                subtitle="Toplam inşaat alanı katsayısı"
-              />
-              <CounterInput
-                label="Taban Oturumu (TAKS)"
-                value={data.arsaTaks}
-                onValChange={(v) => onChange({ arsaTaks: v })}
-                min={0.1}
-                max={0.8}
-                step={0.05}
-                subtitle="Zemin kat oturum oranı"
-              />
-              <CounterInput
-                label="Kat Adedi (Hmax)"
-                value={data.arsaMaxFloors}
-                onValChange={(v) => onChange({ arsaMaxFloors: v })}
-                min={1}
-                max={40}
-                unit="Kat"
-              />
-              <CounterInput
-                label="Müteahhit Kat Karşılığı Payı"
-                value={data.arsaContractorShare}
-                onValChange={(v) => onChange({ arsaContractorShare: v })}
-                min={20}
-                max={70}
-                unit="%"
-                subtitle="Arsa sahibine düşen bağımsız bölüm"
-              />
+            </div>
+
+            {/* İmar & Emsal Bilgisi (TAKS / KAKS) - Tercihen / Vatandaş İçin */}
+            <div className="space-y-3 pt-2 border-t border-slate-200/70">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <div className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                    <span>İmar & Emsal Bilgisi (TAKS / KAKS)</span>
+                    <span className="text-[10px] font-extrabold text-blue-700 bg-blue-100/80 px-2 py-0.5 rounded-full lowercase">
+                      tercihen / opsiyonel
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    İmar durumu belgesi olmayan veya bilmeyen vatandaşlar için bölge ortalaması otomatik uygulanır.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-1 shrink-0 bg-slate-100 p-1 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setZoningMode("auto");
+                      onChange({ arsaKaks: 1.5, arsaTaks: 0.35, arsaMaxFloors: 4 });
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                      zoningMode === "auto"
+                        ? "bg-white text-blue-900 shadow-2xs font-black"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Otomatik Bölge Emsali</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setZoningMode("custom")}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      zoningMode === "custom"
+                        ? "bg-white text-slate-900 shadow-2xs font-black"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    <span>İmarı Elle Gir</span>
+                  </button>
+                </div>
+              </div>
+
+              {zoningMode === "auto" ? (
+                <div className="p-3.5 bg-blue-50/60 rounded-xl border border-blue-200/80 flex items-center justify-between gap-4">
+                  <div className="text-xs text-blue-950 leading-relaxed">
+                    <span className="font-extrabold">Bölge Standart Emsali Uygulanıyor: </span>
+                    <span>Emsal (KAKS): <strong>{data.arsaKaks || 1.5}</strong>, Taban Oturumu (TAKS): <strong>{data.arsaTaks || 0.35}</strong>, Kat: <strong>{data.arsaMaxFloors || 4} Kat</strong></span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setZoningMode("custom")}
+                    className="text-xs font-extrabold text-blue-700 hover:underline shrink-0 cursor-pointer"
+                  >
+                    Değiştir →
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 bg-slate-50/60 rounded-xl border border-slate-200">
+                  <CounterInput
+                    label="Emsal (KAKS)"
+                    value={data.arsaKaks}
+                    onValChange={(v) => onChange({ arsaKaks: v })}
+                    min={0.1}
+                    max={4.0}
+                    step={0.1}
+                    subtitle="Tercihen (Varsayılan: 1.5)"
+                  />
+                  <CounterInput
+                    label="Taban Oturumu (TAKS)"
+                    value={data.arsaTaks}
+                    onValChange={(v) => onChange({ arsaTaks: v })}
+                    min={0.1}
+                    max={0.8}
+                    step={0.05}
+                    subtitle="Tercihen (Varsayılan: 0.35)"
+                  />
+                  <CounterInput
+                    label="Kat Adedi (Hmax)"
+                    value={data.arsaMaxFloors}
+                    onValChange={(v) => onChange({ arsaMaxFloors: v })}
+                    min={1}
+                    max={40}
+                    unit="Kat"
+                    subtitle="Tercihen (Varsayılan: 4)"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Müteahhit Kat Karşılığı Payı - İsteğe Bağlı / Tercihen */}
+            <div className="pt-2 border-t border-slate-200/70">
+              <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2.5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <div className="text-xs sm:text-sm font-bold text-slate-900 flex items-center gap-2">
+                      <span>Müteahhit Kat Karşılığı Payı</span>
+                      <span className="text-[10px] font-extrabold text-slate-600 bg-slate-200/80 px-2 py-0.5 rounded-full">
+                        İsteğe Bağlı / Tercihen
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      Mal sahibi ile müteahhit arasındaki anlaşma oranıdır. Bilinmiyorsa standart %50 kabul edilir.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {[
+                      { val: 40, label: "%40" },
+                      { val: 50, label: "%50 (Standart)" },
+                      { val: 60, label: "%60" },
+                    ].map((opt) => (
+                      <button
+                        key={opt.val}
+                        type="button"
+                        onClick={() => onChange({ arsaContractorShare: opt.val })}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                          data.arsaContractorShare === opt.val
+                            ? "bg-[#0B1E3B] text-white shadow-2xs font-black"
+                            : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-100"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between text-xs text-slate-600 pt-1 border-t border-slate-200/50">
+                  <span>Seçili Oran: <strong>%{data.arsaContractorShare || 50} Müteahhit Payı</strong></span>
+                  <span className="text-[11px] text-slate-500 italic">Arsa Sahibine Kalan: %{100 - (data.arsaContractorShare || 50)}</span>
+                </div>
+              </div>
             </div>
           </div>
         )}

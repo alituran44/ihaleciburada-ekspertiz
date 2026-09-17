@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { 
   searchDistrictsAndProvinces, 
   TURKEY_PROVINCES_AND_DISTRICTS,
-  findFastLocationFromCoords
+  findFastLocationFromCoords,
+  getDistrictCoordinates
 } from "@/lib/turkeyLocations";
 
 // 81 İl Merkez Koordinatları
@@ -217,6 +218,7 @@ export async function GET(request: NextRequest) {
         lng: coords.lng,
       });
     } else if (match.type === "ilce" && match.district) {
+      const distCoord = getDistrictCoordinates(match.province, match.district) || coords;
       results.push({
         id: `ilce-${match.province}-${match.district}`,
         label: match.district,
@@ -224,8 +226,8 @@ export async function GET(request: NextRequest) {
         type: "ilce",
         province: match.province,
         district: match.district,
-        lat: coords.lat,
-        lng: coords.lng,
+        lat: distCoord.lat,
+        lng: distCoord.lng,
       });
     }
   }

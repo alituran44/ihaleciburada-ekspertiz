@@ -4,6 +4,7 @@ import React, { useState, useMemo } from "react";
 import { Search, ChevronDown, ChevronUp, MapPin, ArrowUpRight, ArrowDownRight, Info, Gavel, ShieldCheck, TrendingUp, DollarSign } from "lucide-react";
 import { getDistrictsByProvince } from "@/lib/turkeyLocations";
 import { TURKEY_81_PROVINCES } from "@/lib/api/valuation";
+import { PropertyCategory } from "@/types";
 
 interface DistrictScoreRow {
   name: string;
@@ -23,7 +24,7 @@ interface DistrictScoreRow {
 interface InvestmentScoreCardProps {
   city: string;
   selectedDistrict: string;
-  category?: "arsa" | "konut";
+  category?: PropertyCategory;
   onSelectDistrict?: (districtName: string) => void;
 }
 

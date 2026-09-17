@@ -147,24 +147,64 @@ export const LocationStep: React.FC<LocationStepProps> = ({
     const buildPinIcon = (adaVal: string, parselVal: string, areaVal: number) => L.divIcon({
       className: "custom-kadastro-pin",
       html: `
-        <div style="position: relative; display: flex; flex-direction: column; align-items: center; transform: translate(-50%, -100%); cursor: pointer;">
-          <div style="background: #0F223D; color: #FCD34D; font-weight: 900; font-size: 11px; padding: 4px 10px; border-radius: 14px; border: 2px solid #FCD34D; box-shadow: 0 4px 12px rgba(0,0,0,0.3); white-space: nowrap; font-family: sans-serif; display: flex; align-items: center; gap: 4px;">
+        <div style="position: relative; display: flex; flex-direction: column; align-items: center; transform: translate(-50%, -100%); cursor: grab;" title="Pini farenizle sürükleyip parselinizin üzerine bırakabilirsiniz">
+          <div style="background: #0F223D; color: #FCD34D; font-weight: 900; font-size: 11px; padding: 5px 12px; border-radius: 14px; border: 2px solid #FCD34D; box-shadow: 0 4px 14px rgba(0,0,0,0.35); white-space: nowrap; font-family: sans-serif; display: flex; align-items: center; gap: 5px;">
             <span>📍</span>
             <span>Ada ${adaVal || "1357"} / Parsel ${parselVal || "4"}</span>
             <span style="color: #60A5FA; font-size: 10px; margin-left: 2px;">(${areaVal} m²)</span>
+            <span style="background: rgba(255,255,255,0.15); border-radius: 6px; padding: 1px 4px; font-size: 9px; color: #A7F3D0; margin-left: 3px;">🖐 Sürükle</span>
           </div>
-          <div style="width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid #0F223D;"></div>
+          <div style="width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 7px solid #0F223D;"></div>
         </div>
       `,
       iconSize: [0, 0],
     });
 
     const marker = L.marker([currentLat, currentLng], { 
-      icon: buildPinIcon(data.ada, data.parsel, currentArea) 
+      icon: buildPinIcon(data.ada, data.parsel, currentArea),
+      draggable: true,
+      autoPan: true,
     }).addTo(map);
     markerRef.current = marker;
 
-    // Harita Tıklama Dinleyicisi
+    // Pini Fareyle (Mouse) Elle Sürükleyerek Konum Düzeltme Dinleyicisi
+    marker.on("dragend", async (e: any) => {
+      const position = e.target.getLatLng();
+      const dragLat = Number(position.lat.toFixed(6));
+      const dragLng = Number(position.lng.toFixed(6));
+
+      // 0ms hızlı il/ilçe çözümü
+      const fastLoc = findFastLocationFromCoords(dragLat, dragLng);
+
+      onChange({
+        city: fastLoc.city,
+        district: fastLoc.district,
+        neighborhood: fastLoc.neighborhood,
+        coordinates: { lat: dragLat, lng: dragLng },
+        searchQuery: `${fastLoc.neighborhood}, ${fastLoc.district}, ${fastLoc.city}`,
+      });
+
+      if (circleRef.current) {
+        circleRef.current.setLatLng([dragLat, dragLng]);
+      }
+
+      // Arka planda cadde/mahalle detayını güncelle
+      try {
+        const res = await fetch(`/api/location/search?lat=${dragLat}&lng=${dragLng}`);
+        const result = await res.json();
+        if (result.success && result.location) {
+          const loc = result.location;
+          onChange({
+            city: loc.province || fastLoc.city,
+            district: loc.district || fastLoc.district,
+            neighborhood: loc.neighborhood || fastLoc.neighborhood,
+            searchQuery: `${loc.neighborhood || fastLoc.neighborhood}, ${loc.district || fastLoc.district}, ${loc.province || fastLoc.city}`,
+          });
+        }
+      } catch (err) {}
+    });
+
+    // Harita Tıklama Dinleyicisi (Haritaya Tıklayarak Pini Taşıma)
     map.on("click", async (e: L.LeafletMouseEvent) => {
       const clickLat = Number(e.latlng.lat.toFixed(6));
       const clickLng = Number(e.latlng.lng.toFixed(6));
@@ -198,7 +238,7 @@ export const LocationStep: React.FC<LocationStepProps> = ({
             searchQuery: `${loc.neighborhood || fastLoc.neighborhood}, ${loc.district || fastLoc.district}, ${loc.province || fastLoc.city}`,
           });
         }
-      } catch (e) {}
+      } catch (err) {}
     });
 
     mapInstanceRef.current = map;
@@ -211,7 +251,7 @@ export const LocationStep: React.FC<LocationStepProps> = ({
     };
   }, []);
 
-  // Koordinat Değiştiğinde Haritayı Güncelle
+  // Koordinat veya Ada/Parsel/Alan Değiştiğinde Haritayı & Pini Güncelle
   useEffect(() => {
     if (!mapInstanceRef.current) return;
     const center = mapInstanceRef.current.getCenter();
@@ -221,13 +261,30 @@ export const LocationStep: React.FC<LocationStepProps> = ({
       mapInstanceRef.current.flyTo([currentLat, currentLng], 15, { duration: 0.8 });
     }
 
-    if (markerRef.current) {
+    if (markerRef.current && (window as any).L) {
+      const L = (window as any).L;
       markerRef.current.setLatLng([currentLat, currentLng]);
+      const newIcon = L.divIcon({
+        className: "custom-kadastro-pin",
+        html: `
+          <div style="position: relative; display: flex; flex-direction: column; align-items: center; transform: translate(-50%, -100%); cursor: grab;" title="Pini farenizle sürükleyip parselinizin üzerine bırakabilirsiniz">
+            <div style="background: #0F223D; color: #FCD34D; font-weight: 900; font-size: 11px; padding: 5px 12px; border-radius: 14px; border: 2px solid #FCD34D; box-shadow: 0 4px 14px rgba(0,0,0,0.35); white-space: nowrap; font-family: sans-serif; display: flex; align-items: center; gap: 5px;">
+              <span>📍</span>
+              <span>Ada ${data.ada || "1357"} / Parsel ${data.parsel || "4"}</span>
+              <span style="color: #60A5FA; font-size: 10px; margin-left: 2px;">(${currentArea} m²)</span>
+              <span style="background: rgba(255,255,255,0.15); border-radius: 6px; padding: 1px 4px; font-size: 9px; color: #A7F3D0; margin-left: 3px;">🖐 Sürükle</span>
+            </div>
+            <div style="width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 7px solid #0F223D;"></div>
+          </div>
+        `,
+        iconSize: [0, 0],
+      });
+      markerRef.current.setIcon(newIcon);
     }
     if (circleRef.current) {
       circleRef.current.setLatLng([currentLat, currentLng]);
     }
-  }, [currentLat, currentLng]);
+  }, [currentLat, currentLng, data.ada, data.parsel, currentArea]);
 
   // Canlı Arama / Autocomplete
   useEffect(() => {
@@ -526,6 +583,20 @@ export const LocationStep: React.FC<LocationStepProps> = ({
               <span>Haritada Konumlandır</span>
             </button>
           </div>
+        </div>
+
+        {/* HARİTA KULLANIM İPUCU: FAREYLE SÜRÜKLE VEYA TIKLA */}
+        <div className="flex items-center justify-between px-3.5 py-2 bg-gradient-to-r from-blue-50 to-indigo-50/60 border border-blue-200/80 rounded-xl text-xs text-blue-950 shadow-2xs">
+          <div className="flex items-center gap-2">
+            <span className="text-base shrink-0">🖐️</span>
+            <span className="font-medium">
+              <strong className="font-extrabold text-blue-900">Pini farenizle (mouse) sürükleyip</strong> parselinizin tam üstüne taşıyabilir veya haritaya tıklayarak konumu milimetrik düzeltebilirsiniz.
+            </span>
+          </div>
+          <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-extrabold text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded-full border border-emerald-300/60 shrink-0">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+            Canlı Koordinat
+          </span>
         </div>
 
         {/* 3. GERÇEK ETKİLEŞİMLİ LEAFLET KADASTRO HARİTASI */}

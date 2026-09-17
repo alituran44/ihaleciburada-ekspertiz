@@ -1,4 +1,4 @@
-export type PropertyCategory = "arsa" | "konut";
+export type PropertyCategory = "arsa" | "konut" | "arazi" | "ticari";
 
 export type ZoningType = 
   | "konut" 
@@ -152,7 +152,7 @@ export interface LoanAnalysisResult {
 export interface ComparableListing {
   id: string;
   title: string;
-  category: "arsa" | "konut";
+  category: PropertyCategory;
   type: "satilik" | "kiralik";
   priceTL: number;
   areaM2: number;
