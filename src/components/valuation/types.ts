@@ -12,6 +12,7 @@ export interface ValuationFormData {
   ada: string;
   parsel: string;
   pafta: string;
+  tapuNiteligi?: string;
   pgaSeismicHazard: string;
   coordinates?: { lat: number; lng: number };
 
@@ -80,6 +81,7 @@ export const INITIAL_VALUATION_DATA: ValuationFormData = {
   ada: "48507",
   parsel: "1",
   pafta: "H29-D-12-B",
+  tapuNiteligi: "Kat Mülkiyeti / Mesken",
   pgaSeismicHazard: "0.140g",
   coordinates: { lat: 39.974, lng: 32.641 },
 

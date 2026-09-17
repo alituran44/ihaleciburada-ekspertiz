@@ -31,19 +31,50 @@ export const EndeksaValuationModal: React.FC<EndeksaValuationModalProps> = ({
   const [formData, setFormData] = useState<ValuationFormData>({
     ...INITIAL_VALUATION_DATA,
     service: initialService,
-    city: input.city || "Ankara",
-    district: input.district || "Etimesgut",
-    neighborhood: input.neighborhood || "Devlet Mah.",
-    ada: input.ada || "48507",
-    parsel: input.parsel || "1",
+    city: input.city || "Çanakkale",
+    district: input.district || "Merkez",
+    neighborhood: input.neighborhood || "Sarıbeyli Köyü",
+    ada: input.ada || "1357",
+    parsel: input.parsel || "4",
     grossAreaM2: input.areaM2 || 110,
     arsaAreaM2: input.areaM2 || 850,
-    araziAreaM2: input.areaM2 || 1170,
+    araziAreaM2: input.areaM2 || 1250,
+    coordinates: input.coordinates,
     searchQuery: input.neighborhood
       ? `${input.neighborhood} ${input.district} ${input.city}`
-      : "Referans Ankara Sitesi E Blok Devlet Mah Etimesgut Ankara",
+      : "Sarıbeyli Köyü Merkez Çanakkale",
     step: 1,
   });
+
+  // Dışarıdan (StartValuationModal veya Home aramasından) gelen input değişikliklerini anında uygula
+  React.useEffect(() => {
+    setFormData((prev) => ({
+      ...prev,
+      city: input.city || prev.city,
+      district: input.district || prev.district,
+      neighborhood: input.neighborhood || prev.neighborhood,
+      ada: input.ada || prev.ada,
+      parsel: input.parsel || prev.parsel,
+      coordinates: input.coordinates || prev.coordinates,
+      grossAreaM2: input.areaM2 || prev.grossAreaM2,
+      arsaAreaM2: input.areaM2 || prev.arsaAreaM2,
+      araziAreaM2: input.areaM2 || prev.araziAreaM2,
+      service: input.category === "konut" ? "konut" : "arsa",
+      searchQuery: input.neighborhood
+        ? `${input.neighborhood}, ${input.district}, ${input.city}`
+        : prev.searchQuery,
+    }));
+  }, [
+    input.city,
+    input.district,
+    input.neighborhood,
+    input.ada,
+    input.parsel,
+    input.areaM2,
+    input.category,
+    input.coordinates?.lat,
+    input.coordinates?.lng,
+  ]);
 
   const [isCalculating, setIsCalculating] = useState(false);
   const [isDashboardActive, setIsDashboardActive] = useState(false);

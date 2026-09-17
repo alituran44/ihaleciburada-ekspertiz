@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import L from "leaflet";
 import { ValuationFormData } from "./types";
-import { findFastLocationFromCoords } from "@/lib/turkeyLocations";
+import { findFastLocationFromCoords, getProvinceCoordinates } from "@/lib/turkeyLocations";
 import { 
   Search, 
   MapPin, 
@@ -60,6 +60,56 @@ export const LocationStep: React.FC<LocationStepProps> = ({
   const currentLat = data.coordinates?.lat || 39.974;
   const currentLng = data.coordinates?.lng || 32.641;
 
+  // Güncel Alan (m²) Değeri
+  const currentArea = 
+    data.service === "arsa" ? (data.arsaAreaM2 || 850) :
+    data.service === "arazi" ? (data.araziAreaM2 || 1250) :
+    data.service === "ticari" ? (data.commercialAreaM2 || 180) :
+    (data.grossAreaM2 || 110);
+
+  const handleAreaChange = (newArea: number) => {
+    if (data.service === "arsa") {
+      onChange({ arsaAreaM2: newArea });
+    } else if (data.service === "arazi") {
+      onChange({ araziAreaM2: newArea });
+    } else if (data.service === "ticari") {
+      onChange({ commercialAreaM2: newArea });
+    } else {
+      onChange({ grossAreaM2: newArea });
+    }
+  };
+
+  const handleLocateByText = async () => {
+    const q = `${data.neighborhood || ""}, ${data.district || ""}, ${data.city || ""}`.trim();
+    if (!q) return;
+
+    try {
+      const res = await fetch(`/api/location/search?q=${encodeURIComponent(q)}`);
+      const json = await res.json();
+      if (json.success && Array.isArray(json.results) && json.results.length > 0) {
+        const best = json.results[0];
+        onChange({
+          coordinates: { lat: best.lat, lng: best.lng },
+          searchQuery: `${best.label}, ${best.province}`,
+        });
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.flyTo([best.lat, best.lng], 16, { duration: 0.8 });
+        }
+        return;
+      }
+    } catch {
+      // Fallback
+    }
+
+    const provCoords = getProvinceCoordinates(data.city);
+    if (provCoords) {
+      onChange({ coordinates: provCoords });
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.flyTo([provCoords.lat, provCoords.lng], 14, { duration: 0.8 });
+      }
+    }
+  };
+
   // =========================================================================
   // LEAFLET MAP BAŞLATMA
   // =========================================================================
@@ -94,13 +144,14 @@ export const LocationStep: React.FC<LocationStepProps> = ({
     circleRef.current = circle;
 
     // Hedef Kadastro Pini
-    const customIcon = L.divIcon({
+    const buildPinIcon = (adaVal: string, parselVal: string, areaVal: number) => L.divIcon({
       className: "custom-kadastro-pin",
       html: `
         <div style="position: relative; display: flex; flex-direction: column; align-items: center; transform: translate(-50%, -100%); cursor: pointer;">
           <div style="background: #0F223D; color: #FCD34D; font-weight: 900; font-size: 11px; padding: 4px 10px; border-radius: 14px; border: 2px solid #FCD34D; box-shadow: 0 4px 12px rgba(0,0,0,0.3); white-space: nowrap; font-family: sans-serif; display: flex; align-items: center; gap: 4px;">
             <span>📍</span>
-            <span>Ada ${data.ada || "1357"} / Parsel ${data.parsel || "4"}</span>
+            <span>Ada ${adaVal || "1357"} / Parsel ${parselVal || "4"}</span>
+            <span style="color: #60A5FA; font-size: 10px; margin-left: 2px;">(${areaVal} m²)</span>
           </div>
           <div style="width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid #0F223D;"></div>
         </div>
@@ -108,7 +159,9 @@ export const LocationStep: React.FC<LocationStepProps> = ({
       iconSize: [0, 0],
     });
 
-    const marker = L.marker([currentLat, currentLng], { icon: customIcon }).addTo(map);
+    const marker = L.marker([currentLat, currentLng], { 
+      icon: buildPinIcon(data.ada, data.parsel, currentArea) 
+    }).addTo(map);
     markerRef.current = marker;
 
     // Harita Tıklama Dinleyicisi
@@ -128,7 +181,9 @@ export const LocationStep: React.FC<LocationStepProps> = ({
       });
 
       marker.setLatLng([clickLat, clickLng]);
-      circle.setLatLng([clickLat, clickLng]);
+      if (circleRef.current) {
+        circleRef.current.setLatLng([clickLat, clickLng]);
+      }
 
       // Arka planda cadde/mahalle detayını güncelle
       try {
@@ -360,58 +415,116 @@ export const LocationStep: React.FC<LocationStepProps> = ({
           )}
         </div>
 
-        {/* 2. DİNAMİK İL / İLÇE / MAHALLE / ADA / PARSEL GİRİŞ IZGARASI */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 p-3 rounded-xl bg-slate-50 border border-slate-200">
-          <div>
-            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">İl</label>
-            <input
-              type="text"
-              value={data.city}
-              onChange={(e) => onChange({ city: e.target.value })}
-              className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900 outline-none focus:border-blue-500"
-            />
+        {/* 2. DİNAMİK İL / İLÇE / KÖY / ADA / PARSEL / ALAN GİRİŞ BÖLÜMÜ */}
+        <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+            <span className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+              <Layers className="w-3.5 h-3.5 text-blue-600" />
+              <span>Resmi Kadastro & Parsel Bilgileri</span>
+            </span>
+            <span className="text-[11px] text-slate-500 font-medium">
+              Tüm alanları elle klavyeyle düzenleyebilir veya haritadan seçebilirsiniz
+            </span>
           </div>
 
-          <div>
-            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">İlçe</label>
-            <input
-              type="text"
-              value={data.district}
-              onChange={(e) => onChange({ district: e.target.value })}
-              className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900 outline-none focus:border-blue-500"
-            />
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+            {/* İL */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">İl</label>
+              <input
+                type="text"
+                value={data.city}
+                onChange={(e) => onChange({ city: e.target.value })}
+                placeholder="Örn: Çanakkale"
+                className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-200 transition"
+              />
+            </div>
+
+            {/* İLÇE */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">İlçe</label>
+              <input
+                type="text"
+                value={data.district}
+                onChange={(e) => onChange({ district: e.target.value })}
+                placeholder="Örn: Merkez"
+                className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-200 transition"
+              />
+            </div>
+
+            {/* KÖY / MAHALLE */}
+            <div>
+              <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">Köy / Mahalle</label>
+              <input
+                type="text"
+                value={data.neighborhood}
+                onChange={(e) => onChange({ neighborhood: e.target.value })}
+                placeholder="Örn: Sarıbeyli Köyü"
+                className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-200 transition"
+              />
+            </div>
+
+            {/* ADA NO */}
+            <div>
+              <label className="block text-[10px] font-bold text-amber-800 uppercase mb-1">Ada No</label>
+              <input
+                type="text"
+                value={data.ada}
+                onChange={(e) => onChange({ ada: e.target.value })}
+                placeholder="Örn: 1357"
+                className="w-full px-2.5 py-1.5 bg-white border border-amber-300 rounded-lg text-xs font-mono font-black text-amber-700 outline-none focus:border-amber-600 focus:ring-1 focus:ring-amber-200 transition"
+              />
+            </div>
+
+            {/* PARSEL NO */}
+            <div>
+              <label className="block text-[10px] font-bold text-amber-800 uppercase mb-1">Parsel No</label>
+              <input
+                type="text"
+                value={data.parsel}
+                onChange={(e) => onChange({ parsel: e.target.value })}
+                placeholder="Örn: 4"
+                className="w-full px-2.5 py-1.5 bg-white border border-amber-300 rounded-lg text-xs font-mono font-black text-amber-700 outline-none focus:border-amber-600 focus:ring-1 focus:ring-amber-200 transition"
+              />
+            </div>
+
+            {/* ALAN (m²) */}
+            <div>
+              <label className="block text-[10px] font-bold text-blue-900 uppercase mb-1">Alan (m²)</label>
+              <div className="relative flex items-center">
+                <input
+                  type="number"
+                  min={1}
+                  max={5000000}
+                  value={currentArea}
+                  onChange={(e) => handleAreaChange(Number(e.target.value))}
+                  placeholder="Örn: 1250"
+                  className="w-full px-2 py-1.5 pr-7 bg-white border border-blue-300 rounded-lg text-xs font-mono font-black text-slate-900 outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-200 transition [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
+                <span className="absolute right-1.5 text-[10px] font-bold text-slate-400 select-none pointer-events-none">
+                  m²
+                </span>
+              </div>
+            </div>
           </div>
 
-          <div>
-            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Mahalle</label>
-            <input
-              type="text"
-              value={data.neighborhood}
-              onChange={(e) => onChange({ neighborhood: e.target.value })}
-              className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900 outline-none focus:border-blue-500"
-            />
-          </div>
+          {/* TAPU NİTELİĞİ & HARİTADA KONUMLANDIR AKSİYONU */}
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-200/60">
+            <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-600">
+              <span>Tapu Niteliği:</span>
+              <span className="font-extrabold text-blue-900 bg-white px-2 py-0.5 rounded border border-slate-200">
+                {data.tapuNiteligi || (data.service === "konut" ? "Kat Mülkiyeti / Mesken" : data.service === "arazi" ? "Tarla" : data.service === "ticari" ? "Dükkan / Mağaza" : "İmarlı Arsa")}
+              </span>
+            </div>
 
-          <div>
-            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Ada No</label>
-            <input
-              type="text"
-              value={data.ada}
-              onChange={(e) => onChange({ ada: e.target.value })}
-              placeholder="Örn: 1357"
-              className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-mono font-bold text-amber-600 outline-none focus:border-blue-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Parsel No</label>
-            <input
-              type="text"
-              value={data.parsel}
-              onChange={(e) => onChange({ parsel: e.target.value })}
-              placeholder="Örn: 4"
-              className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-mono font-bold text-amber-600 outline-none focus:border-blue-500"
-            />
+            <button
+              type="button"
+              onClick={handleLocateByText}
+              className="px-3 py-1 bg-white hover:bg-blue-50 border border-slate-300 text-blue-700 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1 active:scale-95"
+            >
+              <MapPin className="w-3.5 h-3.5 text-blue-600" />
+              <span>Haritada Konumlandır</span>
+            </button>
           </div>
         </div>
 
@@ -463,11 +576,11 @@ export const LocationStep: React.FC<LocationStepProps> = ({
                 <span>{data.city} / {data.district} {data.neighborhood ? `• ${data.neighborhood}` : ""}</span>
               </span>
               <span className="font-mono text-slate-300 text-[11px]">
-                Ada: <strong className="text-white font-mono">{data.ada || "1357"}</strong> | Parsel: <strong className="text-white font-mono">{data.parsel || "4"}</strong> | Pafta: {data.pafta || "H29-D-12-B"}
+                Ada: <strong className="text-white font-mono">{data.ada || "1357"}</strong> | Parsel: <strong className="text-white font-mono">{data.parsel || "4"}</strong> | Alan: <strong className="text-amber-400 font-mono">{currentArea} m²</strong> | Pafta: {data.pafta || "H29-D-12-B"}
               </span>
             </div>
             <div className="text-slate-300 text-[10.5px] flex items-center justify-between">
-              <span>Mevcut Tapu Niteliği: <strong>{data.service === "konut" ? "Kat Mülkiyeti / Mesken" : "İmarlı Arsa Parseli"}</strong></span>
+              <span>Mevcut Tapu Niteliği: <strong>{data.tapuNiteligi || (data.service === "konut" ? "Kat Mülkiyeti / Mesken" : data.service === "arazi" ? "Tarla" : data.service === "ticari" ? "Dükkan / Mağaza" : "İmarlı Arsa")}</strong></span>
               <span className="text-emerald-400 font-bold flex items-center gap-1">
                 <CheckCircle2 className="w-3.5 h-3.5" />
                 Kadastro Tescili Doğrulandı

@@ -29,6 +29,7 @@ const EndeksaValuationModal = dynamic(
 );
 import { ElectronicReportModal } from "@/components/ElectronicReportModal";
 import { ReportSelectionModal, ReportPackageType } from "@/components/ReportSelectionModal";
+import { StartValuationModal, StartValuationPayload } from "@/components/valuation/StartValuationModal";
 import { ParcelInput } from "@/types";
 import { SAMPLE_SCENARIOS, formatTL, formatNumber } from "@/lib/constants";
 import { calculateFeasibility } from "@/lib/calculator";
@@ -69,6 +70,7 @@ export default function Home() {
   const [shareModalOpen, setShareModalOpen] = useState<boolean>(false);
   const [showElectronicReportModal, setShowElectronicReportModal] = useState<boolean>(false);
   const [showReportSelectionModal, setShowReportSelectionModal] = useState<boolean>(false);
+  const [showStartValuationModal, setShowStartValuationModal] = useState<boolean>(false);
   const [subTab, setSubTab] = useState<"deger" | "trend" | "rayic" | "best_use">("deger");
   const [valuationMode, setValuationMode] = useState<"otomatik" | "manuel">("otomatik");
   const [isEmsalOpen, setIsEmsalOpen] = useState<boolean>(true);
@@ -78,6 +80,25 @@ export default function Home() {
     `${SAMPLE_SCENARIOS[0].data.city}, ${SAMPLE_SCENARIOS[0].data.district}${SAMPLE_SCENARIOS[0].data.neighborhood ? `, ${SAMPLE_SCENARIOS[0].data.neighborhood}` : ""}`
   );
   const [isSearching, setIsSearching] = useState<boolean>(false);
+
+  // Yeni Değerleme Başlat Formu Gönderildiğinde
+  const handleStartValuationSubmit = (payload: StartValuationPayload) => {
+    setShowStartValuationModal(false);
+    const isRes = payload.category === "konut";
+    setParcelData((prev) => ({
+      ...prev,
+      category: isRes ? "konut" : "arsa",
+      city: payload.city,
+      district: payload.district,
+      neighborhood: payload.neighborhood,
+      ada: payload.ada,
+      parsel: payload.parsel,
+      areaM2: payload.areaM2,
+      coordinates: payload.coordinates || prev.coordinates,
+    }));
+    setSearchQuery(`${payload.neighborhood}, ${payload.district}, ${payload.city}`);
+    setActiveTab("degerleme");
+  };
 
   // Türkiye Geneli Canlı Konum Autocomplete Arama Durumu
   const [suggestions, setSuggestions] = useState<any[]>([]);
@@ -452,7 +473,7 @@ export default function Home() {
               {/* "Ekspertiz Başlat" Amber Butonu */}
               <button
                 type="button"
-                onClick={() => setActiveTab("degerleme")}
+                onClick={() => setShowStartValuationModal(true)}
                 className="hidden md:flex items-center gap-1.5 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white text-xs font-extrabold px-4 py-1.5 rounded-full shadow-xs transition active:scale-95 cursor-pointer shrink-0"
               >
                 <span>Ekspertiz Başlat</span>
@@ -1097,6 +1118,20 @@ export default function Home() {
         parcelText={`${parcelData.city}, ${parcelData.district}, ${parcelData.neighborhood || "Merkez"}, ${parcelData.ada || "48507"} Ada, ${parcelData.parsel || "1"} Parsel`}
         marketValueTL={calculation.fairMarketValueTL || 7900000}
         areaM2={parcelData.areaM2 || 110}
+      />
+
+      {/* Yeni Ekspertiz ve Değerleme Başlat Modalı (Ada, Parsel, İl, İlçe, Köy, Alan) */}
+      <StartValuationModal
+        isOpen={showStartValuationModal}
+        onClose={() => setShowStartValuationModal(false)}
+        onSubmit={handleStartValuationSubmit}
+        initialCity={parcelData.city || "Çanakkale"}
+        initialDistrict={parcelData.district || "Merkez"}
+        initialNeighborhood={parcelData.neighborhood || "Sarıbeyli Köyü"}
+        initialAda={parcelData.ada || "1357"}
+        initialParsel={parcelData.parsel || "4"}
+        initialAreaM2={parcelData.areaM2 || 1250}
+        initialCategory={parcelData.category === "konut" ? "konut" : "arazi"}
       />
     </div>
   );

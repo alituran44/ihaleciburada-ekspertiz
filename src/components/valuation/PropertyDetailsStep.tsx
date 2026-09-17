@@ -25,59 +25,139 @@ interface PropertyDetailsStepProps {
   onPrev: () => void;
 }
 
-export const PropertyDetailsStep: React.FC<PropertyDetailsStepProps> = ({
-  data,
-  onChange,
-  onNext,
-  onPrev,
+interface CounterInputProps {
+  label: string;
+  value: number;
+  onValChange: (v: number) => void;
+  min?: number;
+  max?: number;
+  step?: number;
+  unit?: string;
+  subtitle?: string;
+}
+
+// Sayaç ve Doğrudan Klavye Girişi Bileşeni (Elle yazılabilir & +/- butonlu)
+const CounterInput: React.FC<CounterInputProps> = ({
+  label,
+  value,
+  onValChange,
+  min = 0,
+  max = 99999,
+  step = 1,
+  unit = "",
+  subtitle,
 }) => {
-  // Sayaç Yardımcısı
-  const CounterInput = ({
-    label,
-    value,
-    onValChange,
-    min = 0,
-    max = 99999,
-    step = 1,
-    unit = "",
-    subtitle,
-  }: {
-    label: string;
-    value: number;
-    onValChange: (v: number) => void;
-    min?: number;
-    max?: number;
-    step?: number;
-    unit?: string;
-    subtitle?: string;
-  }) => (
-    <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-xl border border-slate-200 bg-white hover:border-slate-300 transition gap-2">
+  const [localVal, setLocalVal] = React.useState<string>(
+    value !== undefined && value !== null ? String(value) : "0"
+  );
+
+  React.useEffect(() => {
+    setLocalVal(value !== undefined && value !== null ? String(value) : "0");
+  }, [value]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    setLocalVal(raw);
+    if (raw === "" || raw === "-") {
+      return;
+    }
+    const parsed = parseFloat(raw);
+    if (!isNaN(parsed)) {
+      onValChange(parsed);
+    }
+  };
+
+  const handleBlur = () => {
+    let parsed = parseFloat(localVal);
+    if (isNaN(parsed)) {
+      parsed = min;
+    } else {
+      if (min !== undefined && parsed < min) parsed = min;
+      if (max !== undefined && parsed > max) parsed = max;
+    }
+    setLocalVal(String(parsed));
+    onValChange(parsed);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      (e.target as HTMLInputElement).blur();
+    }
+  };
+
+  const handleDecrement = () => {
+    const current = parseFloat(localVal);
+    const base = isNaN(current) ? value : current;
+    const nextVal = Math.max(min, Number((base - step).toFixed(2)));
+    setLocalVal(String(nextVal));
+    onValChange(nextVal);
+  };
+
+  const handleIncrement = () => {
+    const current = parseFloat(localVal);
+    const base = isNaN(current) ? value : current;
+    const nextVal = Math.min(max, Number((base + step).toFixed(2)));
+    setLocalVal(String(nextVal));
+    onValChange(nextVal);
+  };
+
+  return (
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-xl border border-slate-200 bg-white hover:border-slate-300 transition gap-2 shadow-2xs">
       <div>
         <div className="text-xs sm:text-sm font-bold text-slate-900">{label}</div>
         {subtitle && <div className="text-[11px] text-slate-500">{subtitle}</div>}
       </div>
-      <div className="flex items-center gap-2 shrink-0">
+      <div className="flex items-center gap-1.5 shrink-0">
         <button
           type="button"
-          onClick={() => onValChange(Math.max(min, Number((value - step).toFixed(2))))}
-          className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center font-bold text-sm transition active:scale-95 cursor-pointer"
+          onClick={handleDecrement}
+          title="Azalt (-)"
+          className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 flex items-center justify-center font-bold text-sm transition cursor-pointer"
         >
           <Minus className="w-3.5 h-3.5" />
         </button>
-        <div className="min-w-[64px] text-center font-mono font-extrabold text-slate-900 text-sm">
-          {value} {unit}
+
+        <div 
+          className="flex items-center h-8 bg-slate-50 border border-slate-200 hover:border-slate-300 focus-within:bg-white focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-100 rounded-lg px-2 transition group"
+          title="Elle sayı yazabilir veya +/- butonlarıyla değiştirebilirsiniz"
+        >
+          <input
+            type="number"
+            value={localVal}
+            onChange={handleInputChange}
+            onBlur={handleBlur}
+            onKeyDown={handleKeyDown}
+            onFocus={(e) => e.target.select()}
+            step={step}
+            aria-label={label}
+            className="w-14 sm:w-16 text-center font-mono font-black text-slate-900 text-sm bg-transparent outline-none focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none cursor-text"
+          />
+          {unit && (
+            <span className="text-xs font-bold text-slate-500 select-none ml-1 shrink-0">
+              {unit}
+            </span>
+          )}
         </div>
+
         <button
           type="button"
-          onClick={() => onValChange(Math.min(max, Number((value + step).toFixed(2))))}
-          className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center font-bold text-sm transition active:scale-95 cursor-pointer"
+          onClick={handleIncrement}
+          title="Artır (+)"
+          className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 flex items-center justify-center font-bold text-sm transition cursor-pointer"
         >
           <Plus className="w-3.5 h-3.5" />
         </button>
       </div>
     </div>
   );
+};
 
+export const PropertyDetailsStep: React.FC<PropertyDetailsStepProps> = ({
+  data,
+  onChange,
+  onNext,
+  onPrev,
+}) => {
   return (
     <div className="w-full max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
       {/* SOL ANA PANEL: Dinamik Mülk Formu */}
@@ -91,7 +171,7 @@ export const PropertyDetailsStep: React.FC<PropertyDetailsStepProps> = ({
             Taşınmazın Teknik Detaylarını Belirtin
           </h2>
           <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">
-            Gireceğiniz her detay yapay zeka algoritmasının değerleme hassasiyetini ve güven aralığını artırır.
+            Gireceğiniz her detay yapay zeka algoritmasının değerleme hassasiyetini ve güven aralığını artırır. Değerleri klavyenizle doğrudan yazabilir veya sayaç butonlarıyla ayarlayabilirsiniz.
           </p>
         </div>
 
@@ -223,7 +303,7 @@ export const PropertyDetailsStep: React.FC<PropertyDetailsStepProps> = ({
               </div>
             </div>
 
-            {/* Sayısal Sayaçlar */}
+            {/* Sayısal Sayaçlar & Manuel Klavye Girişi */}
             <div className="space-y-3 pt-2">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <CounterInput
@@ -231,28 +311,28 @@ export const PropertyDetailsStep: React.FC<PropertyDetailsStepProps> = ({
                   value={data.roomCount}
                   onValChange={(v) => onChange({ roomCount: v })}
                   min={1}
-                  max={12}
+                  max={20}
                 />
                 <CounterInput
                   label="Salon Sayısı"
                   value={data.livingRoomCount}
                   onValChange={(v) => onChange({ livingRoomCount: v })}
                   min={0}
-                  max={5}
+                  max={10}
                 />
                 <CounterInput
                   label="Banyo Sayısı"
                   value={data.bathroomCount}
                   onValChange={(v) => onChange({ bathroomCount: v })}
                   min={1}
-                  max={6}
+                  max={10}
                 />
                 <CounterInput
                   label="Brüt Alan"
                   value={data.grossAreaM2}
                   onValChange={(v) => onChange({ grossAreaM2: v })}
-                  min={30}
-                  max={1000}
+                  min={10}
+                  max={10000}
                   step={5}
                   unit="m²"
                   subtitle="Duvarlar ve balkonlar dahil"
@@ -262,7 +342,7 @@ export const PropertyDetailsStep: React.FC<PropertyDetailsStepProps> = ({
                   value={data.buildingAge}
                   onValChange={(v) => onChange({ buildingAge: v })}
                   min={0}
-                  max={70}
+                  max={120}
                   unit="Yıl"
                   subtitle="0 = Sıfır Yeni Bina"
                 />
@@ -270,8 +350,8 @@ export const PropertyDetailsStep: React.FC<PropertyDetailsStepProps> = ({
                   label="Bulunduğu Kat"
                   value={data.floorNumber}
                   onValChange={(v) => onChange({ floorNumber: v })}
-                  min={-5}
-                  max={60}
+                  min={-10}
+                  max={100}
                   subtitle="0 = Giriş, -1 = Bodrum/Kot"
                 />
                 <CounterInput
@@ -279,14 +359,15 @@ export const PropertyDetailsStep: React.FC<PropertyDetailsStepProps> = ({
                   value={data.totalFloors}
                   onValChange={(v) => onChange({ totalFloors: v })}
                   min={1}
-                  max={60}
+                  max={100}
                 />
                 <CounterInput
                   label="Açık Teras Alanı"
                   value={data.terraceAreaM2}
                   onValChange={(v) => onChange({ terraceAreaM2: v })}
                   min={0}
-                  max={300}
+                  max={2000}
+                  step={5}
                   unit="m²"
                   subtitle="Brüt alana dahil değilse"
                 />
