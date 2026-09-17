@@ -33,16 +33,16 @@ export const EndeksaValuationModal: React.FC<EndeksaValuationModalProps> = ({
     service: initialService,
     city: input.city || "Çanakkale",
     district: input.district || "Merkez",
-    neighborhood: input.neighborhood || "Sarıbeyli Köyü",
-    ada: input.ada || "1357",
-    parsel: input.parsel || "4",
-    grossAreaM2: input.areaM2 || 110,
+    neighborhood: input.neighborhood || "Kepez",
+    ada: input.ada || "117",
+    parsel: input.parsel || "9",
+    grossAreaM2: input.areaM2 || 135,
     arsaAreaM2: input.areaM2 || 850,
     araziAreaM2: input.areaM2 || 1250,
-    coordinates: input.coordinates,
+    coordinates: input.coordinates || { lat: 40.1172, lng: 26.4022 },
     searchQuery: input.neighborhood
-      ? `${input.neighborhood} ${input.district} ${input.city}`
-      : "Sarıbeyli Köyü Merkez Çanakkale",
+      ? `${input.neighborhood}, ${input.district}, ${input.city}`
+      : "Kepez, Merkez, Çanakkale",
     step: 1,
   });
 

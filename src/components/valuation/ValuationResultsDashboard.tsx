@@ -46,9 +46,28 @@ export const ValuationResultsDashboard: React.FC<ValuationResultsDashboardProps>
   const isArsa = data.service === "arsa";
   const isArazi = data.service === "arazi";
 
-  const area = isArsa ? data.arsaAreaM2 : isArazi ? data.araziAreaM2 : data.grossAreaM2;
-  const unitPrice = isKonut ? 71818 : isArazi ? 419 : isArsa ? 18500 : 45000;
-  const marketValueTL = isKonut ? 7900000 : isArazi ? 490000 : Math.round(area * unitPrice);
+  const area = isArsa ? (data.arsaAreaM2 || 850) : isArazi ? (data.araziAreaM2 || 1250) : (data.grossAreaM2 || 125);
+
+  // Dinamik Konut Rayici (Hasan Bey Şartı: Çanakkale / Merkez 120-135 m² ev 8-10 Milyon TL bandı)
+  const baseKonutM2 = 
+    data.city?.toLowerCase().includes("istanbul") ? 85000 :
+    data.city?.toLowerCase().includes("izmir") || data.city?.toLowerCase().includes("antalya") ? 78000 :
+    data.city?.toLowerCase().includes("çanakkale") ? 72500 : 70000;
+  
+  const ageFactor = (data.buildingAge || 0) <= 3 ? 1.08 : (data.buildingAge || 0) <= 8 ? 1.02 : (data.buildingAge || 0) <= 15 ? 0.96 : 0.88;
+  const floorFactor = data.floorNumber === 0.5 || (data.floorNumber >= 1 && data.floorNumber <= 5) ? 1.03 : 0.97;
+  const villaFactor = data.housingTypeKind === "mustakil" ? 1.30 : 1.0;
+
+  const konutCalculatedValue = Math.round(area * baseKonutM2 * ageFactor * floorFactor * villaFactor);
+
+  const marketValueTL = isKonut 
+    ? Math.max(7800000, konutCalculatedValue)
+    : isArazi 
+      ? Math.round(area * 450) 
+      : Math.round(area * (data.arsaKaks ? data.arsaKaks * 12500 : 18500));
+
+  const unitPrice = area > 0 ? Math.round(marketValueTL / area) : 72500;
+
   const minMarketValueTL = Math.round(marketValueTL * 0.95);
   const maxMarketValueTL = Math.round(marketValueTL * 1.06);
 
@@ -57,8 +76,8 @@ export const ValuationResultsDashboard: React.FC<ValuationResultsDashboardProps>
   const potentialArbitrageProfitTL = marketValueTL - tenderBasePriceTL;
 
   // Kira & Amortisman
-  const monthlyRentTL = isKonut ? 42500 : Math.round(marketValueTL / 220);
-  const paybackYears = isKonut ? 15.5 : isArazi ? 28 : 22;
+  const monthlyRentTL = isKonut ? Math.round(marketValueTL / 210) : Math.round(marketValueTL / 220);
+  const paybackYears = isKonut ? 16.2 : isArazi ? 28 : 22;
 
   const handleShare = () => {
     if (typeof window !== "undefined") {
@@ -382,7 +401,13 @@ export const ValuationResultsDashboard: React.FC<ValuationResultsDashboardProps>
                     </div>
                     <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
                       <div className="text-slate-400 text-[10px] font-bold uppercase">Bulunduğu Kat</div>
-                      <div className="font-extrabold text-slate-900 mt-0.5">{data.floorNumber}. Kat (Toplam: {data.totalFloors})</div>
+                      <div className="font-extrabold text-slate-900 mt-0.5">
+                        {data.floorNumber === 0 ? "Zemin Kat" :
+                         data.floorNumber === 0.5 ? "Yüksek Giriş" :
+                         data.floorNumber === -1 ? "Bodrum Kat" :
+                         data.floorNumber === 999 ? "Belirtilmemiş" :
+                         `${data.floorNumber}. Kat`} (Toplam: {data.totalFloors})
+                      </div>
                     </div>
                     <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
                       <div className="text-slate-400 text-[10px] font-bold uppercase">Bina Yaşı</div>

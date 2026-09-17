@@ -48,11 +48,11 @@ export const StartValuationModal: React.FC<StartValuationModalProps> = ({
   onSubmit,
   initialCity = "Çanakkale",
   initialDistrict = "Merkez",
-  initialNeighborhood = "Sarıbeyli Köyü",
-  initialAda = "1357",
-  initialParsel = "4",
-  initialAreaM2 = 1250,
-  initialCategory = "arazi",
+  initialNeighborhood = "Kepez",
+  initialAda = "117",
+  initialParsel = "9",
+  initialAreaM2 = 135,
+  initialCategory = "konut",
 }) => {
   const [category, setCategory] = useState<"konut" | "arsa" | "arazi" | "ticari">(initialCategory);
   const [city, setCity] = useState(initialCity);
@@ -61,7 +61,7 @@ export const StartValuationModal: React.FC<StartValuationModalProps> = ({
   const [ada, setAda] = useState(initialAda);
   const [parsel, setParsel] = useState(initialParsel);
   const [areaM2, setAreaM2] = useState(initialAreaM2);
-  const [tapuNiteligi, setTapuNiteligi] = useState("Tarla");
+  const [tapuNiteligi, setTapuNiteligi] = useState("Kat Mülkiyeti / Mesken");
 
   if (!isOpen) return null;
 
@@ -408,17 +408,17 @@ export const StartValuationModal: React.FC<StartValuationModalProps> = ({
                 type="button"
                 onClick={() => applyPreset({
                   cat: "konut",
-                  city: "Ankara",
-                  dist: "Etimesgut",
-                  neigh: "Devlet Mah.",
-                  ada: "48507",
-                  parsel: "1",
-                  area: 110,
+                  city: "Çanakkale",
+                  dist: "Merkez",
+                  neigh: "Kepez",
+                  ada: "117",
+                  parsel: "9",
+                  area: 135,
                   nit: "Kat Mülkiyeti / Mesken",
                 })}
                 className="text-left px-2.5 py-1.5 rounded-lg bg-slate-50 hover:bg-blue-50 border border-slate-200 text-[11px] text-slate-700 transition"
               >
-                🏠 <strong>Ankara Etimesgut</strong> (48507/1 - 110 m²)
+                🏠 <strong>Çanakkale Kepez</strong> (117/9 - 135 m² Konut)
               </button>
 
               <button

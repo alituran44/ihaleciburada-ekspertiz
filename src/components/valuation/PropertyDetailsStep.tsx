@@ -347,14 +347,70 @@ export const PropertyDetailsStep: React.FC<PropertyDetailsStepProps> = ({
                   unit="Yıl"
                   subtitle="0 = Sıfır Yeni Bina"
                 />
-                <CounterInput
-                  label="Bulunduğu Kat"
-                  value={data.floorNumber}
-                  onValChange={(v) => onChange({ floorNumber: v })}
-                  min={-10}
-                  max={100}
-                  subtitle="0 = Giriş, -1 = Bodrum/Kot"
-                />
+                {/* Bulunduğu Kat Seçimi (Zemin, Yüksek Giriş, 1, 2, 3, 4, 5, 6... Bilgi Yok) */}
+                <div className="p-3.5 rounded-xl border border-slate-200 bg-white hover:border-slate-300 transition space-y-2.5 shadow-2xs sm:col-span-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-xs sm:text-sm font-bold text-slate-900 flex items-center gap-2">
+                        <span>Bulunduğu Kat</span>
+                        <span className="text-[10px] font-extrabold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full">
+                          {data.floorNumber === 0 ? "Zemin Kat" :
+                           data.floorNumber === 0.5 ? "Yüksek Giriş" :
+                           data.floorNumber === -1 ? "Bodrum Kat" :
+                           data.floorNumber === 999 ? "Bilgi Yok / Bilinmiyor" :
+                           `${data.floorNumber}. Kat`}
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-slate-500">
+                        Taşınmazın yer aldığı kat seviyesini doğrudan seçin
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] font-bold text-slate-400">Elle:</span>
+                      <input
+                        type="number"
+                        min={-5}
+                        max={100}
+                        value={data.floorNumber === 999 ? "" : data.floorNumber}
+                        onChange={(e) => onChange({ floorNumber: e.target.value === "" ? 999 : Number(e.target.value) })}
+                        placeholder="Kat"
+                        className="w-14 h-7 text-center font-mono font-bold text-xs bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-blue-600 focus:bg-white transition [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5 pt-0.5">
+                    {[
+                      { val: 0, label: "Zemin" },
+                      { val: 0.5, label: "Yüksek Giriş" },
+                      { val: 1, label: "1. Kat" },
+                      { val: 2, label: "2. Kat" },
+                      { val: 3, label: "3. Kat" },
+                      { val: 4, label: "4. Kat" },
+                      { val: 5, label: "5. Kat" },
+                      { val: 6, label: "6. Kat" },
+                      { val: -1, label: "Bodrum" },
+                      { val: 999, label: "Bilgi Yok" },
+                    ].map((f) => {
+                      const isSelected = data.floorNumber === f.val;
+                      return (
+                        <button
+                          key={f.val}
+                          type="button"
+                          onClick={() => onChange({ floorNumber: f.val })}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                            isSelected
+                              ? "bg-[#0B1E3B] text-white shadow-2xs font-black"
+                              : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                          }`}
+                        >
+                          {f.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
                 <CounterInput
                   label="Binadaki Toplam Kat"
                   value={data.totalFloors}

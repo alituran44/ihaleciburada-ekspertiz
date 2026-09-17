@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import L from "leaflet";
 import { ValuationFormData } from "./types";
-import { findFastLocationFromCoords, getProvinceCoordinates } from "@/lib/turkeyLocations";
+import { findFastLocationFromCoords, getProvinceCoordinates, getDistrictCoordinates } from "@/lib/turkeyLocations";
 import { 
   Search, 
   MapPin, 
@@ -17,7 +17,8 @@ import {
   Sparkles,
   Building,
   Plus,
-  Minus
+  Minus,
+  Loader2
 } from "lucide-react";
 
 interface LocationStepProps {
@@ -46,26 +47,29 @@ export const LocationStep: React.FC<LocationStepProps> = ({
   const mapInstanceRef = useRef<L.Map | null>(null);
   const markerRef = useRef<L.Marker | null>(null);
   const circleRef = useRef<L.Circle | null>(null);
+  const activeTileLayerRef = useRef<L.TileLayer | null>(null);
 
   const [suggestions, setSuggestions] = useState<SuggestionItem[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
+  const [mapLayerType, setMapLayerType] = useState<"satellite" | "streets">("satellite");
 
   const serviceLabel = 
     data.service === "konut" ? "Konut & Daire" :
     data.service === "arsa" ? "İmarlı Arsa" :
     data.service === "arazi" ? "Tarla & Arazi" : "Ticari Gayrimenkul";
 
-  const currentLat = data.coordinates?.lat || 39.974;
-  const currentLng = data.coordinates?.lng || 32.641;
+  // Varsayılan Koordinat (Çanakkale Kepez 40.1172, 26.4022)
+  const currentLat = data.coordinates?.lat || 40.1172;
+  const currentLng = data.coordinates?.lng || 26.4022;
 
   // Güncel Alan (m²) Değeri
   const currentArea = 
     data.service === "arsa" ? (data.arsaAreaM2 || 850) :
     data.service === "arazi" ? (data.araziAreaM2 || 1250) :
     data.service === "ticari" ? (data.commercialAreaM2 || 180) :
-    (data.grossAreaM2 || 110);
+    (data.grossAreaM2 || 125);
 
   const handleAreaChange = (newArea: number) => {
     if (data.service === "arsa") {
@@ -79,35 +83,78 @@ export const LocationStep: React.FC<LocationStepProps> = ({
     }
   };
 
-  const handleLocateByText = async () => {
-    const q = `${data.neighborhood || ""}, ${data.district || ""}, ${data.city || ""}`.trim();
-    if (!q) return;
+  // Harita Katmanı Değiştirme (Uydu / Harita)
+  const handleSwitchMapLayer = (layer: "satellite" | "streets") => {
+    setMapLayerType(layer);
+    if (!mapInstanceRef.current || !activeTileLayerRef.current) return;
+    mapInstanceRef.current.removeLayer(activeTileLayerRef.current);
+    const L = (window as any).L;
+    if (!L) return;
+    const url = layer === "satellite" 
+      ? "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"
+      : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+    const newLayer = L.tileLayer(url, {
+      maxZoom: layer === "satellite" ? 20 : 19,
+      attribution: layer === "satellite" ? '© Google Uydu • TKGM Kadastro' : '© OpenStreetMap • İhaleciBurada',
+    }).addTo(mapInstanceRef.current);
+    activeTileLayerRef.current = newLayer;
+  };
 
-    try {
-      const res = await fetch(`/api/location/search?q=${encodeURIComponent(q)}`);
-      const json = await res.json();
-      if (json.success && Array.isArray(json.results) && json.results.length > 0) {
-        const best = json.results[0];
-        onChange({
-          coordinates: { lat: best.lat, lng: best.lng },
-          searchQuery: `${best.label}, ${best.province}`,
-        });
-        if (mapInstanceRef.current) {
-          mapInstanceRef.current.flyTo([best.lat, best.lng], 16, { duration: 0.8 });
+  // Akıllı ve Kesin Koordinat Çözümleme (Köy/Mahalle -> İlçe -> İl Hiyerarşisi)
+  const handleLocateCoordinates = async () => {
+    setIsLocating(true);
+    const cleanCity = (data.city || "").trim();
+    const cleanDistrict = (data.district || "").trim();
+    const cleanNeigh = (data.neighborhood || "").trim();
+
+    let resolvedCoords: { lat: number; lng: number } | null = null;
+    let resolvedLabel = `${cleanNeigh ? cleanNeigh + ", " : ""}${cleanDistrict ? cleanDistrict + ", " : ""}${cleanCity}`;
+
+    // 1. AŞAMA: Köy + İlçe + İl Arama (Nominatim API)
+    if (cleanNeigh && cleanDistrict) {
+      try {
+        const q = `${cleanNeigh}, ${cleanDistrict}, ${cleanCity}`;
+        const res = await fetch(`/api/location/search?q=${encodeURIComponent(q)}`);
+        const json = await res.json();
+        if (json.success && Array.isArray(json.results) && json.results.length > 0) {
+          const best = json.results[0];
+          if (best.lat && best.lng) {
+            resolvedCoords = { lat: Number(best.lat), lng: Number(best.lng) };
+            resolvedLabel = `${best.label}, ${best.province}`;
+          }
         }
-        return;
+      } catch (err) {
+        console.warn("Köy araması tamamlanamadı, ilçe koordinatına geçiliyor:", err);
       }
-    } catch {
-      // Fallback
     }
 
-    const provCoords = getProvinceCoordinates(data.city);
-    if (provCoords) {
-      onChange({ coordinates: provCoords });
+    // 2. AŞAMA: 973 İlçe Koordinatı Fallback (0ms yerel kesin koordinat)
+    if (!resolvedCoords && cleanDistrict) {
+      resolvedCoords = getDistrictCoordinates(cleanCity, cleanDistrict);
+    }
+
+    // 3. AŞAMA: 81 İl Koordinatı Fallback
+    if (!resolvedCoords && cleanCity) {
+      resolvedCoords = getProvinceCoordinates(cleanCity);
+    }
+
+    if (resolvedCoords) {
+      onChange({
+        coordinates: resolvedCoords,
+        searchQuery: resolvedLabel,
+      });
       if (mapInstanceRef.current) {
-        mapInstanceRef.current.flyTo([provCoords.lat, provCoords.lng], 14, { duration: 0.8 });
+        mapInstanceRef.current.flyTo([resolvedCoords.lat, resolvedCoords.lng], 16, { duration: 0.8 });
+      }
+      if (markerRef.current) {
+        markerRef.current.setLatLng([resolvedCoords.lat, resolvedCoords.lng]);
+      }
+      if (circleRef.current) {
+        circleRef.current.setLatLng([resolvedCoords.lat, resolvedCoords.lng]);
       }
     }
+
+    setIsLocating(false);
   };
 
   // =========================================================================
@@ -125,11 +172,12 @@ export const LocationStep: React.FC<LocationStepProps> = ({
       wheelPxPerZoomLevel: 60,
     });
 
-    // Açık Sokak Görünümü (OpenStreetMap)
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19,
-      attribution: '© OpenStreetMap • İhaleciBurada GIS',
+    // Google Hybrid Uydu Katmanı (Varsayılan - Yüksek Çözünürlüklü Uydu + Cadde/Sokak Etiketleri)
+    const initialLayer = L.tileLayer("https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}", {
+      maxZoom: 20,
+      attribution: '© Google Uydu • TKGM Kadastro',
     }).addTo(map);
+    activeTileLayerRef.current = initialLayer;
 
     // 250m Etki Çemberi
     const circle = L.circle([currentLat, currentLng], {
@@ -434,16 +482,15 @@ export const LocationStep: React.FC<LocationStepProps> = ({
 
               <button
                 type="button"
-                onClick={() => {
-                  if (suggestions.length > 0) {
-                    handleSelectSuggestion(suggestions[0]);
-                  } else {
-                    onNext();
-                  }
-                }}
-                className="px-4 py-2 rounded-lg bg-[#0F223D] hover:bg-slate-900 text-amber-400 font-extrabold text-xs shadow-xs transition cursor-pointer flex items-center gap-1.5 active:scale-95"
+                onClick={handleLocateCoordinates}
+                disabled={isLocating}
+                className="px-4 py-2 rounded-lg bg-[#0F223D] hover:bg-slate-900 disabled:opacity-60 text-amber-400 font-extrabold text-xs shadow-xs transition cursor-pointer flex items-center gap-1.5 active:scale-95"
               >
-                <Search className="w-3.5 h-3.5" />
+                {isLocating ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" />
+                ) : (
+                  <Search className="w-3.5 h-3.5" />
+                )}
                 <span className="hidden sm:inline">Konumu Doğrula</span>
               </button>
             </div>
@@ -576,10 +623,15 @@ export const LocationStep: React.FC<LocationStepProps> = ({
 
             <button
               type="button"
-              onClick={handleLocateByText}
-              className="px-3 py-1 bg-white hover:bg-blue-50 border border-slate-300 text-blue-700 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1 active:scale-95"
+              onClick={handleLocateCoordinates}
+              disabled={isLocating}
+              className="px-3 py-1 bg-white hover:bg-blue-50 border border-slate-300 text-blue-700 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1 active:scale-95 disabled:opacity-60"
             >
-              <MapPin className="w-3.5 h-3.5 text-blue-600" />
+              {isLocating ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" />
+              ) : (
+                <MapPin className="w-3.5 h-3.5 text-blue-600" />
+              )}
               <span>Haritada Konumlandır</span>
             </button>
           </div>
@@ -599,7 +651,7 @@ export const LocationStep: React.FC<LocationStepProps> = ({
           </span>
         </div>
 
-        {/* 3. GERÇEK ETKİLEŞİMLİ LEAFLET KADASTRO HARİTASI */}
+        {/* 3. GERÇEK ETKİLEŞİMLİ LEAFLET KADASTRO HARİTASI (UYDU GÖRÜNTÜSÜ) */}
         <div className="relative rounded-2xl overflow-hidden border border-slate-300 h-72 sm:h-80 bg-slate-100 shadow-inner">
           <div ref={mapContainerRef} className="w-full h-full" />
 
@@ -611,8 +663,34 @@ export const LocationStep: React.FC<LocationStepProps> = ({
             </div>
           </div>
 
-          {/* Sağ Üst: Deprem Risk PGA Rozeti */}
-          <div className="absolute top-3 right-3 z-[400] pointer-events-none">
+          {/* Sağ Üst: Katman Değiştirici (Uydu / Harita) */}
+          <div className="absolute top-3 right-3 z-[400] flex items-center bg-slate-950/85 backdrop-blur-md rounded-xl p-1 border border-white/10 shadow-lg">
+            <button
+              type="button"
+              onClick={() => handleSwitchMapLayer("satellite")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                mapLayerType === "satellite"
+                  ? "bg-amber-500 text-slate-950 font-black shadow-xs"
+                  : "text-slate-300 hover:text-white"
+              }`}
+            >
+              <span>🛰️ Uydu Görünümü</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSwitchMapLayer("streets")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                mapLayerType === "streets"
+                  ? "bg-white text-slate-950 font-black shadow-xs"
+                  : "text-slate-300 hover:text-white"
+              }`}
+            >
+              <span>🗺️ Harita</span>
+            </button>
+          </div>
+
+          {/* Sol Alt: Deprem Risk PGA Rozeti */}
+          <div className="absolute bottom-16 left-3 z-[400] pointer-events-none">
             <div className="px-3 py-1.5 rounded-lg bg-slate-950/85 backdrop-blur-md text-white text-[11px] font-bold border border-white/10 flex items-center gap-1.5 shadow-md">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
               <span>PGA Deprem İvmesi: {data.pgaSeismicHazard}</span>
