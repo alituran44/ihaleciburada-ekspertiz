@@ -6,7 +6,11 @@ import {
   X, 
   Printer, 
   ChevronLeft, 
-  ChevronRight
+  ChevronRight,
+  Download,
+  Loader2,
+  CheckCircle2,
+  ChevronDown
 } from "lucide-react";
 import { ValuationFormData } from "./valuation/types";
 import { ReportPagesContent } from "./ReportPagesContent";
@@ -35,6 +39,13 @@ export const ElectronicReportModal: React.FC<ElectronicReportModalProps> = ({
   areaM2,
 }) => {
   const [currentPage, setCurrentPage] = useState<number>(1);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState<boolean>(false);
+  const [pdfProgress, setPdfProgress] = useState<{ current: number; total: number; stage: string }>({
+    current: 0,
+    total: 13,
+    stage: "",
+  });
+  const [showPdfOptions, setShowPdfOptions] = useState<boolean>(false);
   const totalPages = 13;
 
   if (!isOpen) return null;
@@ -111,6 +122,117 @@ export const ElectronicReportModal: React.FC<ElectronicReportModalProps> = ({
       setTimeout(() => {
         document.title = originalTitle;
       }, 1500);
+    }
+  };
+
+  const handleDownloadFullPdf = async () => {
+    setIsGeneratingPdf(true);
+    setShowPdfOptions(false);
+    setPdfProgress({ current: 0, total: totalPages, stage: "PDF motoru başlatılıyor..." });
+
+    try {
+      const { jsPDF } = await import("jspdf");
+      const html2canvas = (await import("html2canvas")).default;
+
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4",
+        compress: true,
+      });
+
+      for (let p = 1; p <= totalPages; p++) {
+        setPdfProgress({
+          current: p,
+          total: totalPages,
+          stage: `Sayfa ${p} / ${totalPages} derleniyor...`,
+        });
+
+        const pageElement = document.getElementById(`pdf-capture-page-${p}`);
+        if (!pageElement) continue;
+
+        const canvas = await html2canvas(pageElement, {
+          scale: 1.5,
+          useCORS: true,
+          allowTaint: true,
+          logging: false,
+          backgroundColor: "#ffffff",
+          width: 794,
+          windowWidth: 794,
+        });
+
+        const imgData = canvas.toDataURL("image/jpeg", 0.90);
+        if (p > 1) {
+          pdf.addPage("a4", "portrait");
+        }
+        pdf.addImage(imgData, "JPEG", 0, 0, 210, 297, undefined, "FAST");
+
+        // Clean up memory
+        canvas.width = 0;
+        canvas.height = 0;
+      }
+
+      setPdfProgress({
+        current: totalPages,
+        total: totalPages,
+        stage: "Dosya kaydediliyor...",
+      });
+
+      const fileName = `IhaleciBurada_Ekspertiz_Raporu_${city}_${ada}_${parsel}.pdf`;
+      pdf.save(fileName);
+
+      setTimeout(() => {
+        setIsGeneratingPdf(false);
+      }, 1000);
+    } catch (error) {
+      console.error("PDF oluşturma hatası:", error);
+      alert("Doğrudan PDF oluşturulurken bir sorun oluştu. Yazdır / PDF seçeneği ile kaydedebilirsiniz.");
+      setIsGeneratingPdf(false);
+    }
+  };
+
+  const handleDownloadSinglePage = async (pageNumber: number) => {
+    setIsGeneratingPdf(true);
+    setShowPdfOptions(false);
+    setPdfProgress({ current: 1, total: 1, stage: `Sayfa ${pageNumber} hazırlanıyor...` });
+
+    try {
+      const { jsPDF } = await import("jspdf");
+      const html2canvas = (await import("html2canvas")).default;
+
+      const pageElement = document.getElementById(`pdf-capture-page-${pageNumber}`);
+      if (!pageElement) throw new Error("Sayfa bulunamadı");
+
+      const canvas = await html2canvas(pageElement, {
+        scale: 1.5,
+        useCORS: true,
+        allowTaint: true,
+        logging: false,
+        backgroundColor: "#ffffff",
+        width: 794,
+        windowWidth: 794,
+      });
+
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4",
+        compress: true,
+      });
+
+      const imgData = canvas.toDataURL("image/jpeg", 0.90);
+      pdf.addImage(imgData, "JPEG", 0, 0, 210, 297, undefined, "FAST");
+
+      const fileName = `IhaleciBurada_Rapor_Sayfa_${pageNumber}_${city}_${ada}_${parsel}.pdf`;
+      pdf.save(fileName);
+
+      setTimeout(() => {
+        setIsGeneratingPdf(false);
+      }, 800);
+    } catch (error) {
+      console.error("Tek sayfa PDF hatası:", error);
+      alert("Sayfa PDF oluşturulamadı.");
+      setIsGeneratingPdf(false);
     }
   };
 
@@ -220,13 +342,62 @@ export const ElectronicReportModal: React.FC<ElectronicReportModalProps> = ({
                 </button>
               </div>
 
+              {/* DİREKT PDF İNDİR BUTONU & MENÜSÜ */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowPdfOptions(!showPdfOptions)}
+                  disabled={isGeneratingPdf}
+                  className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs shadow-emerald-950/40 disabled:opacity-50"
+                  title="PDF Dosyası Olarak İndir"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>PDF İndir</span>
+                  <ChevronDown className="w-3 h-3 opacity-80" />
+                </button>
+
+                {showPdfOptions && (
+                  <div className="absolute right-0 mt-2 w-64 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl p-2 z-50 text-xs animate-in fade-in zoom-in-95 duration-150">
+                    <button
+                      type="button"
+                      onClick={handleDownloadFullPdf}
+                      className="w-full text-left p-2.5 rounded-lg hover:bg-slate-800 text-white font-bold flex items-center gap-2.5 transition cursor-pointer"
+                    >
+                      <div className="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-500/30 text-amber-400 flex items-center justify-center font-black text-xs shrink-0">
+                        13
+                      </div>
+                      <div>
+                        <div className="text-slate-100 font-bold">13 Sayfa Tam Rapor</div>
+                        <div className="text-[10px] text-slate-400 font-normal">Resmi SPK/BDDK Ekspertiz (.pdf)</div>
+                      </div>
+                    </button>
+
+                    <div className="my-1 border-t border-slate-800" />
+
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadSinglePage(currentPage)}
+                      className="w-full text-left p-2.5 rounded-lg hover:bg-slate-800 text-slate-200 hover:text-white flex items-center gap-2.5 transition cursor-pointer"
+                    >
+                      <div className="w-7 h-7 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 flex items-center justify-center font-black text-xs shrink-0">
+                        {currentPage}
+                      </div>
+                      <div>
+                        <div className="font-bold text-slate-200">Görüntülenen Sayfayı İndir</div>
+                        <div className="text-[10px] text-slate-400">Sayfa {currentPage} (.pdf)</div>
+                      </div>
+                    </button>
+                  </div>
+                )}
+              </div>
+
               <button
                 type="button"
                 onClick={handlePrint}
                 className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer border border-slate-700"
               >
                 <Printer className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Yazdır / PDF</span>
+                <span className="hidden sm:inline">Yazdır</span>
               </button>
 
               <button
@@ -287,6 +458,85 @@ export const ElectronicReportModal: React.FC<ElectronicReportModalProps> = ({
             ))}
           </div>
 
+          {/* GİZLİ PDF ÇIKTI OLUŞTURMA ALANI (DOM İÇİNDE, EKRAN DIŞINDA) */}
+          <div
+            id="pdf-hidden-capture-container"
+            aria-hidden="true"
+            style={{
+              position: "fixed",
+              left: "-99999px",
+              top: 0,
+              width: "794px",
+              backgroundColor: "#ffffff",
+              color: "#0f172a",
+              zIndex: -9999,
+              pointerEvents: "none",
+            }}
+          >
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+              <div
+                key={`pdf-page-${p}`}
+                id={`pdf-capture-page-${p}`}
+                style={{
+                  width: "794px",
+                  minHeight: "1123px",
+                  backgroundColor: "#ffffff",
+                  padding: "36px",
+                  boxSizing: "border-box",
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "space-between",
+                }}
+              >
+                <ReportPagesContent currentPage={p} {...reportDataProps} />
+              </div>
+            ))}
+          </div>
+
+          {/* PDF OLUŞTURULUYOR İLERLEME MODALI */}
+          {isGeneratingPdf && (
+            <div className="fixed inset-0 z-60 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+              <div className="bg-slate-900 border border-slate-800 text-white rounded-2xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-5 text-center">
+                <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center mx-auto text-amber-400">
+                  <Loader2 className="w-7 h-7 animate-spin" />
+                </div>
+
+                <div className="space-y-1">
+                  <h3 className="text-base font-black tracking-tight text-white font-heading">
+                    E-Ekspertiz Raporu PDF'e Dönüştürülüyor
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    SPK ve BDDK standartlarında 13 sayfa yüksek çözünürlüklü A4 dokümanı derleniyor.
+                  </p>
+                </div>
+
+                {/* İlerleme Çubuğu */}
+                <div className="space-y-2">
+                  <div className="w-full bg-slate-800 rounded-full h-3 overflow-hidden p-0.5 border border-slate-700">
+                    <div
+                      className="bg-linear-to-r from-amber-500 to-emerald-500 h-full rounded-full transition-all duration-300 ease-out"
+                      style={{
+                        width: `${Math.max(5, Math.round((pdfProgress.current / pdfProgress.total) * 100))}%`,
+                      }}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs font-mono font-bold text-slate-400 px-1">
+                    <span className="text-amber-400">{pdfProgress.stage}</span>
+                    <span className="text-emerald-400">
+                      %{Math.round((pdfProgress.current / pdfProgress.total) * 100)}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="pt-2 text-[11px] text-slate-500 flex items-center justify-center gap-1.5 border-t border-slate-800/80">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span>İşlem bitince PDF otomatik olarak cihazınıza inecektir.</span>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* MODAL ALT GEZİNME VE İŞLEM ÇUBUĞU */}
           <div className="p-4 bg-white border-t border-slate-200 flex items-center justify-between shrink-0 print-hidden-element">
             <button
@@ -299,8 +549,19 @@ export const ElectronicReportModal: React.FC<ElectronicReportModalProps> = ({
               <span>Önceki Sayfa</span>
             </button>
 
-            <div className="text-xs font-bold text-slate-500">
-              Sayfa <span className="text-[#E11D48] font-black">{currentPage}</span> / {totalPages}
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={handleDownloadFullPdf}
+                disabled={isGeneratingPdf}
+                className="hidden sm:flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-bold transition cursor-pointer disabled:opacity-50 shadow-2xs"
+              >
+                <Download className="w-3.5 h-3.5 text-emerald-600" />
+                <span>13 Sayfa PDF İndir</span>
+              </button>
+              <div className="text-xs font-bold text-slate-500">
+                Sayfa <span className="text-[#E11D48] font-black">{currentPage}</span> / {totalPages}
+              </div>
             </div>
 
             <button
