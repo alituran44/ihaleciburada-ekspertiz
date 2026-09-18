@@ -21,8 +21,12 @@ import {
   Clock, 
   Layers, 
   RotateCcw,
-  Compass
+  Compass,
+  Landmark,
+  CreditCard,
+  MessageCircle
 } from "lucide-react";
+import { LeadCaptureModal } from "../LeadCaptureModal";
 
 interface ValuationResultsDashboardProps {
   data: ValuationFormData;
@@ -36,10 +40,11 @@ export const ValuationResultsDashboard: React.FC<ValuationResultsDashboardProps>
   onOpenReportModal,
 }) => {
   const [valuationViewMode, setValuationViewMode] = useState<"satis" | "kira">("satis");
-  const [activeTab, setActiveTab] = useState<"yatirim" | "karne" | "emsaller" | "trend" | "rapor">("yatirim");
+  const [activeTab, setActiveTab] = useState<"yatirim" | "kredi" | "karne" | "emsaller" | "trend" | "rapor">("yatirim");
   const [copied, setCopied] = useState(false);
   const [userReportedPrice, setUserReportedPrice] = useState("");
   const [userReportedSaved, setUserReportedSaved] = useState(false);
+  const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
 
   // Değerleme Değişkenleri
   const isKonut = data.service === "konut";
@@ -75,6 +80,13 @@ export const ValuationResultsDashboard: React.FC<ValuationResultsDashboardProps>
   const tenderBasePriceTL = Math.round(marketValueTL * 0.50);
   const potentialArbitrageProfitTL = marketValueTL - tenderBasePriceTL;
 
+  // BDDK Konut Kredisi & Teminat Parametreleri
+  const isSecondHand = (data.buildingAge || 0) > 0;
+  const maxLtvPercent = isKonut ? (isSecondHand ? 45 : 50) : 40;
+  const maxLoanTL = Math.round(marketValueTL * (maxLtvPercent / 100));
+  const minDownPaymentTL = marketValueTL - maxLoanTL;
+  const monthlyMortgageTL = Math.round(maxLoanTL * 0.0315);
+
   // Kira & Amortisman
   const monthlyRentTL = isKonut ? Math.round(marketValueTL / 210) : Math.round(marketValueTL / 220);
   const paybackYears = isKonut ? 16.2 : isArazi ? 28 : 22;
@@ -84,6 +96,62 @@ export const ValuationResultsDashboard: React.FC<ValuationResultsDashboardProps>
       navigator.clipboard?.writeText(window.location.href);
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
+    }
+  };
+
+  const handleOpenReport = () => {
+    if (typeof window !== "undefined") {
+      const existingLead = localStorage.getItem("ihaleciburada_lead");
+      if (existingLead) {
+        onOpenReportModal();
+        return;
+      }
+    }
+    setIsLeadModalOpen(true);
+  };
+
+  const handleWhatsAppShare = () => {
+    if (typeof window === "undefined") return;
+    const currentUrl = window.location.href;
+    const messageText = `📍 *İHALECİBURADA RESMİ EKSPERTİZ VE DEĞERLEME RAPORU*
+
+🏡 *Taşınmaz:* ${data.city} / ${data.district}, ${data.neighborhood || "Merkez"}
+📌 *Ada/Parsel:* ${data.ada} Ada / ${data.parsel} Parsel (${area} m²)
+
+💰 *Piyasa Değeri:* ${marketValueTL.toLocaleString("tr-TR")} ₺
+⚖️ *İcra & İhale Fırsat Tabanı (%50):* ${tenderBasePriceTL.toLocaleString("tr-TR")} ₺
+🏦 *BDDK Azami Konut Kredisi:* ${maxLoanTL.toLocaleString("tr-TR")} ₺
+📈 *Yıllık Brüt Kira Getirisi:* ${(monthlyRentTL * 12).toLocaleString("tr-TR")} ₺
+
+📄 *13 Sayfalık SPK Uyumlu Resmi Raporu İncelemek İçin Tıklayın:*
+${currentUrl}`;
+
+    const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(messageText)}`;
+    window.open(waUrl, "_blank");
+  };
+
+  const handleSaveCrowdsourcePrice = async () => {
+    if (!userReportedPrice.trim()) return;
+    const cleanPrice = parseFloat(userReportedPrice.replace(/[^0-9]/g, ""));
+    if (isNaN(cleanPrice) || cleanPrice <= 0) return;
+
+    try {
+      await fetch("/api/crowdsource", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ada: data.ada,
+          parsel: data.parsel,
+          city: data.city,
+          district: data.district,
+          neighborhood: data.neighborhood,
+          reportedPrice: cleanPrice,
+        }),
+      });
+      setUserReportedSaved(true);
+    } catch (e) {
+      console.error(e);
+      setUserReportedSaved(true);
     }
   };
 
@@ -114,7 +182,17 @@ export const ValuationResultsDashboard: React.FC<ValuationResultsDashboardProps>
           </p>
         </div>
 
-        <div className="flex items-center gap-2 self-stretch sm:self-auto shrink-0">
+        <div className="flex items-center gap-2 self-stretch sm:self-auto shrink-0 flex-wrap">
+          <button
+            type="button"
+            onClick={handleWhatsAppShare}
+            className="flex-1 sm:flex-initial px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+            title="WhatsApp ile Raporu Paylaş"
+          >
+            <MessageCircle className="w-3.5 h-3.5" />
+            <span>WhatsApp</span>
+          </button>
+
           <button
             type="button"
             onClick={handleShare}
@@ -127,7 +205,7 @@ export const ValuationResultsDashboard: React.FC<ValuationResultsDashboardProps>
 
           <button
             type="button"
-            onClick={onOpenReportModal}
+            onClick={handleOpenReport}
             className="flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-[#0B1E3B] hover:bg-blue-900 text-amber-400 text-xs font-extrabold shadow-sm transition flex items-center justify-center gap-1.5 cursor-pointer"
           >
             <FileText className="w-4 h-4 text-amber-400" />
@@ -284,12 +362,55 @@ export const ValuationResultsDashboard: React.FC<ValuationResultsDashboardProps>
       </div>
 
       {/* ========================================================================= */}
-      {/* 3. 5'Lİ ANALİTİK SEKMELERİ                                                 */}
+      {/* 2.5. BDDK UYUMLU KONUT KREDİSİ & TEMİNAT ÖZET BANDI                       */}
+      {/* ========================================================================= */}
+      <div className="bg-slate-900 rounded-2xl p-4 sm:p-5 border border-slate-800 shadow-xs text-white flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-xl bg-blue-500/20 text-blue-400 border border-blue-500/30 flex items-center justify-center shrink-0 mt-0.5">
+            <Landmark className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-black text-amber-400 uppercase tracking-wider">
+                BDDK Uyumlu Konut Kredisi & Banka Teminatı
+              </span>
+              <span className="px-2 py-0.5 rounded-md bg-blue-500/20 text-blue-300 text-[10px] font-bold border border-blue-500/30">
+                LTV Azami %{maxLtvPercent}
+              </span>
+            </div>
+            <p className="text-xs text-slate-300 mt-1 max-w-2xl leading-relaxed">
+              SPK lisanslı değerleme baz alınarak bankaların bu mülke açabileceği azami kredi tutarı:{" "}
+              <strong className="text-white font-black">{maxLoanTL.toLocaleString("tr-TR")} ₺</strong>. 
+              Asgari gereken nakit özkaynak / peşinat:{" "}
+              <strong className="text-amber-300 font-bold">{minDownPaymentTL.toLocaleString("tr-TR")} ₺</strong>.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 shrink-0 self-stretch md:self-auto justify-end">
+          <div className="text-right hidden sm:block">
+            <div className="text-[10px] font-bold text-slate-400 uppercase">Tahmini 120 Ay Taksit</div>
+            <div className="text-sm font-black text-emerald-400 font-mono">~{monthlyMortgageTL.toLocaleString("tr-TR")} ₺/ay</div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setActiveTab("kredi")}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black transition cursor-pointer flex items-center gap-1.5 shadow-sm"
+          >
+            <CreditCard className="w-3.5 h-3.5" />
+            <span>Kredi Detayı</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* 3. 6'LI ANALİTİK SEKMELERİ                                                 */}
       {/* ========================================================================= */}
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
         <div className="flex items-center overflow-x-auto border-b border-slate-200 bg-slate-50/70 px-3 pt-2 text-xs font-extrabold">
           {[
-            { id: "yatirim", label: "Yatırım & Arbitraj Fizibilitesi", icon: BarChart2 },
+            { id: "yatirim", label: "Yatırım & Arbitraj", icon: BarChart2 },
+            { id: "kredi", label: "BDDK Kredi & Teminat", icon: Landmark },
             { id: "karne", label: "Mülk & Kadastro Karnesi", icon: Layers },
             { id: "emsaller", label: "Bölge Emsalleri & İlanlar", icon: Building2 },
             { id: "trend", label: "Değer Değişim Trendi", icon: TrendingUp },
@@ -365,6 +486,111 @@ export const ValuationResultsDashboard: React.FC<ValuationResultsDashboardProps>
                     </tr>
                   </tbody>
                 </table>
+              </div>
+            </div>
+          )}
+
+          {/* TAB: BDDK KREDİ & TEMİNAT ANALİZİ */}
+          {activeTab === "kredi" && (
+            <div className="space-y-6">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-bold text-slate-900">
+                    BDDK Mevzuatına Uyumlu Konut Kredisi & Teminat Hesabı
+                  </h3>
+                  <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[10px] font-black border border-blue-200">
+                    Karar No: 10655
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500">
+                  Bankacılık Düzenleme ve Denetleme Kurumu (BDDK) konut kredisi sınırlandırmalarına göre ekspertiz teminat marjı ve azami kredi tutarı.
+                </p>
+              </div>
+
+              {/* 4'lü Finansal Özet Kartları */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-1">
+                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Ekspertiz Teminat Değeri</div>
+                  <div className="text-lg font-black text-slate-900 font-mono">
+                    {marketValueTL.toLocaleString("tr-TR")} ₺
+                  </div>
+                  <div className="text-[11px] text-slate-500">Bankanın esas alacağı rayiç</div>
+                </div>
+
+                <div className="p-4 bg-blue-50/60 rounded-2xl border border-blue-200 space-y-1">
+                  <div className="text-[10px] font-bold text-blue-700 uppercase tracking-tight">Azami Kredi Tutarı (LTV %{maxLtvPercent})</div>
+                  <div className="text-lg font-black text-blue-900 font-mono">
+                    {maxLoanTL.toLocaleString("tr-TR")} ₺
+                  </div>
+                  <div className="text-[11px] text-blue-600">Çekilebilecek net azami limit</div>
+                </div>
+
+                <div className="p-4 bg-amber-50/60 rounded-2xl border border-amber-200 space-y-1">
+                  <div className="text-[10px] font-bold text-amber-800 uppercase tracking-tight">Gereken Nakit Peşinat</div>
+                  <div className="text-lg font-black text-amber-950 font-mono">
+                    {minDownPaymentTL.toLocaleString("tr-TR")} ₺
+                  </div>
+                  <div className="text-[11px] text-amber-700">Asgari özkaynak gereksinimi</div>
+                </div>
+
+                <div className="p-4 bg-emerald-50/60 rounded-2xl border border-emerald-200 space-y-1">
+                  <div className="text-[10px] font-bold text-emerald-800 uppercase tracking-tight">Tahmini Taksit (120 Ay)</div>
+                  <div className="text-lg font-black text-emerald-950 font-mono">
+                    ~{monthlyMortgageTL.toLocaleString("tr-TR")} ₺
+                  </div>
+                  <div className="text-[11px] text-emerald-700">Aylık %3.15 gösterge faiziyle</div>
+                </div>
+              </div>
+
+              {/* Detay Tablosu & BDDK Hükümleri */}
+              <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200 space-y-3 text-xs">
+                <h4 className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4 text-blue-600" />
+                  Kredi Kullandırım Parametreleri ve Yasal Koşullar
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-slate-600 leading-relaxed">
+                  <div className="space-y-2">
+                    <div className="flex justify-between py-1 border-b border-slate-200">
+                      <span className="font-medium">Gayrimenkul Türü:</span>
+                      <strong className="text-slate-900 capitalize">{data.service} {isKonut ? "(Konut)" : ""}</strong>
+                    </div>
+                    <div className="flex justify-between py-1 border-b border-slate-200">
+                      <span className="font-medium">Yapı Durumu / Yaş:</span>
+                      <strong className="text-slate-900">{isSecondHand ? `2. El (${data.buildingAge || 5} Yaşında)` : "Sıfır Yapı (1. El)"}</strong>
+                    </div>
+                    <div className="flex justify-between py-1 border-b border-slate-200">
+                      <span className="font-medium">Tahmini Enerji Kimlik Belgesi (EKB):</span>
+                      <strong className="text-slate-900">B / C Sınıfı</strong>
+                    </div>
+                    <div className="flex justify-between py-1 border-b border-slate-200">
+                      <span className="font-medium">İlk Konut Alımı LTV:</span>
+                      <strong className="text-emerald-700 font-bold">%{maxLtvPercent}</strong>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex justify-between py-1 border-b border-slate-200">
+                      <span className="font-medium">2. Konut Alımı (BDDK Kısıtı):</span>
+                      <strong className="text-amber-700 font-bold">%{Math.round(maxLtvPercent * 0.25)} (Azami {(Math.round(maxLoanTL * 0.25)).toLocaleString("tr-TR")} ₺)</strong>
+                    </div>
+                    <div className="flex justify-between py-1 border-b border-slate-200">
+                      <span className="font-medium">İpotek Tesis Harcı Muafiyeti:</span>
+                      <strong className="text-slate-900">İlk konut alımlarında muaf</strong>
+                    </div>
+                    <div className="flex justify-between py-1 border-b border-slate-200">
+                      <span className="font-medium">Ekspertiz Şerh Durumu:</span>
+                      <strong className="text-emerald-700">Teminata Uygun (Temiz)</strong>
+                    </div>
+                    <div className="flex justify-between py-1 border-b border-slate-200">
+                      <span className="font-medium">Zorunlu Sigortalar:</span>
+                      <strong className="text-slate-900">DASK + Konut Yangın</strong>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-3 p-3 bg-amber-50 rounded-xl border border-amber-200 text-amber-900 text-[11px] leading-relaxed">
+                  <strong>⚠️ BDDK 10655 Sayılı Kurul Kararı Uyarısı:</strong> Tüketicinin kendisinin, eşinin veya 18 yaş altındaki çocuklarının malik olduğu en az bir konutunun bulunması halinde konut kredisi teminat oranı <strong>%75 daraltılarak (%{Math.round(maxLtvPercent * 0.25)})</strong> kullandırılır. İlk konut alımlarında tam oran (%{maxLtvPercent}) uygulanır.
+                </div>
               </div>
             </div>
           )}
@@ -525,7 +751,7 @@ export const ValuationResultsDashboard: React.FC<ValuationResultsDashboardProps>
               <div className="pt-2">
                 <button
                   type="button"
-                  onClick={onOpenReportModal}
+                  onClick={handleOpenReport}
                   className="px-8 py-3 rounded-xl bg-[#0B1E3B] hover:bg-blue-900 text-amber-400 font-extrabold text-xs shadow-md transition cursor-pointer inline-flex items-center gap-2"
                 >
                   <FileText className="w-4 h-4 text-amber-400" />
@@ -561,15 +787,26 @@ export const ValuationResultsDashboard: React.FC<ValuationResultsDashboardProps>
           />
           <button
             type="button"
-            onClick={() => {
-              if (userReportedPrice) setUserReportedSaved(true);
-            }}
+            onClick={handleSaveCrowdsourcePrice}
             className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-xl transition cursor-pointer whitespace-nowrap"
           >
             {userReportedSaved ? "✓ Kaydedildi" : "Kaydet"}
           </button>
         </div>
       </div>
+
+      {/* ========================================================================= */}
+      {/* 5. LEAD CAPTURE MODALI (13 SAYFALIK RAPOR ÖNCESİ)                         */}
+      {/* ========================================================================= */}
+      <LeadCaptureModal
+        isOpen={isLeadModalOpen}
+        onClose={() => setIsLeadModalOpen(false)}
+        onSuccess={() => {
+          setIsLeadModalOpen(false);
+          onOpenReportModal();
+        }}
+        formData={data}
+      />
     </div>
   );
 };

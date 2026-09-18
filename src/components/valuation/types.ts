@@ -68,6 +68,32 @@ export interface ValuationFormData {
   // 7. Kullanıcı Doğrulama & Notlar
   userEstimatedPriceTL?: number;
   userNote?: string;
+
+  // 8. Fotoğraflar
+  uploadedPhotos?: string[];
+}
+
+export interface LeadCaptureData {
+  fullName: string;
+  phone: string;
+  email?: string;
+  userRole: "mulk_sahibi" | "yatirimci" | "emlak_danismani" | "diger";
+  ada?: string;
+  parsel?: string;
+  city?: string;
+  district?: string;
+  createdAt?: string;
+}
+
+export interface CrowdsourcePriceData {
+  ada: string;
+  parsel: string;
+  city: string;
+  district: string;
+  neighborhood: string;
+  reportedPrice: number;
+  userNote?: string;
+  date: string;
 }
 
 export const INITIAL_VALUATION_DATA: ValuationFormData = {
@@ -141,4 +167,5 @@ export const INITIAL_VALUATION_DATA: ValuationFormData = {
     "klima",
     "jenerator",
   ],
+  uploadedPhotos: [],
 };

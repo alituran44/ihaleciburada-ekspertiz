@@ -117,18 +117,30 @@ export const EndeksaValuationModal: React.FC<EndeksaValuationModalProps> = ({
     updateFormData({ step: 1 });
   };
 
+  const isKonut = formData.service === "konut";
+  const isArsa = formData.service === "arsa";
+  const isArazi = formData.service === "arazi";
+
   const currentArea = 
-    formData.service === "arsa" ? formData.arsaAreaM2 :
-    formData.service === "arazi" ? formData.araziAreaM2 : formData.grossAreaM2;
+    isArsa ? (formData.arsaAreaM2 || 850) :
+    isArazi ? (formData.araziAreaM2 || 1250) : (formData.grossAreaM2 || 125);
 
-  const currentUnitPrice = 
-    formData.service === "konut" ? 71818 :
-    formData.service === "arazi" ? 419 :
-    formData.service === "arsa" ? 18500 : 45000;
+  const baseKonutM2 = 
+    formData.city?.toLowerCase().includes("istanbul") ? 85000 :
+    formData.city?.toLowerCase().includes("izmir") || formData.city?.toLowerCase().includes("antalya") ? 78000 :
+    formData.city?.toLowerCase().includes("çanakkale") ? 72500 : 70000;
+  
+  const ageFactor = (formData.buildingAge || 0) <= 3 ? 1.08 : (formData.buildingAge || 0) <= 8 ? 1.02 : (formData.buildingAge || 0) <= 15 ? 0.96 : 0.88;
+  const floorFactor = formData.floorNumber === 0.5 || (formData.floorNumber >= 1 && formData.floorNumber <= 5) ? 1.03 : 0.97;
+  const villaFactor = formData.housingTypeKind === "mustakil" ? 1.30 : 1.0;
 
-  const currentMarketValue = 
-    formData.service === "konut" ? 7900000 :
-    formData.service === "arazi" ? 490000 : Math.round(currentArea * currentUnitPrice);
+  const konutCalculatedValue = Math.round(currentArea * baseKonutM2 * ageFactor * floorFactor * villaFactor);
+
+  const currentMarketValue = isKonut 
+    ? Math.max(7800000, konutCalculatedValue)
+    : isArazi 
+      ? Math.round(currentArea * 450) 
+      : Math.round(currentArea * (formData.arsaKaks ? formData.arsaKaks * 12500 : 18500));
 
   return (
     <div className="min-h-[calc(100vh-64px)] w-full bg-[#F8FAFC] py-6 sm:py-8 px-3 sm:px-6 flex flex-col items-center">
@@ -190,6 +202,7 @@ export const EndeksaValuationModal: React.FC<EndeksaValuationModalProps> = ({
       <ElectronicReportModal
         isOpen={showReportModal}
         onClose={() => setShowReportModal(false)}
+        formData={formData}
         propertyTitle={`${formData.city} / ${formData.district} / ${formData.neighborhood || "Merkez"}`}
         category={formData.service === "konut" ? "konut" : formData.service === "arazi" ? "arazi" : "arsa"}
         locationText={`${formData.neighborhood || "Merkez"}, ${formData.district}, ${formData.city}`}

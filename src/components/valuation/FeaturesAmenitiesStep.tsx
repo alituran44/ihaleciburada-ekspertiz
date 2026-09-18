@@ -12,7 +12,11 @@ import {
   Check, 
   Eye, 
   CheckCircle2,
-  TrendingUp
+  TrendingUp,
+  Camera,
+  UploadCloud,
+  Trash2,
+  Image as ImageIcon
 } from "lucide-react";
 
 interface FeaturesAmenitiesStepProps {
@@ -28,6 +32,41 @@ export const FeaturesAmenitiesStep: React.FC<FeaturesAmenitiesStepProps> = ({
   onPrev,
   onSubmit,
 }) => {
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
+
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const currentPhotos = data.uploadedPhotos || [];
+    const remainingSlots = Math.max(0, 6 - currentPhotos.length);
+    const filesToProcess = Array.from(files).slice(0, remainingSlots);
+
+    const promises = filesToProcess.map((file) => {
+      return new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          if (typeof reader.result === "string") {
+            resolve(reader.result);
+          }
+        };
+        reader.readAsDataURL(file);
+      });
+    });
+
+    Promise.all(promises).then((newPhotos) => {
+      onChange({
+        uploadedPhotos: [...currentPhotos, ...newPhotos],
+      });
+    });
+  };
+
+  const handleRemovePhoto = (index: number) => {
+    const currentPhotos = data.uploadedPhotos || [];
+    onChange({
+      uploadedPhotos: currentPhotos.filter((_, i) => i !== index),
+    });
+  };
   const toggleFacade = (item: string) => {
     const exists = data.facades.includes(item);
     onChange({
@@ -212,6 +251,63 @@ export const FeaturesAmenitiesStep: React.FC<FeaturesAmenitiesStepProps> = ({
               );
             })}
           </div>
+        </div>
+
+        {/* 4. TAŞINMAZ FOTOĞRAFLARI (OPSİYONEL - RAPORDA YER ALIR) */}
+        <div className="space-y-3 pt-2 border-t border-slate-100">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+              <Camera className="w-3.5 h-3.5 text-blue-600" />
+              <span>Taşınmaz Fotoğrafları (Opsiyonel)</span>
+            </label>
+            <span className="text-[11px] text-slate-400 font-medium">Maksimum 6 fotoğraf • Raporda basılır</span>
+          </div>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={handlePhotoUpload}
+          />
+
+          {/* Fotoğraf Grid veya Yükleme Butonu */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2.5">
+            {(data.uploadedPhotos || []).map((photoUrl, idx) => (
+              <div key={idx} className="relative aspect-4/3 rounded-xl overflow-hidden border border-slate-300 shadow-2xs group bg-slate-100">
+                <img src={photoUrl} alt={`Fotoğraf ${idx + 1}`} className="w-full h-full object-cover" />
+                <button
+                  type="button"
+                  onClick={() => handleRemovePhoto(idx)}
+                  className="absolute top-1 right-1 w-6 h-6 rounded-full bg-slate-900/80 text-white flex items-center justify-center hover:bg-rose-600 transition cursor-pointer"
+                  title="Fotoğrafı Kaldır"
+                >
+                  <Trash2 className="w-3 h-3" />
+                </button>
+                {idx === 0 && (
+                  <span className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-[#0B1E3B]/90 text-[9px] font-black text-amber-400">
+                    Kapak
+                  </span>
+                )}
+              </div>
+            ))}
+
+            {(data.uploadedPhotos || []).length < 6 && (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="aspect-4/3 rounded-xl border-2 border-dashed border-slate-300 hover:border-blue-500 bg-slate-50/60 hover:bg-blue-50/30 flex flex-col items-center justify-center p-2 text-center transition cursor-pointer group"
+              >
+                <UploadCloud className="w-5 h-5 text-slate-400 group-hover:text-blue-600 mb-1 transition" />
+                <span className="text-[11px] font-bold text-slate-600 group-hover:text-blue-700">Fotoğraf Ekle</span>
+                <span className="text-[9px] text-slate-400 mt-0.5">JPEG, PNG</span>
+              </button>
+            )}
+          </div>
+          <p className="text-[11px] text-slate-500">
+            Eklediğiniz ilk fotoğraf 13 sayfalık resmi raporun kapak görseli olarak, diğerleri ise 3. sayfadaki saha fotoğrafları galerisinde basılacaktır.
+          </p>
         </div>
 
         {/* ALT AKSİYON BUTONLARI & HESAPLA CTA */}

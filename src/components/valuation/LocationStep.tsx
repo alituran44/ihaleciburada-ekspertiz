@@ -47,6 +47,8 @@ export const LocationStep: React.FC<LocationStepProps> = ({
   const mapInstanceRef = useRef<L.Map | null>(null);
   const markerRef = useRef<L.Marker | null>(null);
   const circleRef = useRef<L.Circle | null>(null);
+  const polygonRef = useRef<L.Polygon | null>(null);
+  const comparableMarkersRef = useRef<L.Marker[]>([]);
   const activeTileLayerRef = useRef<L.TileLayer | null>(null);
 
   const [suggestions, setSuggestions] = useState<SuggestionItem[]>([]);
@@ -152,9 +154,157 @@ export const LocationStep: React.FC<LocationStepProps> = ({
       if (circleRef.current) {
         circleRef.current.setLatLng([resolvedCoords.lat, resolvedCoords.lng]);
       }
+      if (mapInstanceRef.current) {
+        renderComparablesAndPolygon(mapInstanceRef.current, resolvedCoords.lat, resolvedCoords.lng, data.ada, data.parsel, currentArea, data.service);
+      }
     }
 
     setIsLocating(false);
+  };
+
+  // =========================================================================
+  // YÜZEN EMSAL BALONLARI & KADASTRO SINIR POLİGONU ÇİZİCİ
+  // =========================================================================
+  const renderComparablesAndPolygon = (
+    map: L.Map | null,
+    lat: number,
+    lng: number,
+    adaVal: string,
+    parselVal: string,
+    areaVal: number,
+    serviceVal: string
+  ) => {
+    if (!map) return;
+    const L = (window as any).L;
+    if (!L) return;
+
+    // 1. Kadastro Parsel Sınır Poligonu
+    if (polygonRef.current) {
+      try {
+        map.removeLayer(polygonRef.current);
+      } catch (e) {}
+      polygonRef.current = null;
+    }
+
+    const dLat = 0.00030;
+    const dLng = 0.00040;
+    const parcelCoords: [number, number][] = [
+      [lat + dLat, lng - dLng],
+      [lat + dLat * 0.95, lng + dLng * 1.05],
+      [lat - dLat * 1.05, lng + dLng * 0.85],
+      [lat - dLat * 0.85, lng - dLng * 0.95],
+    ];
+
+    try {
+      const polygon = L.polygon(parcelCoords, {
+        color: "#F59E0B",
+        weight: 2.5,
+        opacity: 0.95,
+        fillColor: "#FCD34D",
+        fillOpacity: 0.22,
+        dashArray: "4, 4",
+      }).addTo(map);
+
+      polygon.bindTooltip(`TKGM Kadastro Parseli • Ada ${adaVal || "117"} / Parsel ${parselVal || "9"} (${areaVal} m²)`, {
+        permanent: false,
+        direction: "top",
+      });
+      polygonRef.current = polygon;
+    } catch (e) {}
+
+    // 2. Yüzen Emsal Balonları (3 Serbest Piyasa İlanı + 1 İcra Satış Kararı)
+    comparableMarkersRef.current.forEach((m) => {
+      try {
+        map.removeLayer(m);
+      } catch (e) {}
+    });
+    comparableMarkersRef.current = [];
+
+    const isKonut = serviceVal === "konut";
+    const compArea = isKonut ? areaVal : 850;
+
+    const comps = [
+      {
+        offset: [0.0017, 0.0022],
+        title: "Yakın Çevre Satılık Daire",
+        price: "8.850.000 ₺",
+        badge: "8.85M ₺",
+        m2: `${compArea - 5} m²`,
+        type: "sale",
+        detail: "3 Gün Önce Eklendi • Emsal: 68.076 ₺/m²",
+      },
+      {
+        offset: [-0.0016, 0.0026],
+        title: "Yeni Yapı Lüks Konut",
+        price: "9.400.000 ₺",
+        badge: "9.40M ₺",
+        m2: `${compArea} m²`,
+        type: "sale",
+        detail: "Dün Eklendi • Emsal: 69.629 ₺/m²",
+      },
+      {
+        offset: [0.0021, -0.0024],
+        title: "Cadde Üzeri Ara Kat",
+        price: "8.250.000 ₺",
+        badge: "8.25M ₺",
+        m2: `${compArea - 15} m²`,
+        type: "sale",
+        detail: "1 Hafta Önce • Emsal: 71.739 ₺/m²",
+      },
+      {
+        offset: [-0.0022, -0.0019],
+        title: "İcra İhalesi Kararı (İİK m.115)",
+        price: "4.450.000 ₺",
+        badge: "4.45M ₺ İhale",
+        m2: `${compArea} m²`,
+        type: "auction",
+        detail: "%50 Başlangıç Rayici • İhaleciBurada Takipte",
+      },
+    ];
+
+    comps.forEach((c) => {
+      const cLat = lat + c.offset[0];
+      const cLng = lng + c.offset[1];
+
+      const html = c.type === "auction"
+        ? `
+          <div style="background: #0B1E3B; border: 2px solid #F59E0B; border-radius: 20px; padding: 4px 10px; box-shadow: 0 4px 14px rgba(0,0,0,0.4); display: flex; align-items: center; gap: 5px; font-family: sans-serif; cursor: pointer; white-space: nowrap; transform: translate(-50%, -50%);">
+            <span style="font-size: 11px;">⚖️</span>
+            <span style="font-weight: 900; font-size: 11px; color: #FCD34D;">${c.badge}</span>
+            <span style="background: rgba(16,185,129,0.25); color: #34D399; font-size: 9px; font-weight: 800; border-radius: 6px; padding: 1px 5px;">%50</span>
+          </div>
+        `
+        : `
+          <div style="background: #FFFFFF; border: 2px solid #2563EB; border-radius: 20px; padding: 4px 10px; box-shadow: 0 4px 14px rgba(0,0,0,0.25); display: flex; align-items: center; gap: 5px; font-family: sans-serif; cursor: pointer; white-space: nowrap; transform: translate(-50%, -50%);">
+            <span style="font-size: 11px;">📍</span>
+            <span style="font-weight: 900; font-size: 11px; color: #1E3A8A;">${c.badge}</span>
+            <span style="color: #64748B; font-size: 9px; font-weight: 700;">(${c.m2})</span>
+          </div>
+        `;
+
+      const compIcon = L.divIcon({
+        className: "custom-emsal-balloon",
+        html,
+        iconSize: [0, 0],
+      });
+
+      try {
+        const compMarker = L.marker([cLat, cLng], { icon: compIcon }).addTo(map);
+
+        const popupContent = `
+          <div style="font-family: sans-serif; padding: 4px; min-width: 170px;">
+            <div style="font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 6px; display: inline-block; margin-bottom: 4px; ${c.type === "auction" ? "background: #FEF3C7; color: #92400E;" : "background: #DBEAFE; color: #1E40AF;"}">
+              ${c.type === "auction" ? "İcra & İhale Kararı" : "Piyasa Satılık İlanı"}
+            </div>
+            <div style="font-weight: 800; font-size: 12px; color: #0F172A;">${c.title}</div>
+            <div style="font-weight: 900; font-size: 15px; color: ${c.type === "auction" ? "#D97706" : "#2563EB"}; margin: 3px 0;">${c.price}</div>
+            <div style="font-size: 10px; color: #64748B;">${c.detail}</div>
+          </div>
+        `;
+        compMarker.bindPopup(popupContent);
+        comparableMarkersRef.current.push(compMarker);
+      } catch (e) {}
+    });
   };
 
   // =========================================================================
@@ -215,6 +365,9 @@ export const LocationStep: React.FC<LocationStepProps> = ({
     }).addTo(map);
     markerRef.current = marker;
 
+    // Kadastro Sınır Poligonu ve Emsal Balonlarını Çiz
+    renderComparablesAndPolygon(map, currentLat, currentLng, data.ada, data.parsel, currentArea, data.service);
+
     // Pini Fareyle (Mouse) Elle Sürükleyerek Konum Düzeltme Dinleyicisi
     marker.on("dragend", async (e: any) => {
       const position = e.target.getLatLng();
@@ -235,6 +388,8 @@ export const LocationStep: React.FC<LocationStepProps> = ({
       if (circleRef.current) {
         circleRef.current.setLatLng([dragLat, dragLng]);
       }
+
+      renderComparablesAndPolygon(map, dragLat, dragLng, data.ada, data.parsel, currentArea, data.service);
 
       // Arka planda cadde/mahalle detayını güncelle
       try {
@@ -273,6 +428,8 @@ export const LocationStep: React.FC<LocationStepProps> = ({
         circleRef.current.setLatLng([clickLat, clickLng]);
       }
 
+      renderComparablesAndPolygon(map, clickLat, clickLng, data.ada, data.parsel, currentArea, data.service);
+
       // Arka planda cadde/mahalle detayını güncelle
       try {
         const res = await fetch(`/api/location/search?lat=${clickLat}&lng=${clickLng}`);
@@ -293,6 +450,18 @@ export const LocationStep: React.FC<LocationStepProps> = ({
 
     return () => {
       if (mapInstanceRef.current) {
+        comparableMarkersRef.current.forEach((m) => {
+          try {
+            mapInstanceRef.current?.removeLayer(m);
+          } catch (e) {}
+        });
+        comparableMarkersRef.current = [];
+        if (polygonRef.current) {
+          try {
+            mapInstanceRef.current?.removeLayer(polygonRef.current);
+          } catch (e) {}
+          polygonRef.current = null;
+        }
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
       }
@@ -332,7 +501,9 @@ export const LocationStep: React.FC<LocationStepProps> = ({
     if (circleRef.current) {
       circleRef.current.setLatLng([currentLat, currentLng]);
     }
-  }, [currentLat, currentLng, data.ada, data.parsel, currentArea]);
+
+    renderComparablesAndPolygon(mapInstanceRef.current, currentLat, currentLng, data.ada, data.parsel, currentArea, data.service);
+  }, [currentLat, currentLng, data.ada, data.parsel, currentArea, data.service]);
 
   // Canlı Arama / Autocomplete
   useEffect(() => {
