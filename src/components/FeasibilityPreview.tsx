@@ -639,7 +639,7 @@ export const FeasibilityPreview: React.FC<FeasibilityPreviewProps> = ({
                 className="py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition cursor-pointer"
               >
                 <ExternalLink className="w-3.5 h-3.5" />
-                <span>WhatsApp'ta Paylaş</span>
+                <span>WhatsApp&apos;ta Paylaş</span>
               </button>
             </div>
           </div>

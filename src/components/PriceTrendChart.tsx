@@ -740,7 +740,7 @@ export const PriceTrendChart: React.FC<PriceTrendChartProps> = ({
             * Bu ekrandaki değerlemeler, piyasa projeksiyonları ve ihale analizleri; İhaleci Burada Veri Havuzu, TCMB EVDS3 Konut Fiyat Endeksi (KFE), Çevre, Şehircilik ve İklim Değişikliği Bakanlığı 2026/1 Birim Yapı Yaklaşık Maliyetleri ve güncel saha emsal taramaları ile istatistiksel modelleme yöntemleri kullanılarak üretilmiştir.
           </p>
           <p>
-            * İhale başlangıç peyleri İcra ve İflas Kanunu (İİK) m.115 gereğince muhammen bedelin %50'si üzerinden, teminat oranları ise %10-%20 aralığında modellenmektedir. Resmi ihalelerde UYAP İhale ve ilgili icra müdürlüğü şartnameleri esastır.
+            * İhale başlangıç peyleri İcra ve İflas Kanunu (İİK) m.115 gereğince muhammen bedelin %50&apos;si üzerinden, teminat oranları ise %10-%20 aralığında modellenmektedir. Resmi ihalelerde UYAP İhale ve ilgili icra müdürlüğü şartnameleri esastır.
           </p>
         </div>
 

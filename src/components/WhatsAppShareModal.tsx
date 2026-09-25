@@ -156,7 +156,7 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
             className="py-2.5 px-4 rounded-xl font-bold text-xs bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center gap-2 shadow-sm transition cursor-pointer"
           >
             <Share2 className="w-4 h-4" />
-            <span>WhatsApp'ta Aç</span>
+            <span>WhatsApp&apos;ta Aç</span>
           </button>
         </div>
       </div>

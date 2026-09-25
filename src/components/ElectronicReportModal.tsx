@@ -464,7 +464,7 @@ export const ElectronicReportModal: React.FC<ElectronicReportModalProps> = ({
             aria-hidden="true"
             style={{
               position: "fixed",
-              left: "-99999px",
+              left: 0,
               top: 0,
               width: "794px",
               backgroundColor: "#ffffff",
@@ -503,7 +503,7 @@ export const ElectronicReportModal: React.FC<ElectronicReportModalProps> = ({
 
                 <div className="space-y-1">
                   <h3 className="text-base font-black tracking-tight text-white font-heading">
-                    E-Ekspertiz Raporu PDF'e Dönüştürülüyor
+                    E-Ekspertiz Raporu PDF&apos;e Dönüştürülüyor
                   </h3>
                   <p className="text-xs text-slate-400">
                     SPK ve BDDK standartlarında 13 sayfa yüksek çözünürlüklü A4 dokümanı derleniyor.

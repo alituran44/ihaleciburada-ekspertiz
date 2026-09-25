@@ -62,6 +62,7 @@ export const StartValuationModal: React.FC<StartValuationModalProps> = ({
   const [parsel, setParsel] = useState(initialParsel);
   const [areaM2, setAreaM2] = useState(initialAreaM2);
   const [tapuNiteligi, setTapuNiteligi] = useState("Kat Mülkiyeti / Mesken");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isOpen) return null;
 
@@ -114,8 +115,6 @@ export const StartValuationModal: React.FC<StartValuationModalProps> = ({
     setAreaM2(preset.area);
     setTapuNiteligi(preset.nit);
   };
-
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

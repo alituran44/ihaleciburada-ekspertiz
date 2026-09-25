@@ -418,7 +418,7 @@ export const ValuationWizard: React.FC<ValuationWizardProps> = ({
                   <span>Gerçek API Bağlantı Modülü</span>
                 </div>
                 <p className="text-[11px] text-slate-300 mt-0.5">
-                  İl ve İlçe girip butona basarak OpenStreetMap ve Piyasa Değerleme API'sinden güncel verileri çekin.
+                  İl ve İlçe girip butona basarak OpenStreetMap ve Piyasa Değerleme API&apos;sinden güncel verileri çekin.
                 </p>
               </div>
 
@@ -436,7 +436,7 @@ export const ValuationWizard: React.FC<ValuationWizardProps> = ({
                 ) : (
                   <>
                     <Zap className="w-4 h-4 text-slate-950" />
-                    <span>API'den Otomatik Getir</span>
+                    <span>API&apos;den Otomatik Getir</span>
                   </>
                 )}
               </button>
