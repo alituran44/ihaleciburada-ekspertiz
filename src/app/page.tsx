@@ -29,7 +29,11 @@ const EndeksaValuationModal = dynamic(
 );
 import { ElectronicReportModal } from "@/components/ElectronicReportModal";
 import { ReportSelectionModal, ReportPackageType } from "@/components/ReportSelectionModal";
-import { StartValuationModal, StartValuationPayload } from "@/components/valuation/StartValuationModal";
+import type { StartValuationPayload } from "@/components/valuation/StartValuationModal";
+const StartValuationModal = dynamic(
+  () => import("@/components/valuation/StartValuationModal").then((mod) => mod.StartValuationModal),
+  { ssr: false }
+);
 import { ParcelInput, PropertyCategory } from "@/types";
 import { SAMPLE_SCENARIOS, formatTL, formatNumber } from "@/lib/constants";
 import { calculateFeasibility } from "@/lib/calculator";
@@ -71,6 +75,7 @@ export default function Home() {
   const [showElectronicReportModal, setShowElectronicReportModal] = useState<boolean>(false);
   const [showReportSelectionModal, setShowReportSelectionModal] = useState<boolean>(false);
   const [showStartValuationModal, setShowStartValuationModal] = useState<boolean>(false);
+  const [startValuationInitialMode, setStartValuationInitialMode] = useState<"expertiz" | "emlak_bul">("expertiz");
   const [subTab, setSubTab] = useState<"deger" | "trend" | "rayic" | "best_use">("deger");
   const [valuationMode, setValuationMode] = useState<"otomatik" | "manuel">("otomatik");
   const [isEmsalOpen, setIsEmsalOpen] = useState<boolean>(true);
@@ -81,7 +86,7 @@ export default function Home() {
   );
   const [isSearching, setIsSearching] = useState<boolean>(false);
 
-  // Yeni Değerleme Başlat Formu Gönderildiğinde
+  // Yeni Değerleme Başlat Formu Gönderildiğinde (Hasan Bey Modeli: Expertiz veya Emlak Bul)
   const handleStartValuationSubmit = async (payload: StartValuationPayload) => {
     setShowStartValuationModal(false);
     const isRes = payload.category === "konut";
@@ -100,7 +105,13 @@ export default function Home() {
       coordinates: newCoords || prev.coordinates,
     }));
     setSearchQuery(`${payload.neighborhood}, ${payload.district}, ${payload.city}`);
-    setActiveTab("degerleme");
+
+    if (payload.mode === "emlak_bul" || payload.mapAction === "ilanlari_bul") {
+      setActiveTab("endeks");
+      setSubTab("rayic");
+    } else {
+      setActiveTab("degerleme");
+    }
 
     // Arka planda girilen il, ilçe ve köy/mahalle için anlık emsal ve piyasa verisini güncelle
     try {
@@ -496,14 +507,32 @@ export default function Home() {
                 )}
               </button>
 
-              {/* "Ekspertiz Başlat" Amber Butonu */}
-              <button
-                type="button"
-                onClick={() => setShowStartValuationModal(true)}
-                className="hidden md:flex items-center gap-1.5 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white text-xs font-extrabold px-4 py-1.5 rounded-full shadow-xs transition active:scale-95 cursor-pointer shrink-0"
-              >
-                <span>Ekspertiz Başlat</span>
-              </button>
+              {/* Hasan Bey İkili Eylem Butonları: Ekspertiz Başlat & Emlak Bul */}
+              <div className="hidden md:flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStartValuationInitialMode("expertiz");
+                    setShowStartValuationModal(true);
+                  }}
+                  className="flex items-center gap-1.5 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white text-xs font-black px-3.5 py-1.5 rounded-full shadow-xs transition active:scale-95 cursor-pointer"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>Ekspertiz</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStartValuationInitialMode("emlak_bul");
+                    setShowStartValuationModal(true);
+                  }}
+                  className="flex items-center gap-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-black px-3.5 py-1.5 rounded-full shadow-xs transition active:scale-95 cursor-pointer"
+                >
+                  <Search className="w-3.5 h-3.5" />
+                  <span>Emlak Bul</span>
+                </button>
+              </div>
             </form>
 
             {/* TÜRKİYE 81 İL, 973 İLÇE VE KÖY CANLI ÖNERİ AÇILIR PENCERESİ */}
@@ -1146,18 +1175,19 @@ export default function Home() {
         areaM2={parcelData.areaM2 || 110}
       />
 
-      {/* Yeni Ekspertiz ve Değerleme Başlat Modalı (Ada, Parsel, İl, İlçe, Köy, Alan) */}
+      {/* Yeni Ekspertiz ve Değerleme Başlat Modalı (Hasan Hüseyin Yıldırım Modeli: Expertiz & Emlak Bul) */}
       <StartValuationModal
         isOpen={showStartValuationModal}
         onClose={() => setShowStartValuationModal(false)}
         onSubmit={handleStartValuationSubmit}
+        initialMode={startValuationInitialMode}
         initialCity={parcelData.city || "Çanakkale"}
         initialDistrict={parcelData.district || "Merkez"}
-        initialNeighborhood={parcelData.neighborhood || "Sarıbeyli Köyü"}
-        initialAda={parcelData.ada || "1357"}
-        initialParsel={parcelData.parsel || "4"}
-        initialAreaM2={parcelData.areaM2 || 1250}
-        initialCategory={parcelData.category === "konut" ? "konut" : "arazi"}
+        initialNeighborhood={parcelData.neighborhood || "Kepez"}
+        initialAda={parcelData.ada || "117"}
+        initialParsel={parcelData.parsel || "9"}
+        initialAreaM2={parcelData.areaM2 || 135}
+        initialCategory={parcelData.category === "konut" ? "konut" : "arsa"}
       />
     </div>
   );

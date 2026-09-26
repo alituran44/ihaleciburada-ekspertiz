@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { 
   MapPin, 
   Search, 
@@ -13,11 +13,21 @@ import {
   ArrowRight, 
   Sparkles,
   Layers,
-  Loader2
+  Loader2,
+  CheckCircle2,
+  FileText,
+  Compass,
+  Navigation
 } from "lucide-react";
 import { TURKEY_PROVINCES_AND_DISTRICTS, getProvinceCoordinates, getDistrictCoordinates } from "@/lib/turkeyLocations";
 
 export interface StartValuationPayload {
+  mode: "expertiz" | "emlak_bul";
+  mainCategory: "satilik" | "kiralik" | "takas" | "diger";
+  customMainCategory?: string;
+  subCategory: string;
+  customSubCategory?: string;
+  mapAction: "isaretle" | "ilanlari_bul";
   category: "konut" | "arsa" | "arazi" | "ticari";
   city: string;
   district: string;
@@ -33,6 +43,7 @@ interface StartValuationModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (payload: StartValuationPayload) => void;
+  initialMode?: "expertiz" | "emlak_bul";
   initialCity?: string;
   initialDistrict?: string;
   initialNeighborhood?: string;
@@ -46,25 +57,61 @@ export const StartValuationModal: React.FC<StartValuationModalProps> = ({
   isOpen,
   onClose,
   onSubmit,
+  initialMode = "expertiz",
   initialCity = "Çanakkale",
   initialDistrict = "Merkez",
   initialNeighborhood = "Kepez",
   initialAda = "117",
   initialParsel = "9",
   initialAreaM2 = 135,
-  initialCategory = "konut",
+  initialCategory = "arsa",
 }) => {
-  const [category, setCategory] = useState<"konut" | "arsa" | "arazi" | "ticari">(initialCategory);
+  // 1. Mod Seçimi (EXPERTİZ vs EMLAK BUL)
+  const [activeMode, setActiveMode] = useState<"expertiz" | "emlak_bul">(initialMode);
+
+  // 2. Ana Kategori (Gayrimenkul İlanı)
+  const [mainCategory, setMainCategory] = useState<"satilik" | "kiralik" | "takas" | "diger">("satilik");
+  const [customMainCategory, setCustomMainCategory] = useState<string>("");
+  const [showCustomMainCategory, setShowCustomMainCategory] = useState<boolean>(false);
+
+  // 3. Alt Kategori (Arsa Niteliği)
+  const [subCategory, setSubCategory] = useState<string>("konut_imarli");
+  const [customSubCategory, setCustomSubCategory] = useState<string>("");
+  const [showCustomSubCategory, setShowCustomSubCategory] = useState<boolean>(false);
+
+  // 4. Kiralık / Satılık Aynı Menü (Lokasyon & Ada / Parsel)
   const [city, setCity] = useState(initialCity);
   const [district, setDistrict] = useState(initialDistrict);
   const [neighborhood, setNeighborhood] = useState(initialNeighborhood);
   const [ada, setAda] = useState(initialAda);
   const [parsel, setParsel] = useState(initialParsel);
   const [areaM2, setAreaM2] = useState(initialAreaM2);
-  const [tapuNiteligi, setTapuNiteligi] = useState("Kat Mülkiyeti / Mesken");
+  const [tapuNiteligi, setTapuNiteligi] = useState("İmarlı Arsa");
+
+  // 5. Haritada Kendin Seç & İşlem Seçimi
+  const [mapAction, setMapAction] = useState<"isaretle" | "ilanlari_bul">(
+    initialMode === "emlak_bul" ? "ilanlari_bul" : "isaretle"
+  );
+  const [coords, setCoords] = useState<{ lat: number; lng: number }>({
+    lat: 40.0985,
+    lng: 26.3980,
+  });
+
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  if (!isOpen) return null;
+  // Leaflet Harita Referansları
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<any>(null);
+  const markerInstanceRef = useRef<any>(null);
+
+  // Mod değiştiğinde harita eylemini senkronize et
+  useEffect(() => {
+    if (activeMode === "emlak_bul") {
+      setMapAction("ilanlari_bul");
+    } else {
+      setMapAction("isaretle");
+    }
+  }, [activeMode]);
 
   // İl değiştikçe ilçeleri otomatik getir
   const provinceList = Object.keys(TURKEY_PROVINCES_AND_DISTRICTS).sort((a, b) => a.localeCompare(b, "tr"));
@@ -73,31 +120,127 @@ export const StartValuationModal: React.FC<StartValuationModalProps> = ({
   const handleCityChange = (newCity: string) => {
     setCity(newCity);
     const dists = TURKEY_PROVINCES_AND_DISTRICTS[newCity]?.districts || [];
-    if (dists.length > 0) {
-      setDistrict(dists[0]);
+    const newDistrict = dists.length > 0 ? dists[0] : "";
+    setDistrict(newDistrict);
+
+    const distCoords = getDistrictCoordinates(newCity, newDistrict) || getProvinceCoordinates(newCity);
+    if (distCoords) {
+      setCoords(distCoords);
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.flyTo([distCoords.lat, distCoords.lng], 15);
+        if (markerInstanceRef.current) {
+          markerInstanceRef.current.setLatLng([distCoords.lat, distCoords.lng]);
+        }
+      }
     }
   };
 
-  const handleCategorySwitch = (cat: "konut" | "arsa" | "arazi" | "ticari") => {
-    setCategory(cat);
-    if (cat === "konut") {
-      setTapuNiteligi("Kat Mülkiyeti / Mesken");
-      if (areaM2 > 1000) setAreaM2(120);
-    } else if (cat === "arsa") {
-      setTapuNiteligi("İmarlı Arsa");
-      if (areaM2 < 200 || areaM2 > 10000) setAreaM2(850);
-    } else if (cat === "arazi") {
-      setTapuNiteligi("Tarla");
-      if (areaM2 < 500) setAreaM2(2500);
-    } else if (cat === "ticari") {
-      setTapuNiteligi("Dükkan / Mağaza");
-      if (areaM2 > 2000) setAreaM2(180);
+  const handleDistrictChange = (newDistrict: string) => {
+    setDistrict(newDistrict);
+    const distCoords = getDistrictCoordinates(city, newDistrict);
+    if (distCoords) {
+      setCoords(distCoords);
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.flyTo([distCoords.lat, distCoords.lng], 15);
+        if (markerInstanceRef.current) {
+          markerInstanceRef.current.setLatLng([distCoords.lat, distCoords.lng]);
+        }
+      }
     }
   };
 
-  // Hazır Hızlı Test Şablonları
+  // Harita Başlatma & Yenileme (Client-Side Dynamic Leaflet)
+  useEffect(() => {
+    if (!isOpen || !mapContainerRef.current) return;
+
+    let isMounted = true;
+
+    const setupMap = async () => {
+      const L = (await import("leaflet")).default;
+
+      if (!isMounted || !mapContainerRef.current) return;
+
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+      }
+
+      const currentLat = coords?.lat || 40.0985;
+      const currentLng = coords?.lng || 26.3980;
+
+      const map = L.map(mapContainerRef.current, {
+        center: [currentLat, currentLng],
+        zoom: 15,
+        zoomControl: false,
+      });
+
+      // ESRI World Imagery (Uydu Katmanı)
+      L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+        maxZoom: 19,
+        attribution: "Tiles © Esri",
+      }).addTo(map);
+
+      L.control.zoom({ position: "bottomright" }).addTo(map);
+
+      // Özel Kehribar / Kırmızı Rozet İkonu
+      const badgeHtml = `
+        <div style="position: relative; display: flex; flex-direction: column; align-items: center; transform: translate(-50%, -100%);">
+          <div style="background: #0B1E3B; color: #F59E0B; padding: 4px 8px; border-radius: 8px; font-weight: 900; font-size: 11px; white-space: nowrap; box-shadow: 0 4px 12px rgba(0,0,0,0.6); border: 2px solid #F59E0B; display: flex; align-items: center; gap: 4px;">
+            <span>📍</span>
+            <span>${ada ? `${ada}/${parsel}` : "Konum"}</span>
+          </div>
+          <div style="width: 12px; height: 12px; background: #F59E0B; border: 2px solid #ffffff; border-radius: 50%; box-shadow: 0 2px 6px rgba(0,0,0,0.5); margin-top: -3px;"></div>
+        </div>
+      `;
+
+      const customIcon = L.divIcon({
+        className: "custom-pin",
+        html: badgeHtml,
+        iconSize: [0, 0],
+        iconAnchor: [0, 0],
+      });
+
+      const marker = L.marker([currentLat, currentLng], {
+        icon: customIcon,
+        draggable: true,
+      }).addTo(map);
+
+      marker.on("dragend", (e: any) => {
+        const pos = e.target.getLatLng();
+        setCoords({ lat: pos.lat, lng: pos.lng });
+      });
+
+      map.on("click", (e: any) => {
+        marker.setLatLng(e.latlng);
+        setCoords({ lat: e.latlng.lat, lng: e.latlng.lng });
+      });
+
+      markerInstanceRef.current = marker;
+      mapInstanceRef.current = map;
+
+      setTimeout(() => {
+        if (map) map.invalidateSize();
+      }, 250);
+    };
+
+    setupMap();
+
+    return () => {
+      isMounted = false;
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+      }
+    };
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  // Hazır Test Şablonları
   const applyPreset = (preset: {
-    cat: "konut" | "arsa" | "arazi" | "ticari";
+    mode: "expertiz" | "emlak_bul";
+    mainCat: "satilik" | "kiralik" | "takas" | "diger";
+    subCat: string;
     city: string;
     dist: string;
     neigh: string;
@@ -105,8 +248,12 @@ export const StartValuationModal: React.FC<StartValuationModalProps> = ({
     parsel: string;
     area: number;
     nit: string;
+    lat: number;
+    lng: number;
   }) => {
-    setCategory(preset.cat);
+    setActiveMode(preset.mode);
+    setMainCategory(preset.mainCat);
+    setSubCategory(preset.subCat);
     setCity(preset.city);
     setDistrict(preset.dist);
     setNeighborhood(preset.neigh);
@@ -114,6 +261,14 @@ export const StartValuationModal: React.FC<StartValuationModalProps> = ({
     setParsel(preset.parsel);
     setAreaM2(preset.area);
     setTapuNiteligi(preset.nit);
+    setCoords({ lat: preset.lat, lng: preset.lng });
+
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.flyTo([preset.lat, preset.lng], 16);
+      if (markerInstanceRef.current) {
+        markerInstanceRef.current.setLatLng([preset.lat, preset.lng]);
+      }
+    }
   };
 
   const handleFormSubmit = async (e: React.FormEvent) => {
@@ -122,61 +277,65 @@ export const StartValuationModal: React.FC<StartValuationModalProps> = ({
 
     const cleanCity = city.trim() || "Çanakkale";
     const cleanDistrict = district.trim() || "Merkez";
-    const cleanNeigh = neighborhood.trim() || "Merkez";
+    const cleanNeigh = neighborhood.trim() || "Kepez";
 
-    let targetCoords: { lat: number; lng: number } | null = null;
+    let targetCoords = coords;
 
-    // 1. Köy / Mahalle araması (Nominatim API üzerinden tam köy/mahalle koordinatı)
-    try {
-      const searchTarget = `${cleanNeigh}, ${cleanDistrict}, ${cleanCity}`;
-      const res = await fetch(`/api/location/search?q=${encodeURIComponent(searchTarget)}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.results && data.results.length > 0) {
-          const match = data.results[0];
-          if (match.lat && match.lng) {
-            targetCoords = { lat: Number(match.lat), lng: Number(match.lng) };
+    // Koordinat henüz net değilse Nominatim üzerinden teyit et
+    if (!targetCoords || (targetCoords.lat === 40.0985 && targetCoords.lng === 26.3980 && cleanCity !== "Çanakkale")) {
+      try {
+        const searchTarget = `${cleanNeigh}, ${cleanDistrict}, ${cleanCity}`;
+        const res = await fetch(`/api/location/search?q=${encodeURIComponent(searchTarget)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.results && data.results.length > 0) {
+            const match = data.results[0];
+            if (match.lat && match.lng) {
+              targetCoords = { lat: Number(match.lat), lng: Number(match.lng) };
+            }
           }
         }
+      } catch (err) {
+        console.warn("Konum çözümlenemedi, varsayılan koordinata dönülüyor:", err);
       }
-    } catch (err) {
-      console.warn("Köy araması tamamlanamadı, ilçe merkezine dönülüyor:", err);
-    }
-
-    // 2. Fallback: 973 İlçe Koordinatları
-    if (!targetCoords) {
-      targetCoords = getDistrictCoordinates(cleanCity, cleanDistrict);
-    }
-
-    // 3. Fallback: 81 İl Koordinatları
-    if (!targetCoords) {
-      targetCoords = getProvinceCoordinates(cleanCity) || { lat: 39.9334, lng: 32.8597 };
     }
 
     setIsSubmitting(false);
 
+    // Kategori eşleştirme
+    const resolvedCategory: "konut" | "arsa" | "arazi" | "ticari" = 
+      subCategory === "konut_imarli" ? "arsa" :
+      subCategory === "isyeri_imarli" ? "arsa" :
+      subCategory === "tarla" || subCategory === "zeytinlik" || subCategory === "meyvelik" ? "arazi" : "arsa";
+
     onSubmit({
-      category,
+      mode: activeMode,
+      mainCategory,
+      customMainCategory: showCustomMainCategory ? customMainCategory : undefined,
+      subCategory,
+      customSubCategory: showCustomSubCategory ? customSubCategory : undefined,
+      mapAction,
+      category: resolvedCategory,
       city: cleanCity,
       district: cleanDistrict,
       neighborhood: cleanNeigh,
-      ada: ada.trim() || "1",
-      parsel: parsel.trim() || "1",
-      areaM2: Number(areaM2) || (category === "konut" ? 110 : 850),
-      tapuNiteligi: tapuNiteligi.trim() || "Arsa",
+      ada: ada.trim() || "117",
+      parsel: parsel.trim() || "9",
+      areaM2: Number(areaM2) || 850,
+      tapuNiteligi: tapuNiteligi || (subCategory === "tarla" ? "Tarla" : "İmarlı Arsa"),
       coordinates: targetCoords,
     });
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150">
+    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-150">
       <div 
-        className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-xl w-full overflow-hidden flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-200"
+        className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-2xl w-full overflow-hidden flex flex-col max-h-[94vh] animate-in zoom-in-95 duration-200"
         role="dialog"
         aria-modal="true"
       >
-        {/* ÜST BAŞLIK BARI */}
-        <div className="bg-gradient-to-r from-[#0B1E3B] via-[#0F284E] to-[#0B1E3B] text-white p-5 relative">
+        {/* ÜST BAŞLIK & MOD SEÇİMİ (EXPERTİZ vs EMLAK BUL) */}
+        <div className="bg-[#0B1E3B] text-white p-4 sm:p-5 relative border-b border-slate-800">
           <button
             type="button"
             onClick={onClose}
@@ -186,265 +345,378 @@ export const StartValuationModal: React.FC<StartValuationModalProps> = ({
             <X className="w-5 h-5" />
           </button>
 
-          <div className="flex items-center gap-2 text-amber-400 text-xs font-black uppercase tracking-wider mb-1">
+          <div className="flex items-center gap-2 text-amber-400 text-xs font-black uppercase tracking-wider mb-2">
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span>TKGM & İhaleciBurada Kadastro Motoru</span>
+            <span>Hasan Hüseyin Yıldırım Kadastro Standardı (173401031)</span>
           </div>
 
-          <h2 className="text-xl sm:text-2xl font-black text-white font-heading tracking-tight">
-            Yeni Ekspertiz ve Değerleme Başlat
-          </h2>
-          <p className="text-xs text-slate-300 font-medium mt-1">
-            Değerlemesini yapmak istediğiniz taşınmazın il, ilçe, köy, ada, parsel ve alan (m²) bilgilerini belirtin.
+          {/* İKİLİ MOD SEKMELERİ: EXPERTİZ vs EMLAK BUL */}
+          <div className="grid grid-cols-2 gap-2 p-1 bg-slate-900/90 rounded-xl border border-slate-700/80 mb-2">
+            <button
+              type="button"
+              onClick={() => setActiveMode("expertiz")}
+              className={`py-2 px-3 rounded-lg text-xs font-black tracking-wide flex items-center justify-center gap-2 transition cursor-pointer ${
+                activeMode === "expertiz"
+                  ? "bg-linear-to-r from-amber-500 to-amber-600 text-slate-950 shadow-md shadow-amber-500/20"
+                  : "text-slate-400 hover:text-white hover:bg-slate-800/60"
+              }`}
+            >
+              <FileText className="w-4 h-4" />
+              <span>EXPERTİZ (ARSA İÇİN)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveMode("emlak_bul")}
+              className={`py-2 px-3 rounded-lg text-xs font-black tracking-wide flex items-center justify-center gap-2 transition cursor-pointer ${
+                activeMode === "emlak_bul"
+                  ? "bg-linear-to-r from-emerald-500 to-teal-600 text-white shadow-md shadow-emerald-500/20"
+                  : "text-slate-400 hover:text-white hover:bg-slate-800/60"
+              }`}
+            >
+              <Search className="w-4 h-4" />
+              <span>EMLAK BUL (ARSA İÇİN)</span>
+            </button>
+          </div>
+
+          <p className="text-[11px] text-slate-300 font-medium">
+            {activeMode === "expertiz" 
+              ? "Taşınmazın ada, parsel, konum ve nitelik bilgilerini girerek 13 sayfalık resmi SPK/BDDK ekspertiz değerlemesini başlatın."
+              : "Belirlediğiniz ada/parsel veya haritada işaretlediğiniz alan içerisindeki satılık/kiralık ilan ve emsalleri listeleyin."}
           </p>
         </div>
 
         {/* FORM GÖVDESİ */}
-        <form onSubmit={handleFormSubmit} className="p-5 sm:p-6 space-y-4 overflow-y-auto flex-1">
-          {/* 1. TAŞINMAZ TÜRÜ SEÇİMİ */}
-          <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-              Taşınmaz Türü
-            </label>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <form onSubmit={handleFormSubmit} className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 font-sans">
+          
+          {/* 1. ANA KATEGORİ (GAYRİMENKUL İLANI) */}
+          <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-[11px] font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                <span>Ana Kategori (Gayrimenkul İlanı)</span>
+              </label>
+              <span className="text-[10px] text-slate-400 font-bold">Hasan Bey Şablonu</span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
               {[
-                { id: "konut", label: "Konut / Daire", icon: Building },
-                { id: "arsa", label: "İmarlı Arsa", icon: Building2 },
-                { id: "arazi", label: "Tarla / Köy", icon: Trees },
-                { id: "ticari", label: "Ticari / Dükkan", icon: Store },
+                { id: "satilik", label: "SATILIK" },
+                { id: "kiralik", label: "KİRALIK" },
+                { id: "takas", label: "TAKAS" },
+                { id: "diger", label: "DİĞER" },
               ].map((item) => {
-                const Icon = item.icon;
-                const isSelected = category === item.id;
+                const isSelected = mainCategory === item.id;
                 return (
                   <button
                     key={item.id}
                     type="button"
-                    onClick={() => handleCategorySwitch(item.id as any)}
-                    className={`py-2 px-2.5 rounded-xl border text-xs font-bold flex flex-col items-center gap-1 transition cursor-pointer ${
+                    onClick={() => {
+                      setMainCategory(item.id as any);
+                      setShowCustomMainCategory(item.id === "diger");
+                    }}
+                    className={`py-2 px-2.5 rounded-lg border text-xs font-black transition cursor-pointer text-center ${
                       isSelected
-                        ? "border-blue-600 bg-blue-50 text-blue-950 shadow-2xs font-extrabold ring-1 ring-blue-600"
-                        : "border-slate-200 bg-slate-50/50 text-slate-600 hover:bg-slate-100"
+                        ? "border-[#0B1E3B] bg-[#0B1E3B] text-amber-400 shadow-2xs"
+                        : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
                     }`}
                   >
-                    <Icon className={`w-4 h-4 ${isSelected ? "text-blue-600" : "text-slate-500"}`} />
-                    <span className="text-[11px] whitespace-nowrap">{item.label}</span>
+                    {item.label}
                   </button>
                 );
               })}
             </div>
+
+            {/* Elle Girilsin Kutusu */}
+            {(showCustomMainCategory || mainCategory === "diger") && (
+              <div className="mt-2.5 animate-in fade-in duration-150">
+                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">
+                  Elle Girilsin (Özel İlan Türü)
+                </label>
+                <input
+                  type="text"
+                  value={customMainCategory}
+                  onChange={(e) => setCustomMainCategory(e.target.value)}
+                  placeholder="Örn: Kat Karşılığı Satış, Devren, İpotekli İhale vb."
+                  className="w-full px-3 py-1.5 bg-white border border-amber-400 rounded-lg text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-amber-200"
+                />
+              </div>
+            )}
           </div>
 
-          {/* 2. İL, İLÇE, KÖY / MAHALLE ALANLARI */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
-            {/* İL */}
-            <div>
-              <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
-                İl <span className="text-rose-500">*</span>
+          {/* 2. ALT KATEGORİ (ARSA NİTELİĞİ) */}
+          <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-[11px] font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                <span>Alt Kategori (Arsa Niteliği)</span>
               </label>
-              <select
-                value={city}
-                onChange={(e) => handleCityChange(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 outline-none focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition"
+              <button
+                type="button"
+                onClick={() => setShowCustomSubCategory(!showCustomSubCategory)}
+                className="text-[10px] text-blue-600 hover:underline font-bold"
               >
-                {provinceList.map((p) => (
-                  <option key={p} value={p}>{p}</option>
-                ))}
-              </select>
+                + Elle Girilsin
+              </button>
             </div>
 
-            {/* İLÇE */}
-            <div>
-              <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
-                İlçe <span className="text-rose-500">*</span>
-              </label>
-              {availableDistricts.length > 0 ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+              {[
+                { id: "konut_imarli", label: "KONUT İMARLI" },
+                { id: "isyeri_imarli", label: "İŞYERİ İMARLI" },
+                { id: "tarla", label: "TARLA" },
+                { id: "zeytinlik", label: "ZEYTİNLİK" },
+                { id: "meyvelik", label: "MEYVELİK" },
+                { id: "diger", label: "DİĞER" },
+              ].map((item) => {
+                const isSelected = subCategory === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      setSubCategory(item.id);
+                      setTapuNiteligi(item.label);
+                      if (item.id === "diger") {
+                        setShowCustomSubCategory(true);
+                      }
+                    }}
+                    className={`py-2 px-2.5 rounded-lg border text-xs font-black transition cursor-pointer text-center ${
+                      isSelected
+                        ? "border-emerald-600 bg-emerald-50 text-emerald-950 ring-1 ring-emerald-600"
+                        : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Elle Girilsin Kutusu */}
+            {showCustomSubCategory && (
+              <div className="mt-2.5 animate-in fade-in duration-150">
+                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">
+                  Elle Girilsin (Özel Arsa Niteliği)
+                </label>
+                <input
+                  type="text"
+                  value={customSubCategory}
+                  onChange={(e) => {
+                    setCustomSubCategory(e.target.value);
+                    setTapuNiteligi(e.target.value);
+                  }}
+                  placeholder="Örn: Sanayi İmarlı, Bağ Evi, Hisseli Tarla vb."
+                  className="w-full px-3 py-1.5 bg-white border border-emerald-400 rounded-lg text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-emerald-200"
+                />
+              </div>
+            )}
+          </div>
+
+          {/* 3. KİRALIK / SATILIK AYNI MENÜ (LOKASYON BİLGİSİ: İL, İLÇE, MAHALLE, ADA, PARSEL) */}
+          <div className="bg-amber-50/40 p-3.5 rounded-xl border border-amber-200">
+            <div className="text-[11px] font-black text-amber-900 uppercase tracking-wider mb-2 flex items-center justify-between">
+              <span>Kiralık / Satılık Aynı Menü (Arsa)</span>
+              <span className="text-[10px] bg-amber-200/80 px-2 py-0.5 rounded text-amber-950 font-bold">
+                TKGM Kadastro
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              {/* İL */}
+              <div>
+                <label className="block text-[10px] font-extrabold text-slate-700 uppercase mb-1">
+                  İL <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  value={city}
+                  onChange={(e) => handleCityChange(e.target.value)}
+                  className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900 outline-none focus:border-amber-600 transition"
+                >
+                  {provinceList.map((p) => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* İLÇE */}
+              <div>
+                <label className="block text-[10px] font-extrabold text-slate-700 uppercase mb-1">
+                  İLÇE <span className="text-rose-500">*</span>
+                </label>
                 <select
                   value={district}
-                  onChange={(e) => setDistrict(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 outline-none focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition"
+                  onChange={(e) => handleDistrictChange(e.target.value)}
+                  className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900 outline-none focus:border-amber-600 transition"
                 >
                   {availableDistricts.map((d) => (
                     <option key={d} value={d}>{d}</option>
                   ))}
                 </select>
-              ) : (
+              </div>
+
+              {/* MAHALLE / KÖY */}
+              <div>
+                <label className="block text-[10px] font-extrabold text-slate-700 uppercase mb-1">
+                  MAHALLE / KÖY <span className="text-rose-500">*</span>
+                </label>
                 <input
                   type="text"
-                  value={district}
-                  onChange={(e) => setDistrict(e.target.value)}
-                  placeholder="İlçe girin"
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 outline-none focus:bg-white focus:border-blue-600"
+                  value={neighborhood}
+                  onChange={(e) => setNeighborhood(e.target.value)}
+                  placeholder="Örn: Kepez"
+                  required
+                  className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900 outline-none focus:border-amber-600 transition"
                 />
-              )}
-            </div>
+              </div>
 
-            {/* KÖY / MAHALLE */}
-            <div>
-              <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
-                Köy / Mahalle <span className="text-rose-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={neighborhood}
-                onChange={(e) => setNeighborhood(e.target.value)}
-                placeholder="Örn: Sarıbeyli Köyü"
-                required
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 outline-none focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition"
-              />
-            </div>
-          </div>
+              {/* ADA */}
+              <div>
+                <label className="block text-[10px] font-extrabold text-slate-700 uppercase mb-1">
+                  ADA (YAZ) <span className="text-amber-700">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={ada}
+                  onChange={(e) => setAda(e.target.value)}
+                  placeholder="Örn: 117"
+                  required
+                  className="w-full px-2.5 py-1.5 bg-white border border-amber-300 rounded-lg text-xs font-mono font-black text-amber-800 outline-none focus:border-amber-600 transition"
+                />
+              </div>
 
-          {/* 3. KADASTRO: ADA NO, PARSEL NO, ALAN (m²) */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 rounded-xl bg-amber-50/50 border border-amber-200/80">
-            {/* ADA NO */}
-            <div>
-              <label className="block text-[11px] font-extrabold text-slate-800 uppercase mb-1">
-                Ada No <span className="text-amber-600">*</span>
-              </label>
-              <input
-                type="text"
-                value={ada}
-                onChange={(e) => setAda(e.target.value)}
-                placeholder="Örn: 1357"
-                required
-                className="w-full px-3 py-2 bg-white border border-amber-300 rounded-xl text-xs font-mono font-black text-amber-700 outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-200 transition"
-              />
-            </div>
+              {/* PARSEL */}
+              <div>
+                <label className="block text-[10px] font-extrabold text-slate-700 uppercase mb-1">
+                  PARSEL (YAZ) <span className="text-amber-700">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={parsel}
+                  onChange={(e) => setParsel(e.target.value)}
+                  placeholder="Örn: 9"
+                  required
+                  className="w-full px-2.5 py-1.5 bg-white border border-amber-300 rounded-lg text-xs font-mono font-black text-amber-800 outline-none focus:border-amber-600 transition"
+                />
+              </div>
 
-            {/* PARSEL NO */}
-            <div>
-              <label className="block text-[11px] font-extrabold text-slate-800 uppercase mb-1">
-                Parsel No <span className="text-amber-600">*</span>
-              </label>
-              <input
-                type="text"
-                value={parsel}
-                onChange={(e) => setParsel(e.target.value)}
-                placeholder="Örn: 4"
-                required
-                className="w-full px-3 py-2 bg-white border border-amber-300 rounded-xl text-xs font-mono font-black text-amber-700 outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-200 transition"
-              />
-            </div>
-
-            {/* TAŞINMAZ ALANI (m²) */}
-            <div>
-              <label className="block text-[11px] font-extrabold text-slate-800 uppercase mb-1">
-                Alan (m²) <span className="text-rose-500">*</span>
-              </label>
-              <div className="relative flex items-center">
+              {/* ALAN m² */}
+              <div>
+                <label className="block text-[10px] font-extrabold text-slate-700 uppercase mb-1">
+                  ALAN (m²) <span className="text-rose-500">*</span>
+                </label>
                 <input
                   type="number"
                   min={1}
-                  max={5000000}
                   value={areaM2}
                   onChange={(e) => setAreaM2(Number(e.target.value))}
-                  placeholder="Örn: 1250"
+                  placeholder="Örn: 850"
                   required
-                  className="w-full px-3 py-2 pr-9 bg-white border border-amber-300 rounded-xl text-xs font-mono font-black text-slate-900 outline-none focus:border-amber-600 focus:ring-2 focus:ring-amber-200 transition"
+                  className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-mono font-black text-slate-900 outline-none focus:border-amber-600 transition"
                 />
-                <span className="absolute right-2.5 text-xs font-extrabold text-slate-500 select-none pointer-events-none">
-                  m²
-                </span>
               </div>
             </div>
           </div>
 
-          {/* 4. TAPU NİTELİĞİ */}
-          <div>
-            <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
-              Tapu Niteliği / Vasfı
-            </label>
-            <div className="flex flex-wrap gap-1.5">
-              {[
-                "Tarla", 
-                "İmarlı Arsa", 
-                "Kat Mülkiyeti / Mesken", 
-                "Bağ / Bahçe", 
-                "Zeytinlik", 
-                "Dükkan / Mağaza"
-              ].map((nitelik) => (
-                <button
-                  key={nitelik}
-                  type="button"
-                  onClick={() => setTapuNiteligi(nitelik)}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition cursor-pointer ${
-                    tapuNiteligi === nitelik
-                      ? "bg-[#0B1E3B] text-white border-[#0B1E3B] shadow-2xs font-bold"
-                      : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
-                  }`}
-                >
-                  {nitelik}
-                </button>
-              ))}
+          {/* 4. HARİTADA KENDİN SEÇ (İNTERAKTİF LEAFLET UYDU HARİTASI) */}
+          <div className="bg-slate-900 p-3.5 rounded-xl border border-slate-800 text-white">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-1.5">
+                <Compass className="w-4 h-4 text-amber-400" />
+                <span className="text-xs font-black uppercase tracking-wider text-amber-400">
+                  Haritada Kendin Seç
+                </span>
+              </div>
+              <span className="text-[10px] font-mono text-slate-400">
+                {coords.lat.toFixed(4)}, {coords.lng.toFixed(4)}
+              </span>
+            </div>
+
+            {/* Harita Konteyneri */}
+            <div 
+              ref={mapContainerRef} 
+              className="w-full h-44 sm:h-52 rounded-lg overflow-hidden border border-slate-700 relative z-10"
+            />
+
+            <div className="text-[10px] text-slate-400 italic mt-1.5">
+              * Harita üzerine tıklayarak veya rozeti sürükleyerek taşınmazınızın tam koordinatını belirleyebilirsiniz.
+            </div>
+
+            {/* HARİTA AKSİYON SEÇENEKLERİ (İŞARETLE vs BU ALAN İÇİNDEKİ İLANLARI BUL LİSTELE) */}
+            <div className="mt-3 pt-3 border-t border-slate-800 space-y-2">
+              <label 
+                className={`flex items-center gap-2.5 p-2 rounded-lg border transition cursor-pointer ${
+                  mapAction === "isaretle"
+                    ? "bg-amber-500/10 border-amber-500/60 text-amber-300 font-bold"
+                    : "bg-slate-800/40 border-slate-700 text-slate-300 hover:bg-slate-800"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="mapAction"
+                  value="isaretle"
+                  checked={mapAction === "isaretle"}
+                  onChange={() => setMapAction("isaretle")}
+                  className="w-4 h-4 accent-amber-500 cursor-pointer"
+                />
+                <span className="text-xs">İŞARETLE (Bu Noktayı Değerlemeye Al)</span>
+              </label>
+
+              <label 
+                className={`flex items-center gap-2.5 p-2 rounded-lg border transition cursor-pointer ${
+                  mapAction === "ilanlari_bul"
+                    ? "bg-emerald-500/10 border-emerald-500/60 text-emerald-300 font-bold"
+                    : "bg-slate-800/40 border-slate-700 text-slate-300 hover:bg-slate-800"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="mapAction"
+                  value="ilanlari_bul"
+                  checked={mapAction === "ilanlari_bul"}
+                  onChange={() => setMapAction("ilanlari_bul")}
+                  className="w-4 h-4 accent-emerald-500 cursor-pointer"
+                />
+                <span className="text-xs">BU ALAN İÇİNDEKİ SATILIK / KİRALIK İLANLARI BUL & LİSTELE</span>
+              </label>
             </div>
           </div>
 
-          {/* 5. HIZLI ÖRNEK SEÇİCİLER (TEST KOLAYLIĞI) */}
-          <div className="pt-2 border-t border-slate-100">
-            <div className="text-[11px] font-bold text-slate-500 flex items-center gap-1 mb-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-              <span>Hızlı Test Örnekleri (Tek Tıkla Doldur):</span>
+          {/* 5. HIZLI TEST ÖRNEKLERİ */}
+          <div className="pt-1">
+            <div className="text-[10px] font-bold text-slate-500 flex items-center gap-1 mb-1">
+              <Sparkles className="w-3 h-3 text-amber-500" />
+              <span>Hızlı Test Örneği (Hasan Bey Çanakkale Portföyü):</span>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
-              <button
-                type="button"
-                onClick={() => applyPreset({
-                  cat: "arazi",
-                  city: "Çanakkale",
-                  dist: "Merkez",
-                  neigh: "Sarıbeyli Köyü",
-                  ada: "1357",
-                  parsel: "4",
-                  area: 1250,
-                  nit: "Tarla",
-                })}
-                className="text-left px-2.5 py-1.5 rounded-lg bg-slate-50 hover:bg-blue-50 border border-slate-200 text-[11px] text-slate-700 transition"
-              >
-                🌾 <strong>Çanakkale Sarıbeyli</strong> (1357/4 - 1.250 m²)
-              </button>
-
-              <button
-                type="button"
-                onClick={() => applyPreset({
-                  cat: "konut",
-                  city: "Çanakkale",
-                  dist: "Merkez",
-                  neigh: "Kepez",
-                  ada: "117",
-                  parsel: "9",
-                  area: 135,
-                  nit: "Kat Mülkiyeti / Mesken",
-                })}
-                className="text-left px-2.5 py-1.5 rounded-lg bg-slate-50 hover:bg-blue-50 border border-slate-200 text-[11px] text-slate-700 transition"
-              >
-                🏠 <strong>Çanakkale Kepez</strong> (117/9 - 135 m² Konut)
-              </button>
-
-              <button
-                type="button"
-                onClick={() => applyPreset({
-                  cat: "arsa",
-                  city: "İstanbul",
-                  dist: "Kadıköy",
-                  neigh: "Caferağa",
-                  ada: "248",
-                  parsel: "12",
-                  area: 850,
-                  nit: "İmarlı Arsa",
-                })}
-                className="text-left px-2.5 py-1.5 rounded-lg bg-slate-50 hover:bg-blue-50 border border-slate-200 text-[11px] text-slate-700 transition"
-              >
-                📐 <strong>İstanbul Kadıköy</strong> (248/12 - 850 m²)
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => applyPreset({
+                mode: "expertiz",
+                mainCat: "satilik",
+                subCat: "konut_imarli",
+                city: "Çanakkale",
+                dist: "Merkez",
+                neigh: "Kepez",
+                ada: "117",
+                parsel: "9",
+                area: 135,
+                nit: "Kat Mülkiyeti / Mesken",
+                lat: 40.0985,
+                lng: 26.3980,
+              })}
+              className="text-left px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-amber-50 border border-slate-200 text-[11px] text-slate-700 transition cursor-pointer flex items-center justify-between w-full"
+            >
+              <span>🏠 <strong>Çanakkale Kepez</strong> (117 Ada / 9 Parsel - 8-10M TL Rayiç)</span>
+              <span className="text-amber-700 font-bold text-[10px]">Doldur ➔</span>
+            </button>
           </div>
 
           {/* BUTONLAR */}
-          <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+          <div className="pt-3 border-t border-slate-200 flex items-center justify-between gap-2.5">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-100 font-bold text-xs transition cursor-pointer"
+              className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 font-bold text-xs transition cursor-pointer"
             >
               Vazgeç
             </button>
@@ -452,21 +724,32 @@ export const StartValuationModal: React.FC<StartValuationModalProps> = ({
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 disabled:opacity-60 text-white font-black text-xs shadow-md shadow-orange-600/20 transition cursor-pointer flex items-center gap-2 active:scale-95"
+              className={`px-5 py-2.5 rounded-xl text-white font-black text-xs shadow-md transition cursor-pointer flex items-center gap-2 active:scale-95 ${
+                activeMode === "emlak_bul" || mapAction === "ilanlari_bul"
+                  ? "bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 shadow-emerald-700/20"
+                  : "bg-linear-to-r from-[#0B1E3B] via-[#0F284E] to-amber-600 hover:from-[#0B1E3B] hover:to-amber-500 shadow-slate-900/30"
+              }`}
             >
               {isSubmitting ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin text-amber-200" />
-                  <span>Koordinat Çözümleniyor...</span>
+                  <span>İşleniyor...</span>
+                </>
+              ) : activeMode === "emlak_bul" || mapAction === "ilanlari_bul" ? (
+                <>
+                  <Search className="w-4 h-4" />
+                  <span>Bu Alandaki İlanları Bul ve Listele</span>
                 </>
               ) : (
                 <>
-                  <span>Kadastroyu Doğrula ve Değerlemeyi Başlat</span>
-                  <ArrowRight className="w-4 h-4 text-amber-200" />
+                  <FileText className="w-4 h-4 text-amber-400" />
+                  <span>Resmi Ekspertiz Değerlemesini Başlat</span>
+                  <ArrowRight className="w-4 h-4 text-amber-400" />
                 </>
               )}
             </button>
           </div>
+
         </form>
       </div>
     </div>
