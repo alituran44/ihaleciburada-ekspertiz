@@ -35,6 +35,9 @@ interface ParcelMapProps {
   unitM2Price?: number;
   areaM2?: number;
   isEndeksaSplitView?: boolean;
+  searchRadius?: number;
+  focusedCompId?: string | null;
+  onSelectComparable?: (comp: ComparableListing) => void;
   onLocationFound?: (coords: { lat: number; lng: number }) => void;
   onSelectDistrict?: (districtName: string) => void;
   onSelectNeighborhood?: (neighborhoodName: string) => void;
@@ -84,6 +87,9 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
   unitM2Price = 54085,
   areaM2 = 135,
   isEndeksaSplitView = false,
+  searchRadius = 1000,
+  focusedCompId,
+  onSelectComparable,
   onLocationFound,
   onSelectDistrict,
   onSelectNeighborhood,
@@ -361,6 +367,19 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
       dashArray: "6, 8",
     }).addTo(parcelLayerGroupRef.current);
 
+    // Hasan Hüseyin Yıldırım: Dinamik Arama Radar Çemberi (Yeşil Vurgu)
+    if (searchRadius && searchRadius > 0) {
+      L.circle([cLat, cLng], {
+        radius: searchRadius,
+        color: "#10B981",
+        weight: 2.5,
+        opacity: 0.95,
+        fillColor: "#10B981",
+        fillOpacity: 0.08,
+        dashArray: "6, 6",
+      }).addTo(parcelLayerGroupRef.current);
+    }
+
     // 2. Bal Peteği Emsal Kümesi (Hexagonal Honeycomb Mesh)
     const hexRadius = 55; // metre cinsinden petek yarıçapı
     const hexStep = hexRadius * 1.732; // komşu petek merkez mesafesi (~95m)
@@ -571,6 +590,9 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
 
       marker.on("click", () => {
         setSelectedCompId(comp.id);
+        if (onSelectComparable) {
+          onSelectComparable(comp);
+        }
       });
 
       markersRef.current[comp.id] = marker;
@@ -741,7 +763,19 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
     }
 
     drawParcelHoneycomb(lat, lng, unitM2Price, city, activeDistrict, activeNeighborhood || undefined);
-  }, [lat, lng, unitM2Price, city, activeDistrict]);
+  }, [lat, lng, unitM2Price, city, activeDistrict, searchRadius]);
+
+  // Dışarıdan seçilen ilanı haritada odakla ve popup aç
+  useEffect(() => {
+    if (focusedCompId && markersRef.current[focusedCompId]) {
+      const marker = markersRef.current[focusedCompId];
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.flyTo(marker.getLatLng(), 16, { duration: 0.8 });
+      }
+      marker.openPopup();
+      setSelectedCompId(focusedCompId);
+    }
+  }, [focusedCompId]);
 
   const handleSelectComp = (comp: ComparableListing) => {
     setSelectedCompId(comp.id);

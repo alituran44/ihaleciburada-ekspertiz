@@ -34,7 +34,7 @@ const StartValuationModal = dynamic(
   () => import("@/components/valuation/StartValuationModal").then((mod) => mod.StartValuationModal),
   { ssr: false }
 );
-import { ParcelInput, PropertyCategory } from "@/types";
+import { ParcelInput, PropertyCategory, ComparableListing } from "@/types";
 import { SAMPLE_SCENARIOS, formatTL, formatNumber } from "@/lib/constants";
 import { calculateFeasibility } from "@/lib/calculator";
 import { parseSearchLocation } from "@/lib/turkeyLocations";
@@ -65,7 +65,12 @@ import {
   Compass,
   Bell,
   Moon,
-  Globe
+  Globe,
+  PlusCircle,
+  Radio,
+  Tag,
+  Check,
+  Filter
 } from "lucide-react";
 
 export default function Home() {
@@ -75,9 +80,12 @@ export default function Home() {
   const [showElectronicReportModal, setShowElectronicReportModal] = useState<boolean>(false);
   const [showReportSelectionModal, setShowReportSelectionModal] = useState<boolean>(false);
   const [showStartValuationModal, setShowStartValuationModal] = useState<boolean>(false);
-  const [startValuationInitialMode, setStartValuationInitialMode] = useState<"expertiz" | "emlak_bul">("expertiz");
+  const [startValuationInitialMode, setStartValuationInitialMode] = useState<"expertiz" | "emlak_bul" | "ilan_ver">("expertiz");
   const [subTab, setSubTab] = useState<"deger" | "trend" | "rayic" | "best_use">("deger");
   const [valuationMode, setValuationMode] = useState<"otomatik" | "manuel">("otomatik");
+  const [searchRadius, setSearchRadius] = useState<number>(1000);
+  const [focusedCompId, setFocusedCompId] = useState<string | null>(null);
+  const [listingFilter, setListingFilter] = useState<"all" | "satilik" | "kiralik">("all");
   const [isEmsalOpen, setIsEmsalOpen] = useState<boolean>(true);
   const [isWeightedOpen, setIsWeightedOpen] = useState<boolean>(true);
   const [isSummaryOpen, setIsSummaryOpen] = useState<boolean>(true);
@@ -86,12 +94,16 @@ export default function Home() {
   );
   const [isSearching, setIsSearching] = useState<boolean>(false);
 
-  // Yeni Değerleme Başlat Formu Gönderildiğinde (Hasan Bey Modeli: Expertiz veya Emlak Bul)
+  // Yeni Değerleme Başlat Formu Gönderildiğinde (Hasan Bey Modeli: Expertiz, Emlak Bul veya İlan Ver)
   const handleStartValuationSubmit = async (payload: StartValuationPayload) => {
     setShowStartValuationModal(false);
     const isRes = payload.category === "konut";
     const newCoords = payload.coordinates;
-    const cat = isRes ? "konut" : "arsa";
+    const cat: PropertyCategory = isRes ? "konut" : "arsa";
+
+    if (payload.searchRadiusMeters) {
+      setSearchRadius(payload.searchRadiusMeters);
+    }
 
     setParcelData((prev) => ({
       ...prev,
@@ -109,8 +121,35 @@ export default function Home() {
     if (payload.mode === "emlak_bul" || payload.mapAction === "ilanlari_bul") {
       setActiveTab("endeks");
       setSubTab("rayic");
+    } else if (payload.mode === "ilan_ver") {
+      setActiveTab("endeks");
+      setSubTab("rayic");
     } else {
       setActiveTab("degerleme");
+    }
+
+    // İlan ver moduysa anlık olarak yerel listeye ve harita emsal havuzuna ekle
+    if (payload.mode === "ilan_ver" && payload.listingPriceTL) {
+      const newCustomListing: ComparableListing = {
+        id: `user-listing-${Date.now()}`,
+        title: payload.listingTitle || `${payload.neighborhood || payload.district} İhaleciBurada Portföy İlanı`,
+        category: cat,
+        type: (payload.mainCategory === "kiralik" ? "kiralik" : "satilik") as "satilik" | "kiralik",
+        areaM2: payload.areaM2,
+        pricePerM2TL: Math.round(payload.listingPriceTL / (payload.areaM2 || 1)),
+        priceTL: payload.listingPriceTL,
+        distanceMeters: 50,
+        coordinates: newCoords || parcelData.coordinates || { lat: 40.0985, lng: 26.3980 },
+        source: "Bölge Emsali",
+        roomCount: isRes ? "3+1" : undefined,
+        zoningType: isRes ? undefined : payload.tapuNiteligi,
+        date: "Bugün",
+      };
+      setParcelData((prev) => ({
+        ...prev,
+        comparables: [newCustomListing, ...(prev.comparables || [])],
+      }));
+      setFocusedCompId(newCustomListing.id);
     }
 
     // Arka planda girilen il, ilçe ve köy/mahalle için anlık emsal ve piyasa verisini güncelle
@@ -127,7 +166,9 @@ export default function Home() {
           contractorSharePercent: resData.contractorSharePercent,
           monthlyRentEstimateTL: isRes ? resData.estimatedMonthlyRentTL : prev.monthlyRentEstimateTL,
           marketResearch: resData,
-          comparables: resData.comparables,
+          comparables: prev.comparables && prev.comparables.length > 0 && prev.comparables[0].id.startsWith("user-listing-") 
+            ? [prev.comparables[0], ...(resData.comparables || [])] 
+            : resData.comparables,
           tcmbOfficialData: resData.tcmbOfficialData,
           buildingCostEstimate: resData.buildingCostEstimate,
         }));
@@ -441,6 +482,31 @@ export default function Home() {
     }
   };
 
+  // Emlak Bul & Bölgesel İlanlar Filtrelenmiş Listesi
+  const displayedListings = useMemo(() => {
+    let list = parcelData.comparables || [];
+    if (listingFilter !== "all") {
+      list = list.filter((c) => c.type === listingFilter);
+    }
+    return list;
+  }, [parcelData.comparables, listingFilter]);
+
+  const satilikCount = useMemo(() => {
+    return (parcelData.comparables || []).filter((c) => c.type === "satilik").length;
+  }, [parcelData.comparables]);
+
+  const kiralikCount = useMemo(() => {
+    return (parcelData.comparables || []).filter((c) => c.type === "kiralik").length;
+  }, [parcelData.comparables]);
+
+  const avgListingM2Price = useMemo(() => {
+    if (!parcelData.comparables || parcelData.comparables.length === 0) {
+      return isResidential ? (parcelData.estimatedUnitSaleM2PriceTL || 54085) : (parcelData.estimatedLandM2PriceTL || 18500);
+    }
+    const sum = parcelData.comparables.reduce((acc, c) => acc + (c.pricePerM2TL || 0), 0);
+    return Math.round(sum / parcelData.comparables.length);
+  }, [parcelData.comparables, isResidential, parcelData.estimatedUnitSaleM2PriceTL, parcelData.estimatedLandM2PriceTL]);
+
   return (
     <div className="min-h-screen flex flex-col bg-[#F8FAFC]">
       {/* 1. ENDEKSA TARZI ÜST ARAMA & GEZİNİM ÇUBUĞU */}
@@ -507,7 +573,7 @@ export default function Home() {
                 )}
               </button>
 
-              {/* Hasan Bey İkili Eylem Butonları: Ekspertiz Başlat & Emlak Bul */}
+              {/* Hasan Bey Üçlü Eylem Butonları: Ekspertiz Başlat & Emlak Bul & İlan Ver */}
               <div className="hidden md:flex items-center gap-1.5 shrink-0">
                 <button
                   type="button"
@@ -531,6 +597,18 @@ export default function Home() {
                 >
                   <Search className="w-3.5 h-3.5" />
                   <span>Emlak Bul</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStartValuationInitialMode("ilan_ver");
+                    setShowStartValuationModal(true);
+                  }}
+                  className="flex items-center gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-black px-3 py-1.5 rounded-full shadow-xs transition active:scale-95 cursor-pointer"
+                >
+                  <PlusCircle className="w-3.5 h-3.5" />
+                  <span>İlan Ver</span>
                 </button>
               </div>
             </form>
@@ -748,7 +826,7 @@ export default function Home() {
                   const titles: Record<string, string> = {
                     deger: "Değer",
                     trend: "Trend",
-                    rayic: "Rayiç",
+                    rayic: "Rayiç & İlanlar",
                     best_use: "Best-Use",
                   };
                   const isActive = subTab === tab;
@@ -769,8 +847,313 @@ export default function Home() {
                 })}
               </div>
 
-              {/* TAPUSOR ESİNTİLİ OTOMATİK DEĞERLEME & FİNANS ANALİZ KARTI */}
-              <div className="bg-gradient-to-br from-slate-900 via-[#0B1E3B] to-slate-950 text-white rounded-2xl p-4 sm:p-5 border border-slate-800 shadow-md space-y-3.5">
+              {/* SEKME: RAYİÇ & İLANLAR (HASAN HÜSEYİN YILDIRIM: BU ALAN İÇİNDEKİ İLANLARI BUL VE LİSTELE) */}
+              {subTab === "rayic" && (
+                <div className="space-y-4 animate-in fade-in duration-200">
+                  {/* 1. RADAR BAŞLIĞI & YARIÇAP KONTROL KARTI */}
+                  <div className="bg-[#0B1E3B] text-white p-4 rounded-2xl border border-slate-800 shadow-md space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+                          <Radio className="w-4 h-4 animate-pulse" />
+                        </div>
+                        <div>
+                          <div className="text-xs font-black text-white font-heading uppercase tracking-wide">
+                            Bölgesel İlanlar & Emsal Radarı
+                          </div>
+                          <div className="text-[10px] text-slate-300 font-mono">
+                            {parcelData.neighborhood || "Merkez"}, {parcelData.district}, {parcelData.city}
+                          </div>
+                        </div>
+                      </div>
+                      <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-black border border-emerald-500/30 font-mono">
+                        {searchRadius >= 1000 ? `${searchRadius / 1000} km` : `${searchRadius} m`} Çapında
+                      </span>
+                    </div>
+
+                    {/* YARIÇAP BUTONLARI (500m - 5km) */}
+                    <div className="pt-2.5 border-t border-slate-800/80">
+                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                        <span>Arama Radar Çapı (Mesafe):</span>
+                        <span className="text-emerald-400 font-mono font-bold">
+                          {searchRadius >= 1000 ? `${searchRadius / 1000} km` : `${searchRadius} m`}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-4 gap-1.5">
+                        {[
+                          { val: 500, label: "500 m" },
+                          { val: 1000, label: "1 km" },
+                          { val: 3000, label: "3 km" },
+                          { val: 5000, label: "5 km" },
+                        ].map((r) => (
+                          <button
+                            key={r.val}
+                            type="button"
+                            onClick={() => setSearchRadius(r.val)}
+                            className={`py-1.5 px-2 rounded-lg text-xs font-mono font-black border transition cursor-pointer text-center ${
+                              searchRadius === r.val
+                                ? "bg-emerald-600 text-white border-emerald-500 shadow-xs"
+                                : "bg-slate-800/80 text-slate-400 border-slate-700 hover:bg-slate-800 hover:text-white"
+                            }`}
+                          >
+                            {r.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 2. PİYASA İSTATİSTİK ŞERİDİ */}
+                  <div className="grid grid-cols-3 gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200 text-center font-mono">
+                    <div className="bg-white p-2 rounded-lg border border-slate-100 shadow-2xs">
+                      <div className="text-[9px] font-bold text-slate-500 uppercase">Taranan İlan</div>
+                      <div className="text-xs sm:text-sm font-black text-slate-900 mt-0.5">
+                        {displayedListings.length} Adet
+                      </div>
+                    </div>
+                    <div className="bg-white p-2 rounded-lg border border-slate-100 shadow-2xs">
+                      <div className="text-[9px] font-bold text-slate-500 uppercase">Ort. m² Birim</div>
+                      <div className="text-xs sm:text-sm font-black text-emerald-700 mt-0.5">
+                        {avgListingM2Price.toLocaleString("tr-TR")} ₺
+                      </div>
+                    </div>
+                    <div className="bg-white p-2 rounded-lg border border-slate-100 shadow-2xs">
+                      <div className="text-[9px] font-bold text-slate-500 uppercase">Kategori</div>
+                      <div className="text-xs sm:text-sm font-black text-amber-700 mt-0.5 truncate">
+                        {isResidential ? "Konut" : "Arsa"}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 3. FİLTRELEME HAPLARI: TÜMÜ / SATILIK / KİRALIK */}
+                  <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl text-xs font-bold border border-slate-200">
+                    {[
+                      { id: "all", label: `Tümü (${parcelData.comparables?.length || 0})` },
+                      { id: "satilik", label: `Satılık (${satilikCount})` },
+                      { id: "kiralik", label: `Kiralık (${kiralikCount})` },
+                    ].map((f) => (
+                      <button
+                        key={f.id}
+                        type="button"
+                        onClick={() => setListingFilter(f.id as any)}
+                        className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer text-center ${
+                          listingFilter === f.id
+                            ? "bg-white text-slate-900 shadow-xs font-black"
+                            : "text-slate-600 hover:text-slate-900"
+                        }`}
+                      >
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* 4. İLAN KARTLARI LİSTESİ */}
+                  <div className="space-y-3">
+                    {displayedListings.length > 0 ? (
+                      displayedListings.map((comp) => {
+                        const isSatilik = comp.type === "satilik";
+                        const isFocused = focusedCompId === comp.id;
+                        return (
+                          <div
+                            key={comp.id}
+                            className={`p-3.5 rounded-xl border transition bg-white shadow-2xs relative ${
+                              isFocused
+                                ? "border-emerald-500 ring-2 ring-emerald-500/30 bg-emerald-50/20"
+                                : "border-slate-200 hover:border-slate-300"
+                            }`}
+                          >
+                            {/* Üst Şerit: Rozetler & Mesafe */}
+                            <div className="flex items-center justify-between gap-2 mb-1.5">
+                              <div className="flex items-center gap-1.5">
+                                <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider ${
+                                  isSatilik ? "bg-emerald-100 text-emerald-800" : "bg-blue-100 text-blue-800"
+                                }`}>
+                                  {isSatilik ? "Satılık" : "Kiralık"}
+                                </span>
+                                <span className="text-[10px] font-semibold text-slate-500">
+                                  {comp.source}
+                                </span>
+                              </div>
+                              <span className="text-[10px] font-mono font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 flex items-center gap-1">
+                                <span>🎯</span>
+                                <span>{comp.distanceMeters || 220} m</span>
+                              </span>
+                            </div>
+
+                            {/* İlan Başlığı */}
+                            <div className="text-xs sm:text-sm font-bold text-slate-900 leading-snug line-clamp-2 mb-2">
+                              {comp.title}
+                            </div>
+
+                            {/* Özellikler */}
+                            <div className="flex flex-wrap items-center gap-2 text-[10px] text-slate-600 pb-2 mb-2 border-b border-slate-100 font-mono">
+                              <span className="bg-slate-100 px-2 py-0.5 rounded font-bold text-slate-800">
+                                {comp.areaM2} m²
+                              </span>
+                              <span>•</span>
+                              <span className="font-bold text-slate-800">
+                                {comp.pricePerM2TL.toLocaleString("tr-TR")} ₺/m²
+                              </span>
+                              <span>•</span>
+                              <span>
+                                {comp.roomCount || comp.zoningType || (isResidential ? "3+1" : "İmarlı")}
+                              </span>
+                              <span>•</span>
+                              <span className="text-slate-400">{comp.date || "Güncel"}</span>
+                            </div>
+
+                            {/* Fiyat & Aksiyon Butonları */}
+                            <div className="flex items-center justify-between gap-2 pt-0.5">
+                              <div>
+                                <div className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">
+                                  İlan Fiyatı
+                                </div>
+                                <div className={`text-base font-black font-mono ${isSatilik ? "text-emerald-700" : "text-blue-700"}`}>
+                                  ₺ {comp.priceTL.toLocaleString("tr-TR")}
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setFocusedCompId(comp.id);
+                                  }}
+                                  className="px-2.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer active:scale-95"
+                                  title="Haritada bu ilanın konumuna odaklan"
+                                >
+                                  <MapPin className="w-3.5 h-3.5 text-amber-400" />
+                                  <span>Haritada Gör</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setParcelData((prev) => ({
+                                      ...prev,
+                                      areaM2: comp.areaM2,
+                                      estimatedUnitSaleM2PriceTL: isResidential ? comp.pricePerM2TL : prev.estimatedUnitSaleM2PriceTL,
+                                      estimatedLandM2PriceTL: !isResidential ? comp.pricePerM2TL : prev.estimatedLandM2PriceTL,
+                                    }));
+                                    setSubTab("deger");
+                                  }}
+                                  className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-lg text-xs font-bold transition cursor-pointer active:scale-95"
+                                  title="Bu ilanın verilerini değerleme sihirbazına aktar"
+                                >
+                                  <span>Değerle</span>
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="p-8 text-center bg-slate-50 border border-dashed border-slate-300 rounded-xl text-slate-500 text-xs">
+                        Seçilen filtrede ilan bulunamadı.
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 5. YENİ İLAN / PORTFÖY EKLE ÇAĞRISI */}
+                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-4 text-center space-y-2">
+                    <div className="text-xs font-black text-blue-950 font-heading">
+                      Kendi İlanınızı veya Portföyünüzü Ekleyin
+                    </div>
+                    <p className="text-[11px] text-blue-800 leading-relaxed">
+                      Bu bölgedeki gayrimenkulünüzü veya ihale portföyünüzü ekleyin; haritada ve değerleme havuzunda anında listelensin.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStartValuationInitialMode("ilan_ver");
+                        setShowStartValuationModal(true);
+                      }}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black shadow-xs transition flex items-center justify-center gap-1.5 mx-auto cursor-pointer active:scale-95"
+                    >
+                      <PlusCircle className="w-4 h-4" />
+                      <span>İlan Ver / Portföy Ekle</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* SEKME: BEST-USE PROJE VE GELİŞTİRME */}
+              {subTab === "best_use" && (
+                <div className="space-y-4 animate-in fade-in duration-200">
+                  <div className="bg-[#0B1E3B] text-white p-4 rounded-2xl border border-slate-800 shadow-md space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-400 text-[10px] font-black border border-amber-500/30 flex items-center gap-1">
+                        <Sparkles className="w-3 h-3 text-amber-400" />
+                        Best-Use & Proje Geliştirme
+                      </span>
+                      <span className="text-xs font-mono font-bold text-slate-400">
+                        KAKS: {parcelData.kaks || 1.5} • TAKS: {parcelData.taks || 0.35}
+                      </span>
+                    </div>
+
+                    <div className="pt-2">
+                      <div className="text-2xl font-black text-white font-mono">
+                        {Math.round((parcelData.areaM2 || 1000) * (parcelData.kaks || 1.5)).toLocaleString("tr-TR")} m²
+                      </div>
+                      <div className="text-[11px] text-slate-400">
+                        Öngörülen Toplam Emsal İnşaat Alanı (Satılabilir Alan)
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800 text-[11px]">
+                      <div>
+                        <span className="text-slate-400">Müteahhit Payı:</span>
+                        <div className="font-bold text-white font-mono">%{parcelData.contractorSharePercent || 50} Kat Karşılığı</div>
+                      </div>
+                      <div>
+                        <span className="text-slate-400">Arsa Sahibi Payı:</span>
+                        <div className="font-bold text-amber-400 font-mono">%{100 - (parcelData.contractorSharePercent || 50)}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-white border border-slate-200 rounded-xl space-y-2 text-xs">
+                    <div className="font-bold text-slate-900 font-heading">
+                      En Etkin ve Verimli Kullanım (Highest & Best Use) Özeti
+                    </div>
+                    <p className="text-slate-600 text-[11px] leading-relaxed">
+                      {parcelData.city} ili, {parcelData.district} ilçesi imar plan notları ve piyasa absorpsiyon oranlarına göre, bu parsel üzerinde zemin ticari + üst katlar konut tipolojisi en yüksek yatırım getirisini (IRR %38) sağlamaktadır.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setShowReportSelectionModal(true)}
+                      className="w-full mt-2 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-lg text-xs transition cursor-pointer"
+                    >
+                      Best-Use Raporunu PDF Olarak İndir
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* SEKME: TREND */}
+              {subTab === "trend" && (
+                <div className="space-y-4 animate-in fade-in duration-200">
+                  <PriceTrendChart
+                    city={parcelData.city}
+                    district={parcelData.district}
+                    neighborhood={parcelData.neighborhood}
+                    category={parcelData.category === "konut" ? "konut" : "arsa"}
+                    currentUnitM2TL={
+                      isResidential 
+                        ? (parcelData.estimatedUnitSaleM2PriceTL || 54090) 
+                        : (parcelData.estimatedLandM2PriceTL || 15000)
+                    }
+                    kfeIndex={parcelData.tcmbOfficialData?.kfeIndex}
+                    kfeAnnualChange={parcelData.tcmbOfficialData?.kfeAnnualChangePercent}
+                    currencyRates={parcelData.currencyRates}
+                  />
+                </div>
+              )}
+
+              {/* SEKME: DEĞER (STANDART TAPUSOR OTOMATİK DEĞERLEME & FİNANS ANALİZ KARTI VE AKORDİYONLAR) */}
+              {subTab === "deger" && (
+                <>
+                  <div className="bg-gradient-to-br from-slate-900 via-[#0B1E3B] to-slate-950 text-white rounded-2xl p-4 sm:p-5 border border-slate-800 shadow-md space-y-3.5">
                 <div className="flex items-center justify-between">
                   <span className="px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-400 text-[10px] font-black border border-amber-500/30 flex items-center gap-1">
                     <Sparkles className="w-3 h-3 text-amber-400" />
@@ -1002,6 +1385,8 @@ export default function Home() {
                   </div>
                 )}
               </div>
+              </>
+              )}
 
               {/* ÇALIŞMA SEKMELERİ: [PİYASA ANALİZİ] | [İHALE & PEY SİMÜLATÖRÜ] */}
               <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-100 rounded-xl text-xs font-bold">
@@ -1114,6 +1499,9 @@ export default function Home() {
                     : (parcelData.estimatedLandM2PriceTL || 18500)
                 }
                 isEndeksaSplitView={true}
+                searchRadius={searchRadius}
+                focusedCompId={focusedCompId}
+                onSelectComparable={(comp) => setFocusedCompId(comp.id)}
                 onLocationFound={(coords) => {
                   setParcelData((prev) => ({
                     ...prev,
