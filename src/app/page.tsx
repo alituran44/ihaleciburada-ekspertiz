@@ -459,6 +459,8 @@ export default function Home() {
     neighborhood: string;
     coordinates: { lat: number; lng: number };
     unitPrice?: number;
+    ada?: string;
+    parsel?: string;
     comparables?: any[];
   }) => {
     // 1. Üst arama çubuğunu haritada tıklanan noktayla anında güncelle
@@ -474,6 +476,8 @@ export default function Home() {
         city: loc.city,
         district: loc.district,
         neighborhood: loc.neighborhood,
+        ada: loc.ada || prev.ada,
+        parsel: loc.parsel || prev.parsel,
         coordinates: loc.coordinates, // Tıklanan koordinat kesin olarak sabitlenir!
         estimatedUnitSaleM2PriceTL: isRes ? newUnitM2 : prev.estimatedUnitSaleM2PriceTL,
         estimatedLandM2PriceTL: newLandM2,

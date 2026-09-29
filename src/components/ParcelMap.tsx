@@ -47,6 +47,8 @@ interface ParcelMapProps {
     neighborhood: string;
     coordinates: { lat: number; lng: number };
     unitPrice?: number;
+    ada?: string;
+    parsel?: string;
     comparables?: ComparableListing[];
   }) => void;
 }
@@ -453,61 +455,94 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
       return pts;
     };
 
-    // Merkez Hedef Altıgen (Sarı Vurgulu Petek)
+    const targetAda = ada || "248";
+    const targetParsel = parsel || "12";
+    const targetArea = areaM2 || 1650;
+
+    // Merkez Hedef Altıgen (Sarı Vurgulu Petek + Kadastro Çerçevesi)
     const centerHexCorners = getHexCorners(cLat, cLng, hexRadius);
     const centerPolygon = L.polygon(centerHexCorners, {
-      color: "#CA8A04",
-      weight: 3,
-      opacity: 0.98,
+      color: "#D97706",
+      weight: 3.5,
+      opacity: 1.0,
       fillColor: "#FDE047",
-      fillOpacity: 0.58,
+      fillOpacity: 0.65,
+      dashArray: "6, 4",
     }).addTo(parcelLayerGroupRef.current);
 
     centerPolygon.bindTooltip(
-      `<div style="font-family: sans-serif; text-align: center; padding: 2px;">
-        <strong style="color: #854D0E; font-size: 11px;">Hedef Değerleme Parseli</strong><br/>
-        <span style="color: #0F172A; font-weight: 800; font-size: 12px;">${targetPrice.toLocaleString("tr-TR")} ₺/m²</span>
+      `<div style="font-family: sans-serif; text-align: center; padding: 4px 8px;">
+        <div style="font-weight: 900; font-size: 13px; color: #92400E; display: flex; align-items: center; justify-content: center; gap: 4px;">
+          <span>🏛️</span>
+          <span>Ada: <strong>${targetAda}</strong> / Parsel: <strong>${targetParsel}</strong></span>
+        </div>
+        <div style="color: #0F172A; font-weight: 800; font-size: 11px; margin-top: 2px;">
+          ${targetPrice.toLocaleString("tr-TR")} ₺/m² • ${targetArea} m²
+        </div>
+        <div style="color: #475569; font-size: 10px;">
+          ${cCity} / ${cDist} ${cNeigh ? `• ${cNeigh}` : ""}
+        </div>
       </div>`,
-      { permanent: false, direction: "top", opacity: 0.95 }
+      { permanent: false, direction: "top", opacity: 0.98 }
     );
 
-    // Merkezde TapuSor İğnesi ve m² Değeri Rozeti
+    // 1. Merkezde Yüzen Ada / Parsel ve m² Rozeti (Pim üstünde)
     const centerBadgeIcon = L.divIcon({
       className: "leaflet-target-badge",
       html: `
-        <div style="position: relative; display: flex; flex-direction: column; align-items: center; transform: translate(-50%, -100%); pointer-events: auto;">
-          <div style="background: #0F223D; color: #FCD34D; font-weight: 900; font-size: 11px; padding: 4px 10px; border-radius: 20px; border: 2px solid #FCD34D; box-shadow: 0 4px 14px rgba(0,0,0,0.35); white-space: nowrap; font-family: monospace; display: flex; align-items: center; gap: 4px;">
-            <span>📍</span>
-            <span>${targetPrice.toLocaleString("tr-TR")} ₺/m²</span>
+        <div style="position: relative; display: flex; flex-direction: column; align-items: center; transform: translate(-50%, -100%); pointer-events: auto; cursor: pointer;">
+          <div style="background: #0B1E3B; color: #FFFFFF; font-weight: 900; font-size: 11px; padding: 4px 10px; border-radius: 20px; border: 2px solid #F59E0B; box-shadow: 0 4px 14px rgba(0,0,0,0.35); white-space: nowrap; font-family: monospace; display: flex; align-items: center; gap: 6px;">
+            <span style="background: #F59E0B; color: #0B1E3B; font-weight: 900; padding: 1px 6px; border-radius: 5px; font-size: 10px; letter-spacing: -0.2px;">Ada ${targetAda} / P. ${targetParsel}</span>
+            <span style="color: #FCD34D;">${targetPrice.toLocaleString("tr-TR")} ₺/m²</span>
           </div>
-          <div style="width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid #0F223D;"></div>
+          <div style="width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid #0B1E3B;"></div>
         </div>
       `,
       iconSize: [0, 0],
     });
-
     L.marker([cLat, cLng], { icon: centerBadgeIcon }).addTo(parcelLayerGroupRef.current);
 
-    // Çevre 12 Adet Bal Peteği Hücresi (2 Halka: 6 Yakın + 6 Orta)
+    // 2. Parsel Yüzeyine Kalıcı Kadastro Ada/Parsel Damgası (TKGM Parsel Sorgu Görünümü)
+    const centerStampIcon = L.divIcon({
+      className: "leaflet-parcel-stamp",
+      html: `
+        <div style="transform: translate(-50%, 6px); pointer-events: none; text-align: center; select-none;">
+          <div style="background: rgba(254, 240, 138, 0.92); border: 1.5px solid #D97706; border-radius: 8px; padding: 2px 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.12); display: inline-flex; flex-direction: column; align-items: center;">
+            <span style="font-family: monospace; font-weight: 900; font-size: 11.5px; color: #92400E; letter-spacing: 0.3px;">ADA ${targetAda} • PARSEL ${targetParsel}</span>
+            <span style="font-size: 9px; font-weight: 800; color: #78350F;">${targetArea} m² • ${category === "konut" ? "Konut Parseli" : "İmarlı Arsa"}</span>
+          </div>
+        </div>
+      `,
+      iconSize: [0, 0],
+    });
+    L.marker([cLat, cLng], { icon: centerStampIcon }).addTo(parcelLayerGroupRef.current);
+
+    // Çevre 12 Adet Bal Peteği Hücresi (Komşu Kadastro Parselleri)
+    const baseAdaNum = parseInt(targetAda.replace(/\D/g, "")) || 248;
+    const baseParselNum = parseInt(targetParsel.replace(/\D/g, "")) || 12;
+
     const honeycombOffsets = [
-      { angle: 0, dist: hexStep, mult: 1.04 },
-      { angle: 60, dist: hexStep, mult: 0.97 },
-      { angle: 120, dist: hexStep, mult: 1.06 },
-      { angle: 180, dist: hexStep, mult: 0.92 },
-      { angle: 240, dist: hexStep, mult: 0.95 },
-      { angle: 300, dist: hexStep, mult: 1.08 },
-      { angle: 30, dist: hexStep * 1.732, mult: 1.11 },
-      { angle: 90, dist: hexStep * 1.732, mult: 1.03 },
-      { angle: 150, dist: hexStep * 1.732, mult: 0.89 },
-      { angle: 210, dist: hexStep * 1.732, mult: 0.91 },
-      { angle: 270, dist: hexStep * 1.732, mult: 0.98 },
-      { angle: 330, dist: hexStep * 1.732, mult: 1.14 },
+      { angle: 0, dist: hexStep, mult: 1.04, pOffset: 1, adaOffset: 0 },
+      { angle: 60, dist: hexStep, mult: 0.97, pOffset: 2, adaOffset: 0 },
+      { angle: 120, dist: hexStep, mult: 1.06, pOffset: 3, adaOffset: 0 },
+      { angle: 180, dist: hexStep, mult: 0.92, pOffset: -1, adaOffset: 0 },
+      { angle: 240, dist: hexStep, mult: 0.95, pOffset: -2, adaOffset: 0 },
+      { angle: 300, dist: hexStep, mult: 1.08, pOffset: -3, adaOffset: 0 },
+      { angle: 30, dist: hexStep * 1.732, mult: 1.11, pOffset: 4, adaOffset: 0 },
+      { angle: 90, dist: hexStep * 1.732, mult: 1.03, pOffset: 5, adaOffset: 0 },
+      { angle: 150, dist: hexStep * 1.732, mult: 0.89, pOffset: -4, adaOffset: 0 },
+      { angle: 210, dist: hexStep * 1.732, mult: 0.91, pOffset: -5, adaOffset: 0 },
+      { angle: 270, dist: hexStep * 1.732, mult: 0.98, pOffset: 1, adaOffset: 1 },
+      { angle: 330, dist: hexStep * 1.732, mult: 1.14, pOffset: 2, adaOffset: -1 },
     ];
 
     honeycombOffsets.forEach((hCell) => {
       const cellCenter = offsetCoord(cLat, cLng, hCell.dist, hCell.angle);
       const cellCorners = getHexCorners(cellCenter.lat, cellCenter.lng, hexRadius);
       const cellPrice = Math.round(targetPrice * hCell.mult);
+      const cellAda = String(baseAdaNum + hCell.adaOffset);
+      const cellParsel = String(Math.max(1, baseParselNum + hCell.pOffset));
+      const cellBadgeLabel = hCell.adaOffset === 0 ? `P. ${cellParsel}` : `${cellAda}/${cellParsel}`;
 
       const cellPoly = L.polygon(cellCorners, {
         color: "#2563EB",
@@ -520,9 +555,11 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
       const cellIcon = L.divIcon({
         className: "leaflet-hex-badge",
         html: `
-          <div style="transform: translate(-50%, -50%); pointer-events: none;">
-            <div style="background: rgba(255, 255, 255, 0.92); color: #1E3A8A; font-weight: 800; font-size: 9px; padding: 2px 6px; border-radius: 8px; border: 1px solid rgba(37, 99, 235, 0.4); box-shadow: 0 1px 4px rgba(0,0,0,0.15); white-space: nowrap; font-family: monospace;">
-              ${cellPrice.toLocaleString("tr-TR")} ₺
+          <div style="transform: translate(-50%, -50%); pointer-events: auto; cursor: pointer;">
+            <div style="background: rgba(255, 255, 255, 0.95); color: #1E3A8A; font-weight: 800; font-size: 9px; padding: 2px 6px; border-radius: 8px; border: 1.5px solid rgba(37, 99, 235, 0.45); box-shadow: 0 2px 5px rgba(0,0,0,0.14); white-space: nowrap; font-family: monospace; display: flex; align-items: center; gap: 4px;">
+              <span style="color: #2563EB; font-weight: 900;">${cellBadgeLabel}</span>
+              <span style="color: #94A3B8;">•</span>
+              <span>${cellPrice.toLocaleString("tr-TR")} ₺</span>
             </div>
           </div>
         `,
@@ -532,12 +569,29 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
       L.marker([cellCenter.lat, cellCenter.lng], { icon: cellIcon }).addTo(parcelLayerGroupRef.current!);
 
       cellPoly.bindTooltip(
-        `<div style="font-family: sans-serif; font-size: 10.5px;">
-          <strong>Bölge Mikro Hücresi</strong><br/>
-          Ort. Rayiç: <span style="color: #2563EB; font-weight: 800;">${cellPrice.toLocaleString("tr-TR")} ₺/m²</span>
+        `<div style="font-family: sans-serif; font-size: 11px; padding: 2px 4px;">
+          <strong style="color: #1E40AF;">🏛️ Ada: ${cellAda} / Parsel: ${cellParsel}</strong><br/>
+          <span style="color: #0F172A; font-weight: 800;">Rayiç: ${cellPrice.toLocaleString("tr-TR")} ₺/m²</span><br/>
+          <span style="color: #64748B; font-size: 10px;">Komşu Kadastro Parseli</span>
         </div>`,
-        { direction: "center", opacity: 0.9 }
+        { direction: "center", opacity: 0.95 }
       );
+
+      cellPoly.on("click", (e) => {
+        L.DomEvent.stopPropagation(e);
+        setParcelNotice(`🏛️ Ada ${cellAda} / Parsel ${cellParsel} • ${cellPrice.toLocaleString("tr-TR")} ₺/m²`);
+        if (onLocationSelect) {
+          onLocationSelect({
+            city: cCity,
+            district: cDist,
+            neighborhood: cNeigh || "",
+            coordinates: { lat: cellCenter.lat, lng: cellCenter.lng },
+            unitPrice: cellPrice,
+            ada: cellAda,
+            parsel: cellParsel,
+          });
+        }
+      });
     });
 
     // 3. Tıklanan Noktanın Çevresine 4-6 Dinamik Emsal İlanı Yerleştir
@@ -1093,10 +1147,14 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
               İİK m.115 %50 Taban
             </span>
           </div>
-          <div className="flex items-center gap-3 text-[9.5px] text-slate-600 font-semibold pt-1 border-t border-slate-100">
+          <div className="flex items-center flex-wrap gap-2.5 text-[9.5px] text-slate-600 font-semibold pt-1 border-t border-slate-100">
             <div className="flex items-center gap-1">
               <span className="w-2.5 h-2.5 rounded-full bg-amber-400 border border-amber-600 inline-block"></span>
               <span>Hedef Parsel</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="font-mono text-[9px] font-black text-amber-900 bg-amber-100 px-1 rounded border border-amber-300">Ada/Par</span>
+              <span>Kadastro No</span>
             </div>
             <div className="flex items-center gap-1">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 inline-block"></span>
