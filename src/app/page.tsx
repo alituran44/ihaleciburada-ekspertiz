@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useRef, useEffect } from "react";
+import React, { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { ValuationWizard } from "@/components/ValuationWizard";
@@ -100,9 +100,9 @@ export default function Home() {
   const [tkgmGlobalToast, setTkgmGlobalToast] = useState<string | null>(null);
 
   // 📍 GPS İle Otomatik İl, İlçe, Köy Bilgisi Doldurma ve Emsal Yükleme
-  const handleAutoLocateGPS = () => {
+  const handleAutoLocateGPS = useCallback((silent: boolean = false) => {
     if (typeof navigator === "undefined" || !navigator.geolocation) {
-      alert("Tarayıcınız GPS konum servisini desteklemiyor.");
+      if (!silent) alert("Tarayıcınız GPS konum servisini desteklemiyor.");
       return;
     }
 
@@ -122,8 +122,8 @@ export default function Home() {
             const detNeigh = loc.neighborhood || "";
 
             setSearchQuery(`${detNeigh ? detNeigh + ", " : ""}${detDist}, ${detCity}`);
-            setLocationToast(`📍 Konumunuz başarıyla alındı: ${detNeigh ? detNeigh + ", " : ""}${detDist} / ${detCity}`);
-            setTimeout(() => setLocationToast(null), 4000);
+            setLocationToast(`📍 Bulunduğunuz konuma göre açıldı: ${detNeigh ? detNeigh + ", " : ""}${detDist} / ${detCity}`);
+            setTimeout(() => setLocationToast(null), 5000);
 
             // Bölgesel emsal sorgusunu tetikle
             const emsalRes = await fetch(`/api/emsal?il=${encodeURIComponent(detCity)}&ilce=${encodeURIComponent(detDist)}&mahalle=${encodeURIComponent(detNeigh)}&kategori=${parcelData.category}&lat=${uLat}&lng=${uLng}`);
@@ -151,13 +151,20 @@ export default function Home() {
           setIsAutoLocating(false);
         }
       },
-      () => {
+      (err) => {
         setIsAutoLocating(false);
-        alert("GPS konumuna erişilemedi veya izin verilmedi.");
+        if (!silent) {
+          alert("GPS konumuna erişilemedi veya izin verilmedi.");
+        }
       },
-      { enableHighAccuracy: true, timeout: 10000 }
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
     );
-  };
+  }, [parcelData.category]);
+
+  // Sayfa açıldığında doğrudan kullanıcının bulunduğu konuma göre başlat
+  useEffect(() => {
+    handleAutoLocateGPS(true);
+  }, [handleAutoLocateGPS]);
 
   // 🏛️ Resmi TKGM Parsel Sorgu Entegrasyonu
   const handleOpenTkgmGlobal = () => {
@@ -589,7 +596,7 @@ export default function Home() {
   return (
     <div className="min-h-screen flex flex-col bg-[#F8FAFC]">
       {/* 1. ENDEKSA TARZI ÜST ARAMA & GEZİNİM ÇUBUĞU */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-2xs">
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-[1000] shadow-2xs">
         <div className="flex items-center justify-between px-3 sm:px-6 h-14 sm:h-16 gap-3">
           
           {/* Sol Kısım: İhaleci Burada Kurumsal Logo */}
@@ -613,7 +620,7 @@ export default function Home() {
           </div>
 
           {/* Orta Kısım: İhaleci Burada Arama Kutusu & Canlı Konum Autocomplete */}
-          <div className="relative flex-1 max-w-xl mx-2" ref={searchContainerRef}>
+          <div className="relative flex-1 max-w-xl mx-2 z-[1100]" ref={searchContainerRef}>
             <form 
               onSubmit={handleSearchSubmit}
               className="w-full flex items-center bg-slate-50 border border-slate-300 rounded-full p-1 shadow-2xs focus-within:ring-2 focus-within:ring-amber-500/20 focus-within:border-amber-500 focus-within:bg-white transition"
@@ -642,7 +649,7 @@ export default function Home() {
               {/* GPS Otomatik Konum Bul Butonu */}
               <button 
                 type="button"
-                onClick={handleAutoLocateGPS}
+                onClick={() => handleAutoLocateGPS(false)}
                 disabled={isAutoLocating}
                 aria-label="Bulunduğum Konumu GPS ile Al"
                 title="Mevcut GPS Konumumu Bul ve İl/İlçe/Köy Otomatik Doldur"
@@ -743,7 +750,7 @@ export default function Home() {
 
             {/* TÜRKİYE 81 İL, 973 İLÇE VE KÖY CANLI ÖNERİ AÇILIR PENCERESİ */}
             {showSuggestions && suggestions.length > 0 && (
-              <div className="absolute left-0 right-0 top-full mt-2 bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-100 max-h-80 overflow-y-auto divide-y divide-slate-100">
+              <div className="absolute left-0 right-0 top-full mt-2 bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden z-[1200] animate-in fade-in zoom-in-95 duration-100 max-h-80 overflow-y-auto divide-y divide-slate-100">
                 <div className="p-2 bg-slate-50 text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
                   <span>Türkiye Mülki İdare & Harita Sonuçları</span>
                   <span>{suggestions.length} Konum</span>

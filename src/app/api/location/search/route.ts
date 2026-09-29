@@ -24,7 +24,7 @@ const PROVINCE_COORDINATES: Record<string, { lat: number; lng: number }> = {
   "Bolu": { lat: 40.7350, lng: 31.6061 },
   "Burdur": { lat: 37.7203, lng: 30.2908 },
   "Bursa": { lat: 40.1885, lng: 29.0610 },
-  "Çanakkale": { lat: 40.1553, lng: 26.4142 },
+  "Çanakkale": { lat: 40.1475, lng: 26.4135 },
   "Çankırı": { lat: 40.6013, lng: 33.6134 },
   "Çorum": { lat: 40.5506, lng: 34.9556 },
   "Denizli": { lat: 37.7765, lng: 29.0864 },

@@ -619,7 +619,7 @@ export const TURKEY_PROVINCE_COORDINATES: Record<string, { lat: number; lng: num
   "Bolu": { lat: 40.7350, lng: 31.6061 },
   "Burdur": { lat: 37.7203, lng: 30.2908 },
   "Bursa": { lat: 40.1885, lng: 29.0610 },
-  "Çanakkale": { lat: 40.1553, lng: 26.4142 },
+  "Çanakkale": { lat: 40.1475, lng: 26.4135 },
   "Çankırı": { lat: 40.6013, lng: 33.6134 },
   "Çorum": { lat: 40.5506, lng: 34.9556 },
   "Denizli": { lat: 37.7765, lng: 29.0864 },
@@ -722,12 +722,16 @@ export function parseSearchLocation(query: string): {
         )
       : undefined;
 
+    const targetDist = distMatch || raw1 || (TURKEY_PROVINCES_AND_DISTRICTS[provMatch].districts[0] || "Merkez");
+    const dCoords = targetDist ? getDistrictCoordinates(provMatch, targetDist) : null;
+    const finalCoords = dCoords || pCoords;
+
     return {
       city: provMatch,
-      district: distMatch || raw1 || (TURKEY_PROVINCES_AND_DISTRICTS[provMatch].districts[0] || "Merkez"),
+      district: targetDist,
       neighborhood: raw2 || undefined,
-      lat: pCoords.lat,
-      lng: pCoords.lng,
+      lat: finalCoords.lat,
+      lng: finalCoords.lng,
     };
   }
 
@@ -737,13 +741,15 @@ export function parseSearchLocation(query: string): {
       (d) => normalizeTr(d) === normalizeTr(raw0) || normalizeTr(d).includes(normalizeTr(raw0))
     );
     if (foundDist) {
+      const dCoords = getDistrictCoordinates(provName, foundDist);
       const pCoords = TURKEY_PROVINCE_COORDINATES[provName] || { lat: 39.0, lng: 35.0 };
+      const finalCoords = dCoords || pCoords;
       return {
         city: provName,
         district: foundDist,
         neighborhood: raw1 || undefined,
-        lat: pCoords.lat,
-        lng: pCoords.lng,
+        lat: finalCoords.lat,
+        lng: finalCoords.lng,
       };
     }
   }

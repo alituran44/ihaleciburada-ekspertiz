@@ -30,7 +30,7 @@ export const SAMPLE_SCENARIOS: { label: string; description: string; data: Parce
       estimatedLandM2PriceTL: 13000,
       estimatedUnitSaleM2PriceTL: 45000,
       contractorSharePercent: 50,
-      coordinates: { lat: 40.1172, lng: 26.4022 },
+      coordinates: { lat: 40.1065, lng: 26.4175 },
       consultantName: "Hasan Hüseyin Yıldırım",
       consultantPhone: "0850 840 86 95",
       consultantAgency: "İhaleciBurada Kurumsal Portföy",
