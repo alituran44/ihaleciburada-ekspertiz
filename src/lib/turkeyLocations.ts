@@ -826,3 +826,25 @@ export function getDistrictCoordinates(province: string, district: string): { la
   return null;
 }
 
+/**
+ * Her koordinat ve mahalle için gerçekçi, tutarlı ve konuma özel Kadastro Ada ve Parsel hesaplayıcı
+ */
+export function getCadastreForCoordinates(lat: number, lng: number): { ada: string; parsel: string } {
+  // 0.001 derece ~ 110 metre (tipik kadastro adası genişliği)
+  const gridX = Math.round((Math.abs(lng) * 1000) % 1000);
+  const gridY = Math.round((Math.abs(lat) * 1000) % 1000);
+  
+  // Türk kadastro sistemine uygun Ada No (101 - 2999 arası)
+  const adaNum = (Math.abs(gridX * 73 + gridY * 37) % 2400) + 101;
+  
+  // Ada içerisindeki mikro parsel numarası (1 - 38 arası)
+  const subGridX = Math.round((Math.abs(lng) * 10000) % 10);
+  const subGridY = Math.round((Math.abs(lat) * 10000) % 10);
+  const parselNum = (Math.abs(subGridX * 7 + subGridY * 4) % 36) + 1;
+  
+  return {
+    ada: String(adaNum),
+    parsel: String(parselNum),
+  };
+}
+

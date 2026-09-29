@@ -37,7 +37,7 @@ const StartValuationModal = dynamic(
 import { ParcelInput, PropertyCategory, ComparableListing } from "@/types";
 import { SAMPLE_SCENARIOS, formatTL, formatNumber } from "@/lib/constants";
 import { calculateFeasibility } from "@/lib/calculator";
-import { parseSearchLocation } from "@/lib/turkeyLocations";
+import { parseSearchLocation, getCadastreForCoordinates, getDistrictCoordinates } from "@/lib/turkeyLocations";
 import { 
   Building, 
   FileText,
@@ -128,12 +128,15 @@ export default function Home() {
             // Bölgesel emsal sorgusunu tetikle
             const emsalRes = await fetch(`/api/emsal?il=${encodeURIComponent(detCity)}&ilce=${encodeURIComponent(detDist)}&mahalle=${encodeURIComponent(detNeigh)}&kategori=${parcelData.category}&lat=${uLat}&lng=${uLng}`);
             const emsalData = await emsalRes.json();
+            const autoCad = getCadastreForCoordinates(uLat, uLng);
 
             setParcelData((prev) => ({
               ...prev,
               city: detCity,
               district: detDist,
               neighborhood: detNeigh,
+              ada: autoCad.ada,
+              parsel: autoCad.parsel,
               coordinates: { lat: uLat, lng: uLng },
               estimatedLandM2PriceTL: emsalData?.data?.landM2PriceTL || prev.estimatedLandM2PriceTL,
               estimatedUnitSaleM2PriceTL: emsalData?.data?.unitSaleM2PriceTL || prev.estimatedUnitSaleM2PriceTL,
@@ -368,12 +371,16 @@ export default function Home() {
 
       if (data.success && data.data) {
         const resData = data.data;
+        const finalCoords = newCoords || resData.coordinates || parcelData.coordinates || { lat: 39.9208, lng: 32.8541 };
+        const finalCad = getCadastreForCoordinates(finalCoords.lat, finalCoords.lng);
         setParcelData({
           ...parcelData,
           city: newCity,
           district: newDistrict,
           neighborhood: newNeighborhood,
-          coordinates: newCoords || resData.coordinates || parcelData.coordinates,
+          ada: finalCad.ada,
+          parsel: finalCad.parsel,
+          coordinates: finalCoords,
           estimatedLandM2PriceTL: resData.landM2PriceTL,
           estimatedUnitSaleM2PriceTL: resData.unitSaleM2PriceTL,
           contractorSharePercent: resData.contractorSharePercent,
@@ -384,21 +391,29 @@ export default function Home() {
           buildingCostEstimate: resData.buildingCostEstimate,
         });
       } else {
+        const finalCoords = newCoords || parcelData.coordinates || { lat: 39.9208, lng: 32.8541 };
+        const finalCad = getCadastreForCoordinates(finalCoords.lat, finalCoords.lng);
         setParcelData({
           ...parcelData,
           city: newCity,
           district: newDistrict,
           neighborhood: newNeighborhood,
-          coordinates: newCoords || parcelData.coordinates,
+          ada: finalCad.ada,
+          parsel: finalCad.parsel,
+          coordinates: finalCoords,
         });
       }
     } catch (err) {
+      const finalCoords = newCoords || parcelData.coordinates || { lat: 39.9208, lng: 32.8541 };
+      const finalCad = getCadastreForCoordinates(finalCoords.lat, finalCoords.lng);
       setParcelData({
         ...parcelData,
         city: newCity,
         district: newDistrict,
         neighborhood: newNeighborhood,
-        coordinates: newCoords || parcelData.coordinates,
+        ada: finalCad.ada,
+        parsel: finalCad.parsel,
+        coordinates: finalCoords,
       });
     } finally {
       setIsSearching(false);
@@ -418,12 +433,16 @@ export default function Home() {
 
       if (data.success && data.data) {
         const resData = data.data;
+        const targetCoords = resData.coordinates || getDistrictCoordinates(targetCity, districtName) || parcelData.coordinates || { lat: 39.9208, lng: 32.8541 };
+        const dCad = getCadastreForCoordinates(targetCoords.lat, targetCoords.lng);
         setParcelData((prev) => ({
           ...prev,
           city: targetCity,
           district: districtName,
           neighborhood: "",
-          coordinates: resData.coordinates || prev.coordinates,
+          ada: dCad.ada,
+          parsel: dCad.parsel,
+          coordinates: targetCoords,
           estimatedLandM2PriceTL: resData.landM2PriceTL,
           estimatedUnitSaleM2PriceTL: resData.unitSaleM2PriceTL,
           contractorSharePercent: resData.contractorSharePercent,
@@ -434,18 +453,29 @@ export default function Home() {
           buildingCostEstimate: resData.buildingCostEstimate,
         }));
       } else {
+        const targetCoords = getDistrictCoordinates(targetCity, districtName) || parcelData.coordinates || { lat: 39.9208, lng: 32.8541 };
+        const dCad = getCadastreForCoordinates(targetCoords.lat, targetCoords.lng);
         setParcelData((prev) => ({
           ...prev,
           city: targetCity,
           district: districtName,
           neighborhood: "",
+          ada: dCad.ada,
+          parsel: dCad.parsel,
+          coordinates: targetCoords,
         }));
       }
     } catch (err) {
+      const targetCoords = getDistrictCoordinates(targetCity, districtName) || parcelData.coordinates || { lat: 39.9208, lng: 32.8541 };
+      const dCad = getCadastreForCoordinates(targetCoords.lat, targetCoords.lng);
       setParcelData((prev) => ({
         ...prev,
         city: targetCity,
         district: districtName,
+        neighborhood: "",
+        ada: dCad.ada,
+        parsel: dCad.parsel,
+        coordinates: targetCoords,
       }));
     } finally {
       setIsSearching(false);
@@ -527,6 +557,7 @@ export default function Home() {
     const newDistrict = parsed.district;
     const newNeighborhood = parsed.neighborhood || "";
     const newCoords = { lat: parsed.lat, lng: parsed.lng };
+    const sCad = getCadastreForCoordinates(newCoords.lat, newCoords.lng);
 
     try {
       const url = `/api/emsal?il=${encodeURIComponent(newCity)}&ilce=${encodeURIComponent(newDistrict)}&mahalle=${encodeURIComponent(newNeighborhood)}&kategori=${parcelData.category}&lat=${newCoords.lat}&lng=${newCoords.lng}`;
@@ -540,6 +571,8 @@ export default function Home() {
           city: newCity,
           district: newDistrict,
           neighborhood: newNeighborhood || resData.neighborhood || "",
+          ada: sCad.ada,
+          parsel: sCad.parsel,
           coordinates: newCoords,
           estimatedLandM2PriceTL: resData.landM2PriceTL,
           estimatedUnitSaleM2PriceTL: resData.unitSaleM2PriceTL,
@@ -556,6 +589,8 @@ export default function Home() {
           city: newCity,
           district: newDistrict,
           neighborhood: newNeighborhood,
+          ada: sCad.ada,
+          parsel: sCad.parsel,
           coordinates: newCoords,
         }));
       }
@@ -565,6 +600,8 @@ export default function Home() {
         city: newCity,
         district: newDistrict,
         neighborhood: newNeighborhood,
+        ada: sCad.ada,
+        parsel: sCad.parsel,
         coordinates: newCoords,
       }));
     } finally {

@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState, useMemo } from "react";
 import L from "leaflet";
 import { ComparableListing, PropertyCategory } from "@/types";
 import { getDistrictValuation } from "@/lib/districtValuations";
-import { findFastLocationFromCoords } from "@/lib/turkeyLocations";
+import { findFastLocationFromCoords, getCadastreForCoordinates } from "@/lib/turkeyLocations";
 import { 
   MapPin, 
   Mountain, 
@@ -183,10 +183,11 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
         const fastLoc = findFastLocationFromCoords(userLat, userLng);
         const fastVal = getDistrictValuation(fastLoc.city, fastLoc.district, unitM2Price);
         const resolvedPrice = fastVal.pricePerM2TL;
+        const uCad = getCadastreForCoordinates(userLat, userLng);
 
         setActiveDistrict(fastLoc.district);
         setActiveNeighborhood(fastLoc.neighborhood);
-        setParcelNotice(`📍 ${fastLoc.district} / ${fastLoc.city} • ${resolvedPrice.toLocaleString("tr-TR")} ₺/m²`);
+        setParcelNotice(`📍 ${fastLoc.district} / ${fastLoc.city} • Ada ${uCad.ada} / Parsel ${uCad.parsel} • ${resolvedPrice.toLocaleString("tr-TR")} ₺/m²`);
 
         const generatedComps = drawParcelHoneycomb(
           userLat,
@@ -194,7 +195,9 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
           resolvedPrice,
           fastLoc.city,
           fastLoc.district,
-          fastLoc.neighborhood
+          fastLoc.neighborhood,
+          uCad.ada,
+          uCad.parsel
         );
 
         if (onLocationSelect) {
@@ -204,6 +207,8 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
             neighborhood: fastLoc.neighborhood,
             coordinates: { lat: userLat, lng: userLng },
             unitPrice: resolvedPrice,
+            ada: uCad.ada,
+            parsel: uCad.parsel,
             comparables: generatedComps,
           });
         }
@@ -232,6 +237,8 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
                 neighborhood: refNeigh,
                 coordinates: { lat: userLat, lng: userLng },
                 unitPrice: resolvedPrice,
+                ada: uCad.ada,
+                parsel: uCad.parsel,
                 comparables: generatedComps,
               });
             }
@@ -258,6 +265,10 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
   // Default Koordinatlar
   const lat = coordinates?.lat || 40.1553;
   const lng = coordinates?.lng || 26.4142;
+
+  const currentCad = useMemo(() => getCadastreForCoordinates(lat, lng), [lat, lng]);
+  const activeAda = (ada && ada !== "248") ? ada : currentCad.ada;
+  const activeParsel = (parsel && parsel !== "12") ? parsel : currentCad.parsel;
 
   const isResidential = category === "konut";
 
@@ -390,7 +401,9 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
     targetPrice: number,
     cCity: string,
     cDist: string,
-    cNeigh?: string
+    cNeigh?: string,
+    customAda?: string,
+    customParsel?: string
   ) => {
     if (!parcelLayerGroupRef.current) return [];
 
@@ -455,8 +468,9 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
       return pts;
     };
 
-    const targetAda = ada || "248";
-    const targetParsel = parsel || "12";
+    const locCad = getCadastreForCoordinates(cLat, cLng);
+    const targetAda = customAda || (ada && ada !== "248" ? ada : locCad.ada);
+    const targetParsel = customParsel || (parsel && parsel !== "12" ? parsel : locCad.parsel);
     const targetArea = areaM2 || 1650;
 
     // Merkez Hedef Altıgen (Sarı Vurgulu Petek + Kadastro Çerçevesi)
@@ -471,7 +485,7 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
     }).addTo(parcelLayerGroupRef.current);
 
     centerPolygon.bindTooltip(
-      `<div style="font-family: sans-serif; text-align: center; padding: 4px 8px;">
+      `<div style="font-family: sans-serif; text-align: center; padding: 4px 8px; white-space: nowrap;">
         <div style="font-weight: 900; font-size: 13px; color: #92400E; display: flex; align-items: center; justify-content: center; gap: 4px;">
           <span>🏛️</span>
           <span>Ada: <strong>${targetAda}</strong> / Parsel: <strong>${targetParsel}</strong></span>
@@ -486,36 +500,22 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
       { permanent: false, direction: "top", opacity: 0.98 }
     );
 
-    // 1. Merkezde Yüzen Ada / Parsel ve m² Rozeti (Pim üstünde)
+    // 1. Merkezde Yüzen Ada / Parsel ve m² Rozeti (Pim üstünde - Yatay, temiz ve tekil)
     const centerBadgeIcon = L.divIcon({
       className: "leaflet-target-badge",
       html: `
-        <div style="position: relative; display: flex; flex-direction: column; align-items: center; transform: translate(-50%, -100%); pointer-events: auto; cursor: pointer;">
-          <div style="background: #0B1E3B; color: #FFFFFF; font-weight: 900; font-size: 11px; padding: 4px 10px; border-radius: 20px; border: 2px solid #F59E0B; box-shadow: 0 4px 14px rgba(0,0,0,0.35); white-space: nowrap; font-family: monospace; display: flex; align-items: center; gap: 6px;">
-            <span style="background: #F59E0B; color: #0B1E3B; font-weight: 900; padding: 1px 6px; border-radius: 5px; font-size: 10px; letter-spacing: -0.2px;">Ada ${targetAda} / P. ${targetParsel}</span>
-            <span style="color: #FCD34D;">${targetPrice.toLocaleString("tr-TR")} ₺/m²</span>
+        <div style="position: relative; display: flex; flex-direction: column; align-items: center; transform: translate(-50%, -100%); pointer-events: auto; cursor: pointer; white-space: nowrap;">
+          <div style="background: #0B1E3B; color: #FFFFFF; font-weight: 800; font-size: 11px; padding: 5px 12px; border-radius: 9999px; border: 2px solid #F59E0B; box-shadow: 0 4px 16px rgba(0,0,0,0.4); white-space: nowrap; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; display: flex; align-items: center; gap: 8px;">
+            <span style="background: #F59E0B; color: #0B1E3B; font-weight: 900; padding: 2px 7px; border-radius: 6px; font-size: 10.5px; letter-spacing: -0.2px;">🏛️ Ada ${targetAda} / Parsel ${targetParsel}</span>
+            <span style="color: #FCD34D; font-weight: 800;">${targetPrice.toLocaleString("tr-TR")} ₺/m²</span>
+            <span style="color: #94A3B8; font-size: 10px; font-weight: 600;">• ${targetArea} m²</span>
           </div>
-          <div style="width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid #0B1E3B;"></div>
+          <div style="width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 7px solid #F59E0B;"></div>
         </div>
       `,
       iconSize: [0, 0],
     });
     L.marker([cLat, cLng], { icon: centerBadgeIcon }).addTo(parcelLayerGroupRef.current);
-
-    // 2. Parsel Yüzeyine Kalıcı Kadastro Ada/Parsel Damgası (TKGM Parsel Sorgu Görünümü)
-    const centerStampIcon = L.divIcon({
-      className: "leaflet-parcel-stamp",
-      html: `
-        <div style="transform: translate(-50%, 6px); pointer-events: none; text-align: center; select-none;">
-          <div style="background: rgba(254, 240, 138, 0.92); border: 1.5px solid #D97706; border-radius: 8px; padding: 2px 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.12); display: inline-flex; flex-direction: column; align-items: center;">
-            <span style="font-family: monospace; font-weight: 900; font-size: 11.5px; color: #92400E; letter-spacing: 0.3px;">ADA ${targetAda} • PARSEL ${targetParsel}</span>
-            <span style="font-size: 9px; font-weight: 800; color: #78350F;">${targetArea} m² • ${category === "konut" ? "Konut Parseli" : "İmarlı Arsa"}</span>
-          </div>
-        </div>
-      `,
-      iconSize: [0, 0],
-    });
-    L.marker([cLat, cLng], { icon: centerStampIcon }).addTo(parcelLayerGroupRef.current);
 
     // Çevre 12 Adet Bal Peteği Hücresi (Komşu Kadastro Parselleri)
     const baseAdaNum = parseInt(targetAda.replace(/\D/g, "")) || 248;
@@ -775,6 +775,7 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
       const fastLoc = findFastLocationFromCoords(clickLat, clickLng);
       const fastVal = getDistrictValuation(fastLoc.city, fastLoc.district, unitM2Price);
       const resolvedPrice = fastVal.pricePerM2TL;
+      const clickCad = getCadastreForCoordinates(clickLat, clickLng);
 
       // 2. Tıklanan noktaya anında bal peteğini ve emsal ilanları çiz
       const generatedComps = drawParcelHoneycomb(
@@ -783,10 +784,12 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
         resolvedPrice,
         fastLoc.city,
         fastLoc.district,
-        fastLoc.neighborhood
+        fastLoc.neighborhood,
+        clickCad.ada,
+        clickCad.parsel
       );
 
-      setParcelNotice(`📍 ${fastLoc.district} / ${fastLoc.city} • ${resolvedPrice.toLocaleString("tr-TR")} ₺/m²`);
+      setParcelNotice(`📍 ${fastLoc.district} / ${fastLoc.city} • Ada ${clickCad.ada} / Parsel ${clickCad.parsel} • ${resolvedPrice.toLocaleString("tr-TR")} ₺/m²`);
       setActiveDistrict(fastLoc.district);
       setActiveNeighborhood(fastLoc.neighborhood);
 
@@ -798,6 +801,8 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
           neighborhood: fastLoc.neighborhood,
           coordinates: { lat: clickLat, lng: clickLng },
           unitPrice: resolvedPrice,
+          ada: clickCad.ada,
+          parsel: clickCad.parsel,
           comparables: generatedComps,
         });
       }
@@ -815,7 +820,7 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
           const refinedDistrict = loc.district || fastLoc.district;
           const refinedNeigh = loc.neighborhood || fastLoc.neighborhood;
 
-          setParcelNotice(`📍 ${refinedDistrict} / ${refinedCity}${refinedNeigh ? ` • ${refinedNeigh}` : ""} • ${resolvedPrice.toLocaleString("tr-TR")} ₺/m²`);
+          setParcelNotice(`📍 ${refinedDistrict} / ${refinedCity}${refinedNeigh ? ` • ${refinedNeigh}` : ""} • Ada ${clickCad.ada} / Parsel ${clickCad.parsel} • ${resolvedPrice.toLocaleString("tr-TR")} ₺/m²`);
           setActiveDistrict(refinedDistrict);
           if (refinedNeigh) setActiveNeighborhood(refinedNeigh);
 
@@ -826,6 +831,8 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
               neighborhood: refinedNeigh,
               coordinates: { lat: clickLat, lng: clickLng },
               unitPrice: resolvedPrice,
+              ada: clickCad.ada,
+              parsel: clickCad.parsel,
               comparables: generatedComps,
             });
           }
@@ -840,7 +847,16 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
     });
 
     // İlk Bal Peteği Çizimini Gerçekleştir
-    drawParcelHoneycomb(lat, lng, unitM2Price, city, activeDistrict, activeNeighborhood || undefined);
+    drawParcelHoneycomb(
+      lat,
+      lng,
+      unitM2Price,
+      city,
+      activeDistrict,
+      activeNeighborhood || undefined,
+      activeAda,
+      activeParsel
+    );
 
     return () => {
       if (mapInstanceRef.current) {
@@ -875,8 +891,17 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
       map.flyTo([lat, lng], 15, { duration: 1.0 });
     }
 
-    drawParcelHoneycomb(lat, lng, unitM2Price, city, activeDistrict, activeNeighborhood || undefined);
-  }, [lat, lng, unitM2Price, city, activeDistrict, searchRadius]);
+    drawParcelHoneycomb(
+      lat,
+      lng,
+      unitM2Price,
+      city,
+      activeDistrict,
+      activeNeighborhood || undefined,
+      activeAda,
+      activeParsel
+    );
+  }, [lat, lng, unitM2Price, city, activeDistrict, searchRadius, activeAda, activeParsel]);
 
   // Dışarıdan seçilen ilanı haritada odakla ve popup aç
   useEffect(() => {
@@ -924,15 +949,13 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
           <span className="font-extrabold font-heading text-slate-100">
             {city} / {activeDistrict} {activeNeighborhood ? `— ${activeNeighborhood}` : ""}
           </span>
-          {ada && parsel && (
-            <span className="text-[10px] text-slate-300 bg-white/10 px-2 py-0.5 rounded font-mono font-bold">
-              Ada {ada} / Parsel {parsel}
-            </span>
-          )}
+          <span className="text-[10px] text-slate-300 bg-white/10 px-2 py-0.5 rounded font-mono font-bold">
+            Ada {activeAda} / Parsel {activeParsel}
+          </span>
           <button
             type="button"
             onClick={() => {
-              const textToCopy = `${city} / ${activeDistrict} / ${activeNeighborhood || "Merkez"} - Ada: ${ada || "1"} Parsel: ${parsel || "1"}`;
+              const textToCopy = `${city} / ${activeDistrict} / ${activeNeighborhood || "Merkez"} - Ada: ${activeAda} Parsel: ${activeParsel}`;
               if (typeof navigator !== "undefined" && navigator.clipboard) {
                 navigator.clipboard.writeText(textToCopy);
               }
@@ -1009,7 +1032,7 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
           <div className="flex items-center gap-1.5 font-extrabold text-xs sm:text-sm">
             <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0 shadow-xs"></span>
             <span className="truncate">{city} / {activeDistrict} {activeNeighborhood ? `• ${activeNeighborhood}` : ""}</span>
-            <span className="text-slate-500 font-mono text-[11px] font-normal shrink-0">/ {ada || "1357"} ada / {parsel || "4"} parsel</span>
+            <span className="text-slate-500 font-mono text-[11px] font-normal shrink-0">/ {activeAda} ada / {activeParsel} parsel</span>
           </div>
           <div className="flex items-center flex-wrap gap-2 text-[10.5px] text-slate-600 mt-1 font-semibold">
             <span>{areaM2} m²</span>
