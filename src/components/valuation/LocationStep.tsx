@@ -554,8 +554,7 @@ export const LocationStep: React.FC<LocationStepProps> = ({
 
     setIsLocating(true);
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setIsLocating(false);
+      async (pos) => {
         const lat = Number(pos.coords.latitude.toFixed(6));
         const lng = Number(pos.coords.longitude.toFixed(6));
         const fastLoc = findFastLocationFromCoords(lat, lng);
@@ -565,11 +564,29 @@ export const LocationStep: React.FC<LocationStepProps> = ({
           district: fastLoc.district,
           neighborhood: fastLoc.neighborhood,
           coordinates: { lat, lng },
-          searchQuery: `${fastLoc.district}, ${fastLoc.city}`,
+          searchQuery: `${fastLoc.neighborhood || fastLoc.district}, ${fastLoc.district}, ${fastLoc.city}`,
         });
 
         if (mapInstanceRef.current) {
           mapInstanceRef.current.flyTo([lat, lng], 16, { duration: 0.8 });
+        }
+
+        try {
+          const res = await fetch(`/api/location/search?lat=${lat}&lng=${lng}`);
+          const result = await res.json();
+          if (result.success && result.location) {
+            const loc = result.location;
+            onChange({
+              city: loc.province || fastLoc.city,
+              district: loc.district || fastLoc.district,
+              neighborhood: loc.neighborhood || fastLoc.neighborhood,
+              coordinates: { lat, lng },
+              searchQuery: `${loc.neighborhood || fastLoc.neighborhood}, ${loc.district || fastLoc.district}, ${loc.province || fastLoc.city}`,
+            });
+          }
+        } catch (e) {
+        } finally {
+          setIsLocating(false);
         }
       },
       () => {
@@ -792,19 +809,37 @@ export const LocationStep: React.FC<LocationStepProps> = ({
               </span>
             </div>
 
-            <button
-              type="button"
-              onClick={handleLocateCoordinates}
-              disabled={isLocating}
-              className="px-3 py-1 bg-white hover:bg-blue-50 border border-slate-300 text-blue-700 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1 active:scale-95 disabled:opacity-60"
-            >
-              {isLocating ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" />
-              ) : (
-                <MapPin className="w-3.5 h-3.5 text-blue-600" />
-              )}
-              <span>Haritada Konumlandır</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const textToCopy = `${data.city} / ${data.district} / ${data.neighborhood || "Merkez"} - Ada: ${data.ada || "1"} Parsel: ${data.parsel || "1"}`;
+                  if (typeof navigator !== "undefined" && navigator.clipboard) {
+                    navigator.clipboard.writeText(textToCopy);
+                  }
+                  const tkgmUrl = `https://parselsorgu.tkgm.gov.tr/#ara/cografi/${currentLat}/${currentLng}`;
+                  window.open(tkgmUrl, "_blank", "noopener,noreferrer");
+                }}
+                className="px-3 py-1 bg-[#0F223D] hover:bg-slate-900 border border-amber-500/40 text-amber-400 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1 active:scale-95 shadow-2xs"
+                title="TKGM Parsel Sorgu resmi sayfasında aç ve bilgileri kopyala"
+              >
+                <span>🏛️ TKGM Parsel Sorgu</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleLocateCoordinates}
+                disabled={isLocating}
+                className="px-3 py-1 bg-white hover:bg-blue-50 border border-slate-300 text-blue-700 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1 active:scale-95 disabled:opacity-60"
+              >
+                {isLocating ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" />
+                ) : (
+                  <MapPin className="w-3.5 h-3.5 text-blue-600" />
+                )}
+                <span>Haritada Konumlandır</span>
+              </button>
+            </div>
           </div>
         </div>
 

@@ -169,8 +169,7 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
     setLocateFeedback(null);
 
     navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setIsLocating(false);
+      async (position) => {
         const userLat = Number(position.coords.latitude.toFixed(6));
         const userLng = Number(position.coords.longitude.toFixed(6));
 
@@ -178,11 +177,71 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
           mapInstanceRef.current.flyTo([userLat, userLng], 16, { duration: 1.2 });
         }
 
-        setLocateFeedback(`GPS Konumu Alındı (${userLat.toFixed(4)}, ${userLng.toFixed(4)})`);
-        setTimeout(() => setLocateFeedback(null), 4000);
+        // 1. Yerel hızlı eşleme
+        const fastLoc = findFastLocationFromCoords(userLat, userLng);
+        const fastVal = getDistrictValuation(fastLoc.city, fastLoc.district, unitM2Price);
+        const resolvedPrice = fastVal.pricePerM2TL;
+
+        setActiveDistrict(fastLoc.district);
+        setActiveNeighborhood(fastLoc.neighborhood);
+        setParcelNotice(`📍 ${fastLoc.district} / ${fastLoc.city} • ${resolvedPrice.toLocaleString("tr-TR")} ₺/m²`);
+
+        const generatedComps = drawParcelHoneycomb(
+          userLat,
+          userLng,
+          resolvedPrice,
+          fastLoc.city,
+          fastLoc.district,
+          fastLoc.neighborhood
+        );
+
+        if (onLocationSelect) {
+          onLocationSelect({
+            city: fastLoc.city,
+            district: fastLoc.district,
+            neighborhood: fastLoc.neighborhood,
+            coordinates: { lat: userLat, lng: userLng },
+            unitPrice: resolvedPrice,
+            comparables: generatedComps,
+          });
+        }
 
         if (onLocationFound) {
           onLocationFound({ lat: userLat, lng: userLng });
+        }
+
+        // 2. Detaylı tersine çözümleme
+        try {
+          const res = await fetch(`/api/location/search?lat=${userLat}&lng=${userLng}`);
+          const data = await res.json();
+          if (data.success && data.location) {
+            const loc = data.location;
+            const refCity = loc.province || fastLoc.city;
+            const refDist = loc.district || fastLoc.district;
+            const refNeigh = loc.neighborhood || fastLoc.neighborhood;
+
+            setActiveDistrict(refDist);
+            if (refNeigh) setActiveNeighborhood(refNeigh);
+
+            if (onLocationSelect) {
+              onLocationSelect({
+                city: refCity,
+                district: refDist,
+                neighborhood: refNeigh,
+                coordinates: { lat: userLat, lng: userLng },
+                unitPrice: resolvedPrice,
+                comparables: generatedComps,
+              });
+            }
+            setLocateFeedback(`📍 ${refNeigh ? refNeigh + ", " : ""}${refDist} / ${refCity} (${userLat.toFixed(4)}, ${userLng.toFixed(4)})`);
+          } else {
+            setLocateFeedback(`GPS Konumu Alındı: ${fastLoc.district} (${userLat.toFixed(4)}, ${userLng.toFixed(4)})`);
+          }
+        } catch (e) {
+          setLocateFeedback(`GPS Konumu Alındı (${userLat.toFixed(4)}, ${userLng.toFixed(4)})`);
+        } finally {
+          setIsLocating(false);
+          setTimeout(() => setLocateFeedback(null), 5000);
         }
       },
       (error) => {
@@ -816,6 +875,21 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
               Ada {ada} / Parsel {parsel}
             </span>
           )}
+          <button
+            type="button"
+            onClick={() => {
+              const textToCopy = `${city} / ${activeDistrict} / ${activeNeighborhood || "Merkez"} - Ada: ${ada || "1"} Parsel: ${parsel || "1"}`;
+              if (typeof navigator !== "undefined" && navigator.clipboard) {
+                navigator.clipboard.writeText(textToCopy);
+              }
+              const tkgmUrl = `https://parselsorgu.tkgm.gov.tr/#ara/cografi/${lat}/${lng}`;
+              window.open(tkgmUrl, "_blank", "noopener,noreferrer");
+            }}
+            className="flex items-center gap-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 px-2 py-0.5 rounded border border-amber-400/40 text-[10px] font-black transition cursor-pointer active:scale-95"
+            title="Resmi TKGM Parsel Sorgu uygulamasını aç ve bilgileri panoya kopyala"
+          >
+            <span>🏛️ TKGM</span>
+          </button>
         </div>
 
         <div className="flex items-center gap-2 text-[11px]">

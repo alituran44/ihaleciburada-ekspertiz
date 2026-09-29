@@ -70,7 +70,9 @@ import {
   Radio,
   Tag,
   Check,
-  Filter
+  Filter,
+  Crosshair,
+  ExternalLink
 } from "lucide-react";
 
 export default function Home() {
@@ -93,6 +95,83 @@ export default function Home() {
     `${SAMPLE_SCENARIOS[0].data.city}, ${SAMPLE_SCENARIOS[0].data.district}${SAMPLE_SCENARIOS[0].data.neighborhood ? `, ${SAMPLE_SCENARIOS[0].data.neighborhood}` : ""}`
   );
   const [isSearching, setIsSearching] = useState<boolean>(false);
+  const [isAutoLocating, setIsAutoLocating] = useState<boolean>(false);
+  const [locationToast, setLocationToast] = useState<string | null>(null);
+  const [tkgmGlobalToast, setTkgmGlobalToast] = useState<string | null>(null);
+
+  // 📍 GPS İle Otomatik İl, İlçe, Köy Bilgisi Doldurma ve Emsal Yükleme
+  const handleAutoLocateGPS = () => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      alert("Tarayıcınız GPS konum servisini desteklemiyor.");
+      return;
+    }
+
+    setIsAutoLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const uLat = Number(pos.coords.latitude.toFixed(6));
+        const uLng = Number(pos.coords.longitude.toFixed(6));
+
+        try {
+          const res = await fetch(`/api/location/search?lat=${uLat}&lng=${uLng}`);
+          const data = await res.json();
+          if (data.success && data.location) {
+            const loc = data.location;
+            const detCity = loc.province || "Çanakkale";
+            const detDist = loc.district || "Merkez";
+            const detNeigh = loc.neighborhood || "";
+
+            setSearchQuery(`${detNeigh ? detNeigh + ", " : ""}${detDist}, ${detCity}`);
+            setLocationToast(`📍 Konumunuz başarıyla alındı: ${detNeigh ? detNeigh + ", " : ""}${detDist} / ${detCity}`);
+            setTimeout(() => setLocationToast(null), 4000);
+
+            // Bölgesel emsal sorgusunu tetikle
+            const emsalRes = await fetch(`/api/emsal?il=${encodeURIComponent(detCity)}&ilce=${encodeURIComponent(detDist)}&mahalle=${encodeURIComponent(detNeigh)}&kategori=${parcelData.category}&lat=${uLat}&lng=${uLng}`);
+            const emsalData = await emsalRes.json();
+
+            setParcelData((prev) => ({
+              ...prev,
+              city: detCity,
+              district: detDist,
+              neighborhood: detNeigh,
+              coordinates: { lat: uLat, lng: uLng },
+              estimatedLandM2PriceTL: emsalData?.data?.landM2PriceTL || prev.estimatedLandM2PriceTL,
+              estimatedUnitSaleM2PriceTL: emsalData?.data?.unitSaleM2PriceTL || prev.estimatedUnitSaleM2PriceTL,
+              comparables: emsalData?.data?.comparables || prev.comparables,
+              contractorSharePercent: emsalData?.data?.contractorSharePercent ?? prev.contractorSharePercent,
+              monthlyRentEstimateTL: prev.category === "konut" ? (emsalData?.data?.estimatedMonthlyRentTL ?? prev.monthlyRentEstimateTL) : prev.monthlyRentEstimateTL,
+              marketResearch: emsalData?.data || prev.marketResearch,
+              tcmbOfficialData: emsalData?.data?.tcmbOfficialData || prev.tcmbOfficialData,
+              buildingCostEstimate: emsalData?.data?.buildingCostEstimate || prev.buildingCostEstimate,
+            }));
+          }
+        } catch (err) {
+          console.warn("GPS konum servisi hatası:", err);
+        } finally {
+          setIsAutoLocating(false);
+        }
+      },
+      () => {
+        setIsAutoLocating(false);
+        alert("GPS konumuna erişilemedi veya izin verilmedi.");
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
+
+  // 🏛️ Resmi TKGM Parsel Sorgu Entegrasyonu
+  const handleOpenTkgmGlobal = () => {
+    const textToCopy = `${parcelData.city} / ${parcelData.district} / ${parcelData.neighborhood || "Merkez"} - Ada: ${parcelData.ada || "1"} Parsel: ${parcelData.parsel || "1"}`;
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(textToCopy);
+    }
+    setTkgmGlobalToast(`Ada ${parcelData.ada || "1"} / Parsel ${parcelData.parsel || "1"} bilgisi panoya kopyalandı! TKGM resmi ekranı açılıyor...`);
+    setTimeout(() => setTkgmGlobalToast(null), 4000);
+
+    const lat = parcelData.coordinates?.lat || 40.1553;
+    const lng = parcelData.coordinates?.lng || 26.4142;
+    window.open(`https://parselsorgu.tkgm.gov.tr/#ara/cografi/${lat}/${lng}`, "_blank", "noopener,noreferrer");
+  };
 
   // Yeni Değerleme Başlat Formu Gönderildiğinde (Hasan Bey Modeli: Expertiz, Emlak Bul veya İlan Ver)
   const handleStartValuationSubmit = async (payload: StartValuationPayload) => {
@@ -556,9 +635,21 @@ export default function Home() {
                 onFocus={() => {
                   if (suggestions.length > 0) setShowSuggestions(true);
                 }}
-                placeholder="81 İl, İlçe veya Köy Arayın (Örn: Çanakkale, Bayramiç, Adatepe)"
+                placeholder="81 İl, İlçe veya Köy Arayın (Örn: Çanakkale, Kepez, Adatepe)"
                 className="flex-1 bg-transparent px-3 text-xs sm:text-sm font-medium text-slate-900 outline-none placeholder:text-slate-400 min-w-0"
               />
+
+              {/* GPS Otomatik Konum Bul Butonu */}
+              <button 
+                type="button"
+                onClick={handleAutoLocateGPS}
+                disabled={isAutoLocating}
+                aria-label="Bulunduğum Konumu GPS ile Al"
+                title="Mevcut GPS Konumumu Bul ve İl/İlçe/Köy Otomatik Doldur"
+                className="p-1.5 text-slate-400 hover:text-amber-600 transition shrink-0 cursor-pointer"
+              >
+                <Crosshair className={`w-4 h-4 ${isAutoLocating ? "animate-spin text-amber-600" : "text-amber-500 hover:text-amber-600"}`} />
+              </button>
 
               {/* Arama / Yükleniyor İkonu */}
               <button 
@@ -573,15 +664,15 @@ export default function Home() {
                 )}
               </button>
 
-              {/* Hasan Bey Üçlü Eylem Butonları: Ekspertiz Başlat & Emlak Bul & İlan Ver */}
-              <div className="hidden md:flex items-center gap-1.5 shrink-0">
+              {/* Hasan Bey Üçlü Eylem Butonları: Geniş ekranda tam butonlar, orta ekranda kompakt ikonlar */}
+              <div className="hidden xl:flex items-center gap-1.5 shrink-0">
                 <button
                   type="button"
                   onClick={() => {
                     setStartValuationInitialMode("expertiz");
                     setShowStartValuationModal(true);
                   }}
-                  className="flex items-center gap-1.5 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white text-xs font-black px-3.5 py-1.5 rounded-full shadow-xs transition active:scale-95 cursor-pointer"
+                  className="flex items-center gap-1.5 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white text-xs font-black px-3.5 py-1.5 rounded-full shadow-xs transition active:scale-95 cursor-pointer whitespace-nowrap"
                 >
                   <FileText className="w-3.5 h-3.5" />
                   <span>Ekspertiz</span>
@@ -593,7 +684,7 @@ export default function Home() {
                     setStartValuationInitialMode("emlak_bul");
                     setShowStartValuationModal(true);
                   }}
-                  className="flex items-center gap-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-black px-3.5 py-1.5 rounded-full shadow-xs transition active:scale-95 cursor-pointer"
+                  className="flex items-center gap-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-black px-3.5 py-1.5 rounded-full shadow-xs transition active:scale-95 cursor-pointer whitespace-nowrap"
                 >
                   <Search className="w-3.5 h-3.5" />
                   <span>Emlak Bul</span>
@@ -605,10 +696,47 @@ export default function Home() {
                     setStartValuationInitialMode("ilan_ver");
                     setShowStartValuationModal(true);
                   }}
-                  className="flex items-center gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-black px-3 py-1.5 rounded-full shadow-xs transition active:scale-95 cursor-pointer"
+                  className="flex items-center gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-black px-3 py-1.5 rounded-full shadow-xs transition active:scale-95 cursor-pointer whitespace-nowrap"
                 >
                   <PlusCircle className="w-3.5 h-3.5" />
                   <span>İlan Ver</span>
+                </button>
+              </div>
+
+              {/* Orta Ekran (md:flex xl:hidden) Kompakt İkon Grubu - Menü çakışmasını önler */}
+              <div className="hidden md:flex xl:hidden items-center gap-1 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStartValuationInitialMode("expertiz");
+                    setShowStartValuationModal(true);
+                  }}
+                  className="p-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-full shadow-2xs transition active:scale-95 cursor-pointer"
+                  title="Ekspertiz Başlat"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStartValuationInitialMode("emlak_bul");
+                    setShowStartValuationModal(true);
+                  }}
+                  className="p-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full shadow-2xs transition active:scale-95 cursor-pointer"
+                  title="Emlak Bul"
+                >
+                  <Search className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStartValuationInitialMode("ilan_ver");
+                    setShowStartValuationModal(true);
+                  }}
+                  className="p-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-full shadow-2xs transition active:scale-95 cursor-pointer"
+                  title="İlan Ver"
+                >
+                  <PlusCircle className="w-3.5 h-3.5" />
                 </button>
               </div>
             </form>
@@ -674,44 +802,55 @@ export default function Home() {
           </div>
 
           {/* Sağ Kısım: İhaleciBurada Üst Menü & Kullanıcı Rozeti */}
-          <div className="flex items-center gap-2 sm:gap-4 text-xs font-bold">
+          <div className="flex items-center gap-1.5 sm:gap-3 text-xs font-bold shrink-0">
             
             {/* 1. Değerleme Sekmesi */}
             <button
               type="button"
               onClick={() => setActiveTab("degerleme")}
-              className={`py-1.5 px-2.5 transition relative cursor-pointer font-heading font-extrabold ${
+              className={`py-1.5 px-2 transition relative cursor-pointer font-heading font-extrabold whitespace-nowrap shrink-0 ${
                 activeTab === "degerleme"
                   ? "text-blue-600 after:absolute after:bottom-[-16px] after:left-0 after:right-0 after:h-[2.5px] after:bg-blue-600 after:rounded-full"
                   : "text-slate-600 hover:text-slate-900"
               }`}
             >
-              Akıllı Değerleme
+              <span className="hidden sm:inline">Akıllı </span>Değerleme
             </button>
 
             {/* 2. Harita & Bölge Sekmesi */}
             <button
               type="button"
               onClick={() => setActiveTab("endeks")}
-              className={`py-1.5 px-2.5 transition relative cursor-pointer font-heading font-extrabold ${
+              className={`py-1.5 px-2 transition relative cursor-pointer font-heading font-extrabold whitespace-nowrap shrink-0 ${
                 activeTab === "endeks"
                   ? "text-blue-600 after:absolute after:bottom-[-16px] after:left-0 after:right-0 after:h-[2.5px] after:bg-blue-600 after:rounded-full"
                   : "text-slate-600 hover:text-slate-900"
               }`}
             >
-              Harita & Bölge İncele
+              Harita <span className="hidden sm:inline">& Bölge</span>
             </button>
 
-            <span className="hidden xl:inline-block text-slate-600 hover:text-slate-900 cursor-pointer font-medium">
+            {/* 3. Resmi TKGM Parsel Sorgu Butonu */}
+            <button
+              type="button"
+              onClick={handleOpenTkgmGlobal}
+              className="hidden md:flex items-center gap-1 bg-[#0B1E3B] hover:bg-slate-900 text-amber-400 border border-amber-500/40 px-2.5 py-1 rounded-full text-xs font-black transition cursor-pointer active:scale-95 shrink-0 shadow-2xs"
+              title="Resmi TKGM Parsel Sorgu uygulamasını aç ve ada/parseli sorgula"
+            >
+              <ExternalLink className="w-3 h-3 text-amber-400" />
+              <span>TKGM</span>
+            </button>
+
+            <span className="hidden 2xl:inline-block text-slate-600 hover:text-slate-900 cursor-pointer font-medium whitespace-nowrap">
               Profesyoneller
             </span>
 
-            <span className="hidden xl:inline-block text-slate-600 hover:text-slate-900 cursor-pointer font-medium">
+            <span className="hidden 2xl:inline-block text-slate-600 hover:text-slate-900 cursor-pointer font-medium whitespace-nowrap">
               Blog
             </span>
 
             {/* Hızlı İkonlar: 🔔, 🌙, 🌐 */}
-            <div className="hidden sm:flex items-center gap-1 text-slate-400 pl-1 border-l border-slate-200">
+            <div className="hidden xl:flex items-center gap-1 text-slate-400 pl-1 border-l border-slate-200 shrink-0">
               <button 
                 type="button" 
                 aria-label="Bildirimler"
@@ -738,16 +877,24 @@ export default function Home() {
             {/* Kullanıcı Profili Rozeti: Ali Turan */}
             <div 
               onClick={() => setActiveTab("degerleme")}
-              className="flex items-center gap-2 bg-[#0B1E3B] hover:bg-slate-900 text-amber-400 border border-amber-500/30 pl-1.5 pr-3 py-1 rounded-full shadow-xs cursor-pointer select-none transition active:scale-95"
+              className="flex items-center gap-2 bg-[#0B1E3B] hover:bg-slate-900 text-amber-400 border border-amber-500/30 pl-1.5 pr-3 py-1 rounded-full shadow-xs cursor-pointer select-none transition active:scale-95 shrink-0"
               title="Kullanıcı: Ali Turan (İhaleciBurada Pro Hesap)"
             >
               <div className="w-6 h-6 rounded-full bg-amber-500 text-slate-950 flex items-center justify-center text-[10px] font-black">
                 AT
               </div>
-              <span className="text-xs font-extrabold whitespace-nowrap text-white">Ali Turan</span>
+              <span className="text-xs font-extrabold whitespace-nowrap text-white hidden sm:inline">Ali Turan</span>
             </div>
           </div>
         </div>
+
+        {/* Canlı Konum & TKGM Bildirim Bannerı */}
+        {(locationToast || tkgmGlobalToast) && (
+          <div className="bg-[#0B1E3B] text-amber-400 border-t border-amber-500/30 px-4 py-1.5 text-xs font-bold flex items-center justify-center gap-2 animate-in fade-in duration-200">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+            <span>{locationToast || tkgmGlobalToast}</span>
+          </div>
+        )}
       </header>
 
       {/* 2. RAPOR GÖRÜNÜMÜ MODU (Seçildiğinde Tam Ekran A4 Formatı) */}
@@ -1382,6 +1529,18 @@ export default function Home() {
                       <span>Potansiyel Arbitraj Kârı:</span>
                       <span className="font-mono text-sm">₺ {Math.round((isResidential ? (parcelData.estimatedUnitSaleM2PriceTL || 54085) : (parcelData.estimatedLandM2PriceTL || 18500)) * (parcelData.areaM2 || 110) * 0.5).toLocaleString("tr-TR")}</span>
                     </div>
+
+                    <div className="pt-2 border-t border-slate-100">
+                      <button
+                        type="button"
+                        onClick={handleOpenTkgmGlobal}
+                        className="w-full py-2 px-3 rounded-lg bg-[#0B1E3B] hover:bg-slate-900 text-amber-400 font-extrabold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs active:scale-95"
+                        title="Resmi TKGM Parsel Sorgu uygulamasında bu ada/parseli sorgula"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5 text-amber-400" />
+                        <span>🏛️ TKGM Parsel Sorgu&apos;da Resmi Kaydı Gör</span>
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1501,7 +1660,10 @@ export default function Home() {
                 isEndeksaSplitView={true}
                 searchRadius={searchRadius}
                 focusedCompId={focusedCompId}
-                onSelectComparable={(comp) => setFocusedCompId(comp.id)}
+                onSelectComparable={(comp) => {
+                  setFocusedCompId(comp.id);
+                  setSubTab("rayic");
+                }}
                 onLocationFound={(coords) => {
                   setParcelData((prev) => ({
                     ...prev,

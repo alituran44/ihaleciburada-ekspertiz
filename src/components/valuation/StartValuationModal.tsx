@@ -23,7 +23,9 @@ import {
   Tag,
   Phone,
   User,
-  Check
+  Check,
+  Crosshair,
+  ExternalLink
 } from "lucide-react";
 import { TURKEY_PROVINCES_AND_DISTRICTS, getProvinceCoordinates, getDistrictCoordinates } from "@/lib/turkeyLocations";
 
@@ -120,6 +122,63 @@ export const StartValuationModal: React.FC<StartValuationModalProps> = ({
   const [isListingPublishedSuccess, setIsListingPublishedSuccess] = useState<boolean>(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isAutoLocating, setIsAutoLocating] = useState<boolean>(false);
+  const [tkgmCopiedToast, setTkgmCopiedToast] = useState<string | null>(null);
+
+  // GPS ile İl, İlçe, Köy/Mahalle Otomatik Getir
+  const handleAutoLocateGPS = () => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      alert("Cihazınızda GPS konum servisi bulunamadı.");
+      return;
+    }
+    setIsAutoLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const uLat = Number(pos.coords.latitude.toFixed(6));
+        const uLng = Number(pos.coords.longitude.toFixed(6));
+        setCoords({ lat: uLat, lng: uLng });
+
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.flyTo([uLat, uLng], 16);
+          if (markerInstanceRef.current) markerInstanceRef.current.setLatLng([uLat, uLng]);
+          if (circleInstanceRef.current) circleInstanceRef.current.setLatLng([uLat, uLng]);
+        }
+
+        try {
+          const res = await fetch(`/api/location/search?lat=${uLat}&lng=${uLng}`);
+          const data = await res.json();
+          if (data.success && data.location) {
+            const loc = data.location;
+            if (loc.province) setCity(loc.province);
+            if (loc.district) setDistrict(loc.district);
+            if (loc.neighborhood) setNeighborhood(loc.neighborhood);
+          }
+        } catch (err) {
+          console.warn("Otomatik konum çözümleme hatası:", err);
+        } finally {
+          setIsAutoLocating(false);
+        }
+      },
+      (err) => {
+        setIsAutoLocating(false);
+        alert("GPS konum izni verilmedi veya sinyal zayıf.");
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
+
+  // Resmi TKGM Parsel Sorgu Entegrasyonu
+  const handleOpenTkgm = () => {
+    const textToCopy = `${city} / ${district} / ${neighborhood || "Merkez"} - Ada: ${ada || "1"} Parsel: ${parsel || "1"}`;
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(textToCopy);
+    }
+    setTkgmCopiedToast(`Ada ${ada || "1"} / Parsel ${parsel || "1"} bilgisi panoya kopyalandı! TKGM resmi parsel sorgu haritası açılıyor...`);
+    setTimeout(() => setTkgmCopiedToast(null), 4000);
+
+    const tkgmUrl = `https://parselsorgu.tkgm.gov.tr/#ara/cografi/${coords.lat}/${coords.lng}`;
+    window.open(tkgmUrl, "_blank", "noopener,noreferrer");
+  };
 
   // Leaflet Harita Referansları
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -262,7 +321,7 @@ export const StartValuationModal: React.FC<StartValuationModalProps> = ({
         dashArray: "6, 6",
       }).addTo(map);
 
-      const updateGeometries = (newLat: number, newLng: number) => {
+      const updateGeometries = async (newLat: number, newLng: number) => {
         setCoords({ lat: newLat, lng: newLng });
         circle.setLatLng([newLat, newLng]);
 
@@ -274,6 +333,20 @@ export const StartValuationModal: React.FC<StartValuationModalProps> = ({
           [newLat + ndLat * 0.9, newLng + ndLng * 1.1],
           [newLat - ndLat * 0.95, newLng + ndLng * 0.85],
         ]);
+
+        // Haritada işaretlenen noktanın İl, İlçe, Köy/Mahalle bilgisini otomatik doldur
+        try {
+          const res = await fetch(`/api/location/search?lat=${newLat}&lng=${newLng}`);
+          const data = await res.json();
+          if (data.success && data.location) {
+            const loc = data.location;
+            if (loc.province) setCity(loc.province);
+            if (loc.district) setDistrict(loc.district);
+            if (loc.neighborhood) setNeighborhood(loc.neighborhood);
+          }
+        } catch (e) {
+          // ignore
+        }
       };
 
       marker.on("dragend", (e: any) => {
@@ -707,13 +780,44 @@ export const StartValuationModal: React.FC<StartValuationModalProps> = ({
           </div>
 
           {/* 3. KİRALIK / SATILIK AYNI MENÜ (LOKASYON BİLGİSİ: İL, İLÇE, MAHALLE, ADA, PARSEL) */}
-          <div className="bg-amber-50/40 p-3.5 rounded-xl border border-amber-200">
-            <div className="text-[11px] font-black text-amber-900 uppercase tracking-wider mb-2 flex items-center justify-between">
-              <span>Kiralık / Satılık Aynı Menü (Arsa)</span>
-              <span className="text-[10px] bg-amber-200/80 px-2 py-0.5 rounded text-amber-950 font-bold">
-                TKGM Kadastro
+          <div className="bg-amber-50/40 p-3.5 rounded-xl border border-amber-200 space-y-2.5">
+            <div className="text-[11px] font-black text-amber-900 uppercase tracking-wider flex flex-wrap items-center justify-between gap-2">
+              <span className="flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 text-amber-600" />
+                <span>Kiralık / Satılık Konum & Kadastro Bilgileri</span>
               </span>
+              <div className="flex items-center gap-1.5">
+                {/* 📍 GPS İle Otomatik Konum Doldur Butonu */}
+                <button
+                  type="button"
+                  onClick={handleAutoLocateGPS}
+                  disabled={isAutoLocating}
+                  className="px-2.5 py-1 bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-lg text-[10px] font-black transition cursor-pointer flex items-center gap-1 active:scale-95 shadow-2xs"
+                  title="Mevcut GPS konumunuzdan İl, İlçe ve Köy/Mahalle bilgilerini otomatik doldurun"
+                >
+                  <Crosshair className={`w-3 h-3 text-amber-600 ${isAutoLocating ? "animate-spin" : ""}`} />
+                  <span>{isAutoLocating ? "Konum Alınıyor..." : "📍 Konumumu Bul (Otomatik)"}</span>
+                </button>
+
+                {/* 🏛️ TKGM Parsel Sorgu Butonu */}
+                <button
+                  type="button"
+                  onClick={handleOpenTkgm}
+                  className="px-2.5 py-1 bg-[#0B1E3B] hover:bg-slate-900 text-amber-400 border border-amber-500/40 rounded-lg text-[10px] font-black transition cursor-pointer flex items-center gap-1 active:scale-95 shadow-2xs"
+                  title="Resmi TKGM Parsel Sorgu uygulamasında aç"
+                >
+                  <ExternalLink className="w-3 h-3 text-amber-400" />
+                  <span>🏛️ TKGM Parsel Sorgu</span>
+                </button>
+              </div>
             </div>
+
+            {tkgmCopiedToast && (
+              <div className="p-2 rounded-lg bg-emerald-100 border border-emerald-300 text-emerald-900 text-xs font-bold flex items-center gap-1.5 animate-in fade-in duration-200">
+                <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>{tkgmCopiedToast}</span>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
               {/* İL */}

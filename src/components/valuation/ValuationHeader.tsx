@@ -33,10 +33,10 @@ export const ValuationHeader: React.FC<ValuationHeaderProps> = ({
   isDashboardActive = false,
 }) => {
   const steps = [
-    { num: 1, label: "Konum & Kadastro", icon: MapPin },
-    { num: 2, label: "Mülk & İmar Detayları", icon: SlidersHorizontal },
-    { num: 3, label: "Donatı & Nitelikler", icon: Sparkles },
-    { num: 4, label: "Ekspertiz & Yatırım Raporu", icon: TrendingUp },
+    { num: 1, label: "Konum & Kadastro", shortLabel: "Konum", icon: MapPin },
+    { num: 2, label: "Mülk & İmar Detayları", shortLabel: "Mülk İmar", icon: SlidersHorizontal },
+    { num: 3, label: "Donatı & Nitelikler", shortLabel: "Donatı", icon: Sparkles },
+    { num: 4, label: "Ekspertiz & Yatırım Raporu", shortLabel: "Ekspertiz", icon: TrendingUp },
   ];
 
   const progressPercent = isDashboardActive
@@ -90,53 +90,53 @@ export const ValuationHeader: React.FC<ValuationHeaderProps> = ({
           <button
             type="button"
             onClick={() => onServiceChange("konut")}
-            className={`py-2.5 px-3 rounded-xl transition flex items-center justify-center gap-2 text-xs font-bold cursor-pointer border ${
+            className={`py-2.5 px-3 rounded-xl transition flex items-center justify-center gap-2 text-xs font-bold cursor-pointer border truncate ${
               activeService === "konut"
                 ? "bg-[#0B1E3B] text-white border-[#0B1E3B] shadow-md shadow-blue-950/20 ring-2 ring-blue-500/20"
                 : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:text-slate-900"
             }`}
           >
-            <Home className={`w-4 h-4 ${activeService === "konut" ? "text-amber-400" : "text-slate-400"}`} />
-            <span>Konut & Daire</span>
+            <Home className={`w-4 h-4 shrink-0 ${activeService === "konut" ? "text-amber-400" : "text-slate-400"}`} />
+            <span className="truncate">Konut & Daire</span>
           </button>
 
           <button
             type="button"
             onClick={() => onServiceChange("arsa")}
-            className={`py-2.5 px-3 rounded-xl transition flex items-center justify-center gap-2 text-xs font-bold cursor-pointer border ${
+            className={`py-2.5 px-3 rounded-xl transition flex items-center justify-center gap-2 text-xs font-bold cursor-pointer border truncate ${
               activeService === "arsa"
                 ? "bg-[#0B1E3B] text-white border-[#0B1E3B] shadow-md shadow-blue-950/20 ring-2 ring-blue-500/20"
                 : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:text-slate-900"
             }`}
           >
-            <Building className={`w-4 h-4 ${activeService === "arsa" ? "text-emerald-400" : "text-slate-400"}`} />
-            <span>İmarlı Arsa</span>
+            <Building className={`w-4 h-4 shrink-0 ${activeService === "arsa" ? "text-emerald-400" : "text-slate-400"}`} />
+            <span className="truncate">İmarlı Arsa</span>
           </button>
 
           <button
             type="button"
             onClick={() => onServiceChange("arazi")}
-            className={`py-2.5 px-3 rounded-xl transition flex items-center justify-center gap-2 text-xs font-bold cursor-pointer border ${
+            className={`py-2.5 px-3 rounded-xl transition flex items-center justify-center gap-2 text-xs font-bold cursor-pointer border truncate ${
               activeService === "arazi"
                 ? "bg-[#0B1E3B] text-white border-[#0B1E3B] shadow-md shadow-blue-950/20 ring-2 ring-blue-500/20"
                 : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:text-slate-900"
             }`}
           >
-            <Compass className={`w-4 h-4 ${activeService === "arazi" ? "text-amber-400" : "text-slate-400"}`} />
-            <span>Tarla & Arazi</span>
+            <Compass className={`w-4 h-4 shrink-0 ${activeService === "arazi" ? "text-amber-400" : "text-slate-400"}`} />
+            <span className="truncate">Tarla & Arazi</span>
           </button>
 
           <button
             type="button"
             onClick={() => onServiceChange("ticari")}
-            className={`py-2.5 px-3 rounded-xl transition flex items-center justify-center gap-2 text-xs font-bold cursor-pointer border ${
+            className={`py-2.5 px-3 rounded-xl transition flex items-center justify-center gap-2 text-xs font-bold cursor-pointer border truncate ${
               activeService === "ticari"
                 ? "bg-[#0B1E3B] text-white border-[#0B1E3B] shadow-md shadow-blue-950/20 ring-2 ring-blue-500/20"
                 : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:text-slate-900"
             }`}
           >
-            <Store className={`w-4 h-4 ${activeService === "ticari" ? "text-sky-400" : "text-slate-400"}`} />
-            <span>Ticari & İşyeri</span>
+            <Store className={`w-4 h-4 shrink-0 ${activeService === "ticari" ? "text-sky-400" : "text-slate-400"}`} />
+            <span className="truncate">Ticari & İşyeri</span>
           </button>
         </div>
       )}
@@ -189,7 +189,7 @@ export const ValuationHeader: React.FC<ValuationHeaderProps> = ({
                     {isPassed ? <Check className="w-4 h-4" /> : <StepIcon className="w-4 h-4" />}
                   </div>
                   <span
-                    className={`text-[10.5px] sm:text-xs font-bold text-center leading-tight whitespace-nowrap transition ${
+                    className={`text-[10px] sm:text-xs font-bold text-center leading-tight transition break-words line-clamp-2 max-w-[85px] sm:max-w-none ${
                       isCurrent
                         ? "text-slate-900 font-extrabold"
                         : isPassed
@@ -197,7 +197,8 @@ export const ValuationHeader: React.FC<ValuationHeaderProps> = ({
                         : "text-slate-400"
                     }`}
                   >
-                    {s.label}
+                    <span className="sm:hidden">{s.shortLabel}</span>
+                    <span className="hidden sm:inline">{s.label}</span>
                   </span>
                 </div>
               );
