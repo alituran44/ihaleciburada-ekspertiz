@@ -272,21 +272,24 @@ export default function Home() {
   const [showSuggestions, setShowSuggestions] = useState<boolean>(false);
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState<boolean>(false);
   const searchContainerRef = useRef<HTMLDivElement>(null);
+  const isUserTypingRef = useRef<boolean>(false);
 
   // Dışarı tıklandığında arama önerilerini kapatma
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
         setShowSuggestions(false);
+        setSuggestions([]);
+        isUserTypingRef.current = false;
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Canlı Konum Arama (Debounce ile 81 İl, 973 İlçe, Köy ve Mahalleler)
+  // Canlı Konum Arama (Debounce ile 81 İl, 973 İlçe, Köy ve Mahalleler - Yalnızca kullanıcı klavyeden yazıyorsa çalışır)
   useEffect(() => {
-    if (!searchQuery || searchQuery.trim().length < 2) {
+    if (!isUserTypingRef.current || !searchQuery || searchQuery.trim().length < 2) {
       setSuggestions([]);
       setShowSuggestions(false);
       return;
@@ -297,7 +300,7 @@ export default function Home() {
       try {
         const res = await fetch(`/api/location/search?q=${encodeURIComponent(searchQuery.trim())}`);
         const data = await res.json();
-        if (data.success && data.results) {
+        if (isUserTypingRef.current && data.success && data.results) {
           setSuggestions(data.results);
           setShowSuggestions(data.results.length > 0);
         }
@@ -355,7 +358,9 @@ export default function Home() {
 
   // Konum Autocomplete Seçildiğinde Çalışır
   const handleSelectLocation = async (item: any) => {
+    isUserTypingRef.current = false;
     setShowSuggestions(false);
+    setSuggestions([]);
     setSearchQuery(`${item.label}, ${item.province}`);
     setIsSearching(true);
 
@@ -546,6 +551,10 @@ export default function Home() {
     if (e) e.preventDefault();
     if (!searchQuery.trim()) return;
 
+    isUserTypingRef.current = false;
+    setShowSuggestions(false);
+    setSuggestions([]);
+
     if (suggestions.length > 0) {
       handleSelectLocation(suggestions[0]);
       return;
@@ -677,11 +686,12 @@ export default function Home() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => {
+                  isUserTypingRef.current = true;
                   setSearchQuery(e.target.value);
                   setShowSuggestions(true);
                 }}
                 onFocus={() => {
-                  if (suggestions.length > 0) setShowSuggestions(true);
+                  if (isUserTypingRef.current && suggestions.length > 0) setShowSuggestions(true);
                 }}
                 placeholder="81 İl, İlçe veya Köy Arayın (Örn: Çanakkale, Kepez, Adatepe)"
                 className="flex-1 bg-transparent px-3 text-xs sm:text-sm font-medium text-slate-900 outline-none placeholder:text-slate-400 min-w-0"
@@ -799,6 +809,10 @@ export default function Home() {
                 {suggestions.map((item) => (
                   <div
                     key={item.id}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      handleSelectLocation(item);
+                    }}
                     onClick={() => handleSelectLocation(item)}
                     className="p-3 hover:bg-rose-50/60 cursor-pointer transition flex items-center justify-between gap-3 text-left"
                   >

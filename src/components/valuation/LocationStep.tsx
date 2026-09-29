@@ -56,6 +56,21 @@ export const LocationStep: React.FC<LocationStepProps> = ({
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
   const [mapLayerType, setMapLayerType] = useState<"satellite" | "streets">("satellite");
+  const isUserTypingRef = useRef<boolean>(false);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+
+  // Dışarı tıklandığında arama önerilerini kapatma
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
+        setShowSuggestions(false);
+        setSuggestions([]);
+        isUserTypingRef.current = false;
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const serviceLabel = 
     data.service === "konut" ? "Konut & Daire" :
@@ -507,9 +522,15 @@ export const LocationStep: React.FC<LocationStepProps> = ({
 
   // Canlı Arama / Autocomplete
   useEffect(() => {
+    if (!isUserTypingRef.current) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
     const q = data.searchQuery?.trim();
     if (!q || q.length < 2) {
       setSuggestions([]);
+      setShowSuggestions(false);
       return;
     }
 
@@ -518,9 +539,9 @@ export const LocationStep: React.FC<LocationStepProps> = ({
       try {
         const res = await fetch(`/api/location/search?q=${encodeURIComponent(q)}`);
         const json = await res.json();
-        if (json.success && Array.isArray(json.results)) {
+        if (isUserTypingRef.current && json.success && Array.isArray(json.results)) {
           setSuggestions(json.results);
-          setShowSuggestions(true);
+          setShowSuggestions(json.results.length > 0);
         }
       } catch (err) {
       } finally {
@@ -532,7 +553,9 @@ export const LocationStep: React.FC<LocationStepProps> = ({
   }, [data.searchQuery]);
 
   const handleSelectSuggestion = (item: SuggestionItem) => {
+    isUserTypingRef.current = false;
     setShowSuggestions(false);
+    setSuggestions([]);
     onChange({
       city: item.province,
       district: item.district || "Merkez",
@@ -630,7 +653,7 @@ export const LocationStep: React.FC<LocationStepProps> = ({
         </div>
 
         {/* 1. ADRES ARAMA VE AUTOCOMPLETE */}
-        <div className="relative">
+        <div className="relative" ref={searchContainerRef}>
           <div className="flex items-center border-2 border-slate-200 rounded-xl bg-slate-50 p-1.5 focus-within:border-blue-600 focus-within:bg-white focus-within:ring-2 focus-within:ring-blue-500/15 transition shadow-2xs">
             <div className="hidden sm:flex items-center gap-1 px-3 text-xs font-extrabold text-slate-700 border-r border-slate-200 shrink-0">
               <Compass className="w-3.5 h-3.5 text-blue-600" />
@@ -640,9 +663,13 @@ export const LocationStep: React.FC<LocationStepProps> = ({
             <input
               type="text"
               value={data.searchQuery}
-              onChange={(e) => onChange({ searchQuery: e.target.value })}
+              onChange={(e) => {
+                isUserTypingRef.current = true;
+                setShowSuggestions(true);
+                onChange({ searchQuery: e.target.value });
+              }}
               onFocus={() => {
-                if (suggestions.length > 0) setShowSuggestions(true);
+                if (isUserTypingRef.current && suggestions.length > 0) setShowSuggestions(true);
               }}
               placeholder="Örn: Sarıbeyli Çanakkale veya Devlet Mah. Etimesgut Ankara"
               className="flex-1 px-3 text-xs sm:text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 bg-transparent min-w-0"
@@ -651,7 +678,12 @@ export const LocationStep: React.FC<LocationStepProps> = ({
             {data.searchQuery && (
               <button
                 type="button"
-                onClick={() => onChange({ searchQuery: "" })}
+                onClick={() => {
+                  isUserTypingRef.current = false;
+                  setShowSuggestions(false);
+                  setSuggestions([]);
+                  onChange({ searchQuery: "" });
+                }}
                 className="p-1.5 text-slate-400 hover:text-slate-600 transition cursor-pointer"
               >
                 <X className="w-4 h-4" />
@@ -690,6 +722,10 @@ export const LocationStep: React.FC<LocationStepProps> = ({
               {suggestions.map((item) => (
                 <div
                   key={item.id}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    handleSelectSuggestion(item);
+                  }}
                   onClick={() => handleSelectSuggestion(item)}
                   className="p-3 hover:bg-blue-50/80 cursor-pointer transition flex items-center justify-between text-xs"
                 >
