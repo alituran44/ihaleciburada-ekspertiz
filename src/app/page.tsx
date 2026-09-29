@@ -979,7 +979,7 @@ export default function Home() {
           <div className="flex-1 flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden">
             
             {/* SOL ANALİTİK & VERİ PANELİ (Tapusor Genişliği %32) */}
-            <div className="w-full lg:w-[38%] xl:w-[32%] min-w-[360px] lg:h-[calc(100vh-64px)] overflow-y-auto p-3 sm:p-5 space-y-5 border-r border-slate-200 bg-white">
+            <div className="w-full lg:w-[38%] xl:w-[32%] min-w-[360px] lg:h-[calc(100vh-64px)] overflow-y-auto p-3 sm:p-5 space-y-5 border-r border-slate-200 bg-white relative z-10">
               
               {/* İHALECİ BURADA FİLTRE HAPLARI */}
               <div className="flex flex-wrap items-center gap-2 pb-1 border-b border-slate-200/80">
@@ -1688,7 +1688,7 @@ export default function Home() {
             </div>
 
             {/* SAĞ HARİTA PANELİ (Geniş Tapusor & GIS Uydu Haritası %68) */}
-            <div className="w-full lg:w-[62%] xl:w-[68%] lg:h-[calc(100vh-64px)] relative bg-slate-100 flex flex-col">
+            <div className="w-full lg:w-[62%] xl:w-[68%] lg:h-[calc(100vh-64px)] relative z-0 isolate bg-slate-100 flex flex-col">
               <ParcelMap
                 city={parcelData.city}
                 district={parcelData.district}

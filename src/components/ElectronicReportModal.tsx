@@ -294,7 +294,7 @@ export const ElectronicReportModal: React.FC<ElectronicReportModalProps> = ({
         }
       `}</style>
 
-      <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+      <div className="fixed inset-0 z-[99999] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
         <div className="bg-white w-full max-w-4xl rounded-2xl shadow-2xl border border-slate-200 flex flex-col max-h-[92vh] overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-200">
           
           {/* MODAL ÜST ÇUBUĞU */}
@@ -495,7 +495,7 @@ export const ElectronicReportModal: React.FC<ElectronicReportModalProps> = ({
 
           {/* PDF OLUŞTURULUYOR İLERLEME MODALI */}
           {isGeneratingPdf && (
-            <div className="fixed inset-0 z-60 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+            <div className="fixed inset-0 z-[100000] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
               <div className="bg-slate-900 border border-slate-800 text-white rounded-2xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-5 text-center">
                 <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center mx-auto text-amber-400">
                   <Loader2 className="w-7 h-7 animate-spin" />

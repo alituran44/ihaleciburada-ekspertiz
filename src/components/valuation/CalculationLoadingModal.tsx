@@ -59,7 +59,7 @@ export const CalculationLoadingModal: React.FC<CalculationLoadingModalProps> = (
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 select-none animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[99999] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 select-none animate-in fade-in duration-200">
       <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 max-w-md w-full shadow-2xl text-center space-y-6">
         {/* Pulsing Brand Icon */}
         <div className="relative mx-auto w-20 h-20 flex items-center justify-center">

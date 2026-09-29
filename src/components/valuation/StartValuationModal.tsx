@@ -513,7 +513,7 @@ export const StartValuationModal: React.FC<StartValuationModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-150">
+    <div className="fixed inset-0 z-[99999] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-150">
       <div 
         className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-2xl w-full overflow-hidden flex flex-col max-h-[94vh] animate-in zoom-in-95 duration-200"
         role="dialog"
@@ -932,7 +932,7 @@ export const StartValuationModal: React.FC<StartValuationModalProps> = ({
             {/* Harita Konteyneri */}
             <div 
               ref={mapContainerRef} 
-              className="w-full h-44 sm:h-52 rounded-lg overflow-hidden border border-slate-700 relative z-10"
+              className="w-full h-44 sm:h-52 rounded-lg overflow-hidden border border-slate-700 relative z-10 isolate"
             />
 
             <div className="flex items-center justify-between text-[10px] text-slate-400 italic mt-1.5">

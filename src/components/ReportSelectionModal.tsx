@@ -103,7 +103,7 @@ export const ReportSelectionModal: React.FC<ReportSelectionModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+    <div className="fixed inset-0 z-[99999] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
       <div 
         style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: "center center" }}
         className="bg-white w-full max-w-5xl rounded-2xl shadow-2xl border border-slate-200 flex flex-col max-h-[94vh] overflow-hidden my-auto transition-transform duration-150"

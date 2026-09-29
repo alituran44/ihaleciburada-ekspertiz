@@ -939,7 +939,7 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
 
   return (
     <div className={`rounded-2xl border border-slate-300 overflow-hidden bg-white shadow-xl flex flex-col ${
-      isFullscreen ? "fixed inset-0 z-[9999] rounded-none border-none" : "h-full"
+      isFullscreen ? "fixed inset-0 z-[99999] rounded-none border-none" : "h-full relative z-0 isolate"
     }`}>
       
       {/* 1. HARİTA ÜST BİLGİ VE FİLTRE BARI */}
