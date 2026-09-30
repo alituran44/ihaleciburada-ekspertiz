@@ -5,6 +5,7 @@ import {
   findFastLocationFromCoords,
   getDistrictCoordinates
 } from "@/lib/turkeyLocations";
+import { queryTKGMByCoordinates } from "@/lib/api/tkgm";
 
 // 81 İl Merkez Koordinatları
 const PROVINCE_COORDINATES: Record<string, { lat: number; lng: number }> = {
@@ -124,66 +125,62 @@ export async function GET(request: NextRequest) {
   const latParam = searchParams.get("lat");
   const lngParam = searchParams.get("lng");
 
-  // Koordinatla Tersine Konum Çözümleme (Haritada Tıklanan Noktanın Bilgilerini Getirme)
+  // Koordinatla Tersine Konum Çözümleme (Haritada Tıklanan Noktanın Bilgilerini ve Gerçek Kadastro Parselini Getirme)
   if (latParam && lngParam) {
     const lat = parseFloat(latParam);
     const lng = parseFloat(lngParam);
     if (!isNaN(lat) && !isNaN(lng)) {
-      const revCacheKey = `rev-${lat.toFixed(4)}-${lng.toFixed(4)}`;
+      const revCacheKey = `rev-${lat.toFixed(5)}-${lng.toFixed(5)}`;
       if (reverseCache.has(revCacheKey)) {
         return NextResponse.json({ success: true, location: reverseCache.get(revCacheKey) });
       }
 
-      try {
-        const osmRes = await fetch(
+      // 1. Gerçek TKGM MEGSIS Kadastro Parseli ve OSM Cadde/Mahalle Sorgusunu Paralel Başlat
+      const [tkgmParcel, osmItem] = await Promise.all([
+        queryTKGMByCoordinates(lat, lng).catch(() => null),
+        fetch(
           `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&countrycodes=tr&addressdetails=1&format=json`,
           {
             headers: {
               "User-Agent": "IhaleciBurada-Ekspertiz-Reverse/1.0 (info@ihaleciburada.com)",
             },
-            signal: AbortSignal.timeout(1200),
+            signal: AbortSignal.timeout(1800),
           }
-        );
+        )
+          .then((r) => (r.ok ? r.json() : null))
+          .catch(() => null),
+      ]);
 
-        if (osmRes.ok) {
-          const item = await osmRes.json();
-          const addr = item.address || {};
-          const detectedProvince = addr.province || addr.state || addr.city || addr.region;
-          const province = detectedProvince || findClosestProvince(lat, lng);
-          const district = addr.county || addr.town || addr.district || addr.city_district || "Merkez";
-          const neighborhood = addr.suburb || addr.neighbourhood || addr.quarter || addr.village || addr.hamlet || "Merkez";
-          const road = addr.road || addr.pedestrian || addr.street || "";
+      const addr = osmItem?.address || {};
+      const detectedProvince = addr.province || addr.state || addr.city || addr.region;
+      const province = tkgmParcel?.il || detectedProvince || findClosestProvince(lat, lng);
+      const district = tkgmParcel?.ilce || addr.county || addr.town || addr.district || addr.city_district || "Merkez";
+      const neighborhood = tkgmParcel?.mahalle || addr.suburb || addr.neighbourhood || addr.quarter || addr.village || addr.hamlet || "Merkez";
+      const road = addr.road || addr.pedestrian || addr.street || "";
 
-          const locObj = {
-            province,
-            district,
-            neighborhood,
-            road,
-            displayName: item.display_name,
-            lat,
-            lng,
-          };
-
-          reverseCache.set(revCacheKey, locObj);
-          return NextResponse.json({ success: true, location: locObj });
-        }
-      } catch (e) {
-        // Hızlı yerel Türkiye koordinat eşlemesi (0ms yanıt)
-      }
-
-      // Fallback: 973 ilçe koordinat havuzundan en yakın il ve ilçeyi 0ms'de tespit et
-      const fast = findFastLocationFromCoords(lat, lng);
-      const fallbackObj = {
-        province: fast.city,
-        district: fast.district,
-        neighborhood: fast.neighborhood || "Merkez",
-        road: "",
-        displayName: `${fast.district}, ${fast.city}`,
-        lat,
-        lng,
+      const locObj = {
+        province,
+        district,
+        neighborhood,
+        road,
+        displayName: tkgmParcel 
+          ? `${tkgmParcel.mahalle}, ${tkgmParcel.ilce} / ${tkgmParcel.il} • Ada ${tkgmParcel.ada} / Parsel ${tkgmParcel.parsel}`
+          : (osmItem?.display_name || `${district}, ${province}`),
+        lat: tkgmParcel?.coordinates?.lat || lat,
+        lng: tkgmParcel?.coordinates?.lng || lng,
+        ada: tkgmParcel?.ada,
+        parsel: tkgmParcel?.parsel,
+        alanM2: tkgmParcel?.alanM2,
+        nitelik: tkgmParcel?.nitelik,
+        pafta: tkgmParcel?.pafta,
+        mevkii: tkgmParcel?.mevkii,
+        ozet: tkgmParcel?.ozet,
+        polygonGeoJson: tkgmParcel?.polygonGeoJson,
+        isOfficialCadastre: !!tkgmParcel,
       };
-      reverseCache.set(revCacheKey, fallbackObj);
-      return NextResponse.json({ success: true, location: fallbackObj });
+
+      reverseCache.set(revCacheKey, locObj);
+      return NextResponse.json({ success: true, location: locObj });
     }
   }
 

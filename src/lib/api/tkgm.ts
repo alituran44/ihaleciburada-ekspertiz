@@ -5,10 +5,11 @@
 
 export interface TKGMParcelResult {
   success: boolean;
-  source: "TKGM_TAKPAS" | "OPEN_GIS_NOMINATIM" | "OPEN_GIS_FALLBACK";
+  source: "TKGM_MEGSIS" | "TKGM_TAKPAS" | "OPEN_GIS_NOMINATIM" | "OPEN_GIS_FALLBACK";
   il: string;
   ilce: string;
   mahalle: string;
+  mevkii?: string;
   ada: string;
   parsel: string;
   alanM2: number;
@@ -18,7 +19,99 @@ export interface TKGMParcelResult {
   elevationMeters?: number; // Open Topo Data'dan gelen gerçek rakım
   polygonGeoJson?: any;
   yolDurumu?: "var" | "yok";
+  ozet?: string;
   message?: string;
+}
+
+const tkgmCoordCache = new Map<string, TKGMParcelResult>();
+
+/**
+ * TKGM MEGSIS Resmi Web API'si üzerinden GPS koordinatıyla anlık gerçek ada ve parsel sorgular.
+ * Token gerektirmez; koordinat yol veya kamusal alana denk gelirse yakın çevre komşu parsel problaması yapar.
+ */
+export async function queryTKGMByCoordinates(lat: number, lng: number): Promise<TKGMParcelResult | null> {
+  const cacheKey = `${lat.toFixed(5)}_${lng.toFixed(5)}`;
+  if (tkgmCoordCache.has(cacheKey)) {
+    return tkgmCoordCache.get(cacheKey)!;
+  }
+
+  // Tıklanan nokta cadde/yola denk geldiyse 10-25m yakınındaki gerçek parseli yakalamak için kademeli koordinat probları
+  const probes: [number, number][] = [
+    [lat, lng],
+    [lat + 0.00012, lng],
+    [lat - 0.00012, lng],
+    [lat, lng + 0.00012],
+    [lat, lng - 0.00012],
+    [lat + 0.00018, lng + 0.00018],
+    [lat - 0.00018, lng - 0.00018],
+  ];
+
+  for (const [pLat, pLng] of probes) {
+    try {
+      const url = `https://cbsapi.tkgm.gov.tr/megsiswebapi.v3.1/api/parsel/${pLat.toFixed(6)}/${pLng.toFixed(6)}/`;
+      const res = await fetch(url, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "Referer": "https://parselsorgu.tkgm.gov.tr/",
+          "Origin": "https://parselsorgu.tkgm.gov.tr",
+          "Accept": "application/json, text/plain, */*",
+        },
+        signal: AbortSignal.timeout(2800),
+      });
+
+      if (!res.ok) continue;
+
+      const data = await res.json();
+      if (data && data.properties && data.properties.adaNo && data.properties.parselNo) {
+        const props = data.properties;
+        const areaStr = props.alan ? String(props.alan).replace(/\./g, "").replace(",", ".") : "0";
+        const parsedArea = parseFloat(areaStr) || 0;
+
+        let centerCoords = { lat: pLat, lng: pLng };
+        if (data.geometry && data.geometry.type === "Polygon" && Array.isArray(data.geometry.coordinates?.[0])) {
+          const ring = data.geometry.coordinates[0];
+          let sumLat = 0;
+          let sumLng = 0;
+          for (const pt of ring) {
+            sumLng += pt[0];
+            sumLat += pt[1];
+          }
+          if (ring.length > 0) {
+            centerCoords = {
+              lat: Number((sumLat / ring.length).toFixed(6)),
+              lng: Number((sumLng / ring.length).toFixed(6)),
+            };
+          }
+        }
+
+        const result: TKGMParcelResult = {
+          success: true,
+          source: "TKGM_MEGSIS",
+          il: props.ilAd || "",
+          ilce: props.ilceAd || "",
+          mahalle: props.mahalleAd || "",
+          mevkii: props.mevkii || "",
+          ada: String(props.adaNo).trim(),
+          parsel: String(props.parselNo).trim(),
+          alanM2: parsedArea,
+          nitelik: props.nitelik || "Arsa",
+          pafta: props.pafta || "",
+          ozet: props.ozet || "",
+          coordinates: centerCoords,
+          polygonGeoJson: data.geometry,
+          yolDurumu: "var",
+          message: `TKGM MEGSIS resmi kadastro kaydı doğrulandı: Ada ${props.adaNo} / Parsel ${props.parselNo}`,
+        };
+
+        tkgmCoordCache.set(cacheKey, result);
+        return result;
+      }
+    } catch {
+      // Bir sonraki proba geç
+    }
+  }
+
+  return null;
 }
 
 export async function queryTKGMParcel(params: {

@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { queryTKGMParcel } from "@/lib/api/tkgm";
+import { queryTKGMParcel, queryTKGMByCoordinates } from "@/lib/api/tkgm";
 import { fetchMarketValuation } from "@/lib/api/valuation";
 import { performMarketResearch } from "@/lib/api/marketResearch";
-import { getProvinceCoordinates } from "@/lib/turkeyLocations";
+import { getProvinceCoordinates, findFastLocationFromCoords } from "@/lib/turkeyLocations";
 import { 
   fetchLiveCurrencyRates, 
   fetchEarthquakeRisk, 
@@ -11,23 +11,47 @@ import {
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
-  const il = searchParams.get("il") || "";
-  const ilce = searchParams.get("ilce") || "";
-  const mahalle = searchParams.get("mahalle") || "";
-  const ada = searchParams.get("ada") || "";
-  const parsel = searchParams.get("parsel") || "";
+  const latParam = searchParams.get("lat");
+  const lngParam = searchParams.get("lng");
+  let il = searchParams.get("il") || "";
+  let ilce = searchParams.get("ilce") || "";
+  let mahalle = searchParams.get("mahalle") || "";
+  let ada = searchParams.get("ada") || "";
+  let parsel = searchParams.get("parsel") || "";
   const kategori = (searchParams.get("kategori") as "arsa" | "konut") || "arsa";
+
+  let tkgmResult: any = null;
+
+  if (latParam && lngParam) {
+    const lat = parseFloat(latParam);
+    const lng = parseFloat(lngParam);
+    if (!isNaN(lat) && !isNaN(lng)) {
+      tkgmResult = await queryTKGMByCoordinates(lat, lng);
+      if (tkgmResult) {
+        il = tkgmResult.il || il;
+        ilce = tkgmResult.ilce || ilce;
+        mahalle = tkgmResult.mahalle || mahalle;
+        ada = tkgmResult.ada || ada;
+        parsel = tkgmResult.parsel || parsel;
+      } else if (!il || !ilce) {
+        const fast = findFastLocationFromCoords(lat, lng);
+        il = fast.city;
+        ilce = fast.district;
+        mahalle = fast.neighborhood || "Merkez";
+      }
+    }
+  }
 
   if (!il || !ilce) {
     return NextResponse.json(
-      { error: "İl ve İlçe parametreleri zorunludur." },
+      { error: "İl ve İlçe parametreleri veya geçerli koordinat zorunludur." },
       { status: 400 }
     );
   }
 
   try {
     // 1. Kadastro & Parsel Sorgusu
-    const parcelData = await queryTKGMParcel({
+    const parcelData = tkgmResult || await queryTKGMParcel({
       il,
       ilce,
       mahalle,

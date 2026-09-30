@@ -129,14 +129,22 @@ export default function Home() {
             const emsalRes = await fetch(`/api/emsal?il=${encodeURIComponent(detCity)}&ilce=${encodeURIComponent(detDist)}&mahalle=${encodeURIComponent(detNeigh)}&kategori=${parcelData.category}&lat=${uLat}&lng=${uLng}`);
             const emsalData = await emsalRes.json();
             const autoCad = getCadastreForCoordinates(uLat, uLng);
+            const finalAda = loc.ada || autoCad.ada;
+            const finalParsel = loc.parsel || autoCad.parsel;
+
+            if (loc.isOfficialCadastre && loc.ada && loc.parsel) {
+              setTkgmGlobalToast(`🏛️ TKGM Resmi Kadastro: Ada ${loc.ada} / Parsel ${loc.parsel}${loc.alanM2 ? ` • ${loc.alanM2.toLocaleString("tr-TR")} m²` : ""}${loc.nitelik ? ` (${loc.nitelik})` : ""}`);
+              setTimeout(() => setTkgmGlobalToast(null), 5000);
+            }
 
             setParcelData((prev) => ({
               ...prev,
               city: detCity,
               district: detDist,
               neighborhood: detNeigh,
-              ada: autoCad.ada,
-              parsel: autoCad.parsel,
+              ada: finalAda || prev.ada,
+              parsel: finalParsel || prev.parsel,
+              areaM2: loc.alanM2 || prev.areaM2,
               coordinates: { lat: uLat, lng: uLng },
               estimatedLandM2PriceTL: emsalData?.data?.landM2PriceTL || prev.estimatedLandM2PriceTL,
               estimatedUnitSaleM2PriceTL: emsalData?.data?.unitSaleM2PriceTL || prev.estimatedUnitSaleM2PriceTL,
@@ -511,10 +519,19 @@ export default function Home() {
     unitPrice?: number;
     ada?: string;
     parsel?: string;
+    areaM2?: number;
     comparables?: any[];
+    polygonGeoJson?: any;
+    isOfficialCadastre?: boolean;
+    nitelik?: string;
   }) => {
     // 1. Üst arama çubuğunu haritada tıklanan noktayla anında güncelle
     setSearchQuery(`${loc.city}, ${loc.district}${loc.neighborhood ? `, ${loc.neighborhood}` : ""}`);
+
+    if (loc.isOfficialCadastre && loc.ada && loc.parsel) {
+      setTkgmGlobalToast(`🏛️ TKGM Resmi Kadastro: Ada ${loc.ada} / Parsel ${loc.parsel}${loc.areaM2 ? ` • ${loc.areaM2.toLocaleString("tr-TR")} m²` : ""}${loc.nitelik ? ` (${loc.nitelik})` : ""}`);
+      setTimeout(() => setTkgmGlobalToast(null), 5000);
+    }
 
     // 2. Sol analitik paneli ve taşınmaz verilerini anında güncelle (0ms gecikme)
     setParcelData((prev) => {
@@ -526,8 +543,9 @@ export default function Home() {
         city: loc.city,
         district: loc.district,
         neighborhood: loc.neighborhood,
-        ada: loc.ada || prev.ada,
-        parsel: loc.parsel || prev.parsel,
+        ada: (loc.ada && loc.ada.trim()) ? loc.ada : prev.ada,
+        parsel: (loc.parsel && loc.parsel.trim()) ? loc.parsel : prev.parsel,
+        areaM2: loc.areaM2 ? loc.areaM2 : prev.areaM2,
         coordinates: loc.coordinates, // Tıklanan koordinat kesin olarak sabitlenir!
         estimatedUnitSaleM2PriceTL: isRes ? newUnitM2 : prev.estimatedUnitSaleM2PriceTL,
         estimatedLandM2PriceTL: newLandM2,
