@@ -763,75 +763,7 @@ export default function Home() {
                 )}
               </button>
 
-              {/* Hasan Bey Üçlü Eylem Butonları: Geniş ekranda tam butonlar, orta ekranda kompakt ikonlar */}
-              <div className="hidden xl:flex items-center gap-1.5 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setShowElectronicReportModal(true)}
-                  className="flex items-center gap-1.5 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white text-xs font-black px-3.5 py-1.5 rounded-full shadow-xs transition active:scale-95 cursor-pointer whitespace-nowrap"
-                >
-                  <FileText className="w-3.5 h-3.5" />
-                  <span>Ekspertiz Raporu</span>
-                </button>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveTab("endeks");
-                    setSubTab("rayic");
-                  }}
-                  className="flex items-center gap-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-black px-3.5 py-1.5 rounded-full shadow-xs transition active:scale-95 cursor-pointer whitespace-nowrap"
-                >
-                  <Search className="w-3.5 h-3.5" />
-                  <span>Emlak & Emsal Bul</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveTab("endeks");
-                    setSubTab("deger");
-                  }}
-                  className="flex items-center gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-black px-3 py-1.5 rounded-full shadow-xs transition active:scale-95 cursor-pointer whitespace-nowrap"
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>Değerleme Yap</span>
-                </button>
-              </div>
-
-              {/* Orta Ekran (md:flex xl:hidden) Kompakt İkon Grubu - Menü çakışmasını önler */}
-              <div className="hidden md:flex xl:hidden items-center gap-1 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setShowElectronicReportModal(true)}
-                  className="p-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-full shadow-2xs transition active:scale-95 cursor-pointer"
-                  title="Ekspertiz Raporunu Aç"
-                >
-                  <FileText className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveTab("endeks");
-                    setSubTab("rayic");
-                  }}
-                  className="p-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full shadow-2xs transition active:scale-95 cursor-pointer"
-                  title="Emlak Bul"
-                >
-                  <Search className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveTab("endeks");
-                    setSubTab("deger");
-                  }}
-                  className="p-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-full shadow-2xs transition active:scale-95 cursor-pointer"
-                  title="Değerleme Yap"
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                </button>
-              </div>
             </form>
 
             {/* TÜRKİYE 81 İL, 973 İLÇE VE KÖY CANLI ÖNERİ AÇILIR PENCERESİ */}
