@@ -46,6 +46,7 @@ export interface StartValuationPayload {
   areaM2: number;
   tapuNiteligi: string;
   coordinates?: { lat: number; lng: number };
+  serhStatus?: "tapudan_sorulacak" | "temiz" | "ipotek_var" | "haciz_serh_var";
   // İlan Ver Modu Alanları
   listingPriceTL?: number;
   contactName?: string;
@@ -101,6 +102,7 @@ export const StartValuationModal: React.FC<StartValuationModalProps> = ({
   const [parsel, setParsel] = useState(initialParsel);
   const [areaM2, setAreaM2] = useState(initialAreaM2);
   const [tapuNiteligi, setTapuNiteligi] = useState("İmarlı Arsa");
+  const [serhStatus, setSerhStatus] = useState<"tapudan_sorulacak" | "temiz" | "ipotek_var" | "haciz_serh_var">("tapudan_sorulacak");
 
   // 5. Arama Yarıçapı (Radar / Çap Seçimi: 500m, 1000m, 3000m, 5000m)
   const [searchRadius, setSearchRadius] = useState<number>(1000);
@@ -472,6 +474,7 @@ export const StartValuationModal: React.FC<StartValuationModalProps> = ({
       areaM2: Number(areaM2) || 850,
       tapuNiteligi: tapuNiteligi || (subCategory === "tarla" ? "Tarla" : "İmarlı Arsa"),
       coordinates: targetCoords,
+      serhStatus: serhStatus,
       listingPriceTL: activeMode === "ilan_ver" ? listingPriceTL : undefined,
       contactName: activeMode === "ilan_ver" ? contactName : undefined,
       contactPhone: activeMode === "ilan_ver" ? contactPhone : undefined,
@@ -915,7 +918,46 @@ export const StartValuationModal: React.FC<StartValuationModalProps> = ({
             </div>
           </div>
 
-          {/* 4. HARİTADA KENDİN SEÇ & PARSEL POLİGONU & RADAR ÇEMBERİ */}
+          {/* 4. TAPU ŞERH / İPOTEK DURUMU (ALICI / TAPU SORGUSU) */}
+          <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-[11px] font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 text-rose-600" />
+                <span>Tapu Şerh & İpotek Durumu (Alıcı / Tapu Sorgusu)</span>
+              </label>
+              <span className="text-[10px] text-rose-700 font-bold bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
+                Tapudan Sorulacak
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+              {[
+                { id: "tapudan_sorulacak", label: "Tapu Müdürlüğü'nden Sorulacak (Tavsiye)" },
+                { id: "temiz", label: "Şerh / İpotek Yok (Temiz Beyan)" },
+                { id: "ipotek_var", label: "İpotek / Banka Rehinli" },
+                { id: "haciz_serh_var", label: "Haciz / Dava / İcra Şerhli" },
+              ].map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setSerhStatus(item.id as any)}
+                  className={`py-2 px-2.5 rounded-lg border text-xs font-bold transition cursor-pointer text-left flex items-center justify-between ${
+                    serhStatus === item.id
+                      ? "border-[#0B1E3B] bg-[#0B1E3B] text-white shadow-2xs"
+                      : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
+                  }`}
+                >
+                  <span className="truncate">{item.label}</span>
+                  {serhStatus === item.id && <Check className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
+                </button>
+              ))}
+            </div>
+            <p className="text-[10px] text-slate-500 italic">
+              * Tapu takyidatları ve şerh durumu yalnızca e-Devlet Web-Tapu sistemi veya ilgili Tapu Müdürlüğü üzerinden resmi olarak teyit edilir.
+            </p>
+          </div>
+
+          {/* 5. HARİTADA KENDİN SEÇ & PARSEL POLİGONU & RADAR ÇEMBERİ */}
           <div className="bg-slate-900 p-3.5 rounded-xl border border-slate-800 text-white">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-1.5">

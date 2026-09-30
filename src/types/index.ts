@@ -44,6 +44,7 @@ export interface ParcelInput {
   gabariM: number; // Maksimum yükseklik (metre veya kat)
   maxFloors: number; // Kat adedi
   relinquishmentRatio: number; // Terk oranı (% - örn: %10 yola/yeşil alana terk)
+  serhStatus?: "tapudan_sorulacak" | "temiz" | "ipotek_var" | "haciz_serh_var"; // Tapu şerh/ipotek durumu
   
   // KONUT & EV ÖZEL ALANLARI
   housingType?: HousingType;

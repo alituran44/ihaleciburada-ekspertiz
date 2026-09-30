@@ -35,6 +35,7 @@ export const SAMPLE_SCENARIOS: { label: string; description: string; data: Parce
       consultantPhone: "+90 850 308 00 00",
       consultantAgency: "İhaleciBurada Gayrimenkul & Değerleme",
       notes: "TKGM 133826 Zemin Nolu, Enderesi Mevkii, Kat İrtifaklı, 4.961,37 m² İmarlı Arsa.",
+      serhStatus: "tapudan_sorulacak",
     }
   },
   {

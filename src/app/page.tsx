@@ -203,6 +203,7 @@ export default function Home() {
       ada: payload.ada,
       parsel: payload.parsel,
       areaM2: payload.areaM2,
+      serhStatus: payload.serhStatus || prev.serhStatus || "tapudan_sorulacak",
       coordinates: newCoords || prev.coordinates,
     }));
     setSearchQuery(`${payload.neighborhood}, ${payload.district}, ${payload.city}`);
@@ -1057,7 +1058,7 @@ export default function Home() {
                   </span>
                 ) : (
                   <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold border border-slate-200">
-                    Emsal: <strong className="text-slate-900">KAKS {parcelData.kaks || 1.5}</strong>
+                    İmar: <strong className="text-slate-900">İlgili Kurumdan Alınmalıdır</strong>
                   </span>
                 )}
               </div>
@@ -1326,31 +1327,26 @@ export default function Home() {
                     <div className="flex items-center justify-between">
                       <span className="px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-400 text-[10px] font-black border border-amber-500/30 flex items-center gap-1">
                         <Sparkles className="w-3 h-3 text-amber-400" />
-                        Best-Use & Proje Geliştirme
+                        İmar & Geliştirme Bilgisi
                       </span>
-                      <span className="text-xs font-mono font-bold text-slate-400">
-                        KAKS: {parcelData.kaks || 1.5} • TAKS: {parcelData.taks || 0.35}
+                      <span className="text-xs font-bold text-amber-400">
+                        İlgili Kurumdan Alınmalıdır
                       </span>
                     </div>
 
                     <div className="pt-2">
-                      <div className="text-2xl font-black text-white font-mono">
-                        {Math.round((parcelData.areaM2 || 1000) * (parcelData.kaks || 1.5)).toLocaleString("tr-TR")} m²
+                      <div className="text-lg font-black text-white">
+                        Resmi İmar Durum Belgesi (Çap) Esastır
                       </div>
-                      <div className="text-[11px] text-slate-400">
-                        Öngörülen Toplam Emsal İnşaat Alanı (Satılabilir Alan)
+                      <div className="text-[11px] text-slate-300 mt-1 leading-relaxed">
+                        Arsa yapılaşma koşulları, emsal (KAKS), taban alanı (TAKS) ve kat adedi verileri yetkili ilçe belediyesi imar biriminden temin edilecek imar çapı ile netleşir. Sistemimiz afaki inşaat kapasitesi hesabı yapmaz.
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800 text-[11px]">
-                      <div>
-                        <span className="text-slate-400">Müteahhit Payı:</span>
-                        <div className="font-bold text-white font-mono">%{parcelData.contractorSharePercent || 50} Kat Karşılığı</div>
-                      </div>
-                      <div>
-                        <span className="text-slate-400">Arsa Sahibi Payı:</span>
-                        <div className="font-bold text-amber-400 font-mono">%{100 - (parcelData.contractorSharePercent || 50)}</div>
-                      </div>
+                    <div className="p-3 bg-slate-900/80 rounded-xl border border-slate-800 text-[11px] space-y-1.5 text-slate-300">
+                      <div className="flex justify-between"><span className="text-slate-400">İmar Durumu:</span><strong className="text-amber-400">Belediye İmar Müdürlüğü</strong></div>
+                      <div className="flex justify-between"><span className="text-slate-400">Takyidat / Şerh:</span><strong className="text-rose-400">Tapu Müdürlüğü&apos;nden Sorulacak</strong></div>
+                      <div className="flex justify-between"><span className="text-slate-400">Kadastro Durumu:</span><strong className="text-emerald-400">Müstakil Parsel Tescilli</strong></div>
                     </div>
                   </div>
 
@@ -1840,6 +1836,7 @@ export default function Home() {
           housingTypeKind: (parcelData.housingType === "villa" || parcelData.housingType === "mustakil") ? "mustakil" : "apartman",
           pgaSeismicHazard: "0.220g",
           marketValueEstimate: calculation.fairMarketValueTL || 7900000,
+          serhStatus: parcelData.serhStatus || "tapudan_sorulacak",
         }}
       />
 

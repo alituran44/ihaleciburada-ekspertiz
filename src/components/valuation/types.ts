@@ -41,6 +41,7 @@ export interface ValuationFormData {
   arsaKaks: number;
   arsaRoadFrontage: string;
   arsaContractorShare: number;
+  serhStatus?: "tapudan_sorulacak" | "temiz" | "ipotek_var" | "haciz_serh_var";
 
   // 4. Arazi Özel Verileri
   araziType: string;
@@ -135,6 +136,7 @@ export const INITIAL_VALUATION_DATA: ValuationFormData = {
   arsaKaks: 1.5,
   arsaRoadFrontage: "kose_parsel",
   arsaContractorShare: 45,
+  serhStatus: "tapudan_sorulacak",
 
   araziType: "tarla",
   araziIrrigation: "sulu",

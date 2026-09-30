@@ -15,7 +15,8 @@ import {
   Sparkles,
   Layers,
   Trees,
-  Store
+  Store,
+  ShieldCheck
 } from "lucide-react";
 
 interface PropertyDetailsStepProps {
@@ -478,141 +479,89 @@ export const PropertyDetailsStep: React.FC<PropertyDetailsStepProps> = ({
               />
             </div>
 
-            {/* İmar & Emsal Bilgisi (TAKS / KAKS) - Tercihen / Vatandaş İçin */}
-            <div className="space-y-3 pt-2 border-t border-slate-200/70">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div>
-                  <div className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
-                    <span>İmar & Emsal Bilgisi (TAKS / KAKS)</span>
-                    <span className="text-[10px] font-extrabold text-blue-700 bg-blue-100/80 px-2 py-0.5 rounded-full lowercase">
-                      tercihen / opsiyonel
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
-                    İmar durumu belgesi olmayan veya bilmeyen vatandaşlar için bölge ortalaması otomatik uygulanır.
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-1 shrink-0 bg-slate-100 p-1 rounded-xl">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setZoningMode("auto");
-                      onChange({ arsaKaks: 1.5, arsaTaks: 0.35, arsaMaxFloors: 4 });
-                    }}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
-                      zoningMode === "auto"
-                        ? "bg-white text-blue-900 shadow-2xs font-black"
-                        : "text-slate-600 hover:text-slate-900"
-                    }`}
-                  >
-                    <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-                    <span>Otomatik Bölge Emsali</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setZoningMode("custom")}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-                      zoningMode === "custom"
-                        ? "bg-white text-slate-900 shadow-2xs font-black"
-                        : "text-slate-600 hover:text-slate-900"
-                    }`}
-                  >
-                    <span>İmarı Elle Gir</span>
-                  </button>
-                </div>
+            {/* İmar Durumu ve Yapılaşma Bilgilendirmesi */}
+            <div className="p-4 bg-amber-50/70 rounded-xl border border-amber-200/80 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-extrabold text-amber-950 uppercase tracking-wider flex items-center gap-1.5">
+                  <Building className="w-4 h-4 text-amber-600" />
+                  <span>İmar Durumu & Yapılaşma Bilgisi</span>
+                </span>
+                <span className="text-[10px] font-black text-amber-800 bg-amber-200/80 px-2 py-0.5 rounded-full">
+                  İlgili Kurumdan Alınmalıdır
+                </span>
               </div>
-
-              {zoningMode === "auto" ? (
-                <div className="p-3.5 bg-blue-50/60 rounded-xl border border-blue-200/80 flex items-center justify-between gap-4">
-                  <div className="text-xs text-blue-950 leading-relaxed">
-                    <span className="font-extrabold">Bölge Standart Emsali Uygulanıyor: </span>
-                    <span>Emsal (KAKS): <strong>{data.arsaKaks || 1.5}</strong>, Taban Oturumu (TAKS): <strong>{data.arsaTaks || 0.35}</strong>, Kat: <strong>{data.arsaMaxFloors || 4} Kat</strong></span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setZoningMode("custom")}
-                    className="text-xs font-extrabold text-blue-700 hover:underline shrink-0 cursor-pointer"
-                  >
-                    Değiştir →
-                  </button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 bg-slate-50/60 rounded-xl border border-slate-200">
-                  <CounterInput
-                    label="Emsal (KAKS)"
-                    value={data.arsaKaks}
-                    onValChange={(v) => onChange({ arsaKaks: v })}
-                    min={0.1}
-                    max={4.0}
-                    step={0.1}
-                    subtitle="Tercihen (Varsayılan: 1.5)"
-                  />
-                  <CounterInput
-                    label="Taban Oturumu (TAKS)"
-                    value={data.arsaTaks}
-                    onValChange={(v) => onChange({ arsaTaks: v })}
-                    min={0.1}
-                    max={0.8}
-                    step={0.05}
-                    subtitle="Tercihen (Varsayılan: 0.35)"
-                  />
-                  <CounterInput
-                    label="Kat Adedi (Hmax)"
-                    value={data.arsaMaxFloors}
-                    onValChange={(v) => onChange({ arsaMaxFloors: v })}
-                    min={1}
-                    max={40}
-                    unit="Kat"
-                    subtitle="Tercihen (Varsayılan: 4)"
-                  />
-                </div>
-              )}
+              <p className="text-xs text-amber-900 leading-relaxed">
+                Taşınmazın güncel imar fonksiyonu, çekme mesafeleri, kat adedi ve yapılaşma hakları <strong>yetkili ilçe veya büyükşehir belediyesi imar müdürlüğünden</strong> temin edilecek resmi imar çapı ile belirlenir. Sistemimiz afaki KAKS / TAKS hesabı yapmamaktadır.
+              </p>
             </div>
 
-            {/* Müteahhit Kat Karşılığı Payı - İsteğe Bağlı / Tercihen */}
-            <div className="pt-2 border-t border-slate-200/70">
-              <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/50 space-y-2.5">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div>
-                    <div className="text-xs sm:text-sm font-bold text-slate-900 flex items-center gap-2">
-                      <span>Müteahhit Kat Karşılığı Payı</span>
-                      <span className="text-[10px] font-extrabold text-slate-600 bg-slate-200/80 px-2 py-0.5 rounded-full">
-                        İsteğe Bağlı / Tercihen
+            {/* Tapu Şerh & İpotek Durumu - Alıcı / Tapu Sorgusu */}
+            <div className="space-y-3 pt-2 border-t border-slate-200/70">
+              <div>
+                <label className="text-xs font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-rose-600" />
+                  <span>Tapu Şerh / İpotek / Takyidat Durumu</span>
+                  <span className="text-[10px] font-black text-rose-700 bg-rose-100 px-2 py-0.5 rounded-full lowercase">
+                    tapudan sorulacak
+                  </span>
+                </label>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Taşınmaz üzerinde herhangi bir banka ipoteği, icra/haciz veya satış vaadi şerhi bulunuyor mu?
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                {[
+                  {
+                    id: "tapudan_sorulacak",
+                    title: "Tapu Müdürlüğü'nden Sorulacak",
+                    sub: "Tavsiye Edilen (WebTapu teyidi gerekli)",
+                  },
+                  {
+                    id: "temiz",
+                    title: "Şerh / İpotek Yok",
+                    sub: "Alıcı / Satıcı Beyanı: Temiz",
+                  },
+                  {
+                    id: "ipotek_var",
+                    title: "İpotek / Banka Rehinli",
+                    sub: "Kredi / borç bakiyesi mevcut",
+                  },
+                  {
+                    id: "haciz_serh_var",
+                    title: "Haciz / Dava Şerhi Var",
+                    sub: "İcra veya mahkeme şerhi var",
+                  },
+                ].map((opt) => {
+                  const isSelected = (data.serhStatus || "tapudan_sorulacak") === opt.id;
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => onChange({ serhStatus: opt.id as any })}
+                      className={`p-3 rounded-xl border text-left transition cursor-pointer flex flex-col justify-between ${
+                        isSelected
+                          ? "border-[#0B1E3B] bg-slate-900 text-white shadow-xs"
+                          : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <strong className="font-bold text-xs">{opt.title}</strong>
+                        {isSelected && <Check className="w-4 h-4 text-emerald-400" />}
+                      </div>
+                      <span className={`text-[11px] mt-1 ${isSelected ? "text-slate-300" : "text-slate-500"}`}>
+                        {opt.sub}
                       </span>
-                    </div>
-                    <p className="text-[11px] text-slate-500 mt-0.5">
-                      Mal sahibi ile müteahhit arasındaki anlaşma oranıdır. Bilinmiyorsa standart %50 kabul edilir.
-                    </p>
-                  </div>
+                    </button>
+                  );
+                })}
+              </div>
 
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    {[
-                      { val: 40, label: "%40" },
-                      { val: 50, label: "%50 (Standart)" },
-                      { val: 60, label: "%60" },
-                    ].map((opt) => (
-                      <button
-                        key={opt.val}
-                        type="button"
-                        onClick={() => onChange({ arsaContractorShare: opt.val })}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-                          data.arsaContractorShare === opt.val
-                            ? "bg-[#0B1E3B] text-white shadow-2xs font-black"
-                            : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-100"
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between text-xs text-slate-600 pt-1 border-t border-slate-200/50">
-                  <span>Seçili Oran: <strong>%{data.arsaContractorShare || 50} Müteahhit Payı</strong></span>
-                  <span className="text-[11px] text-slate-500 italic">Arsa Sahibine Kalan: %{100 - (data.arsaContractorShare || 50)}</span>
-                </div>
+              <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-[11px] text-slate-600 flex items-start gap-2">
+                <span className="text-amber-600 font-bold shrink-0">⚠️ Not:</span>
+                <span>
+                  Taşınmaz takyidat kayıtları yalnızca e-Devlet Web-Tapu sistemi veya yetkili Tapu Müdürlüğü üzerinden alıcı ve malik tarafından sorgulanabilir.
+                </span>
               </div>
             </div>
           </div>

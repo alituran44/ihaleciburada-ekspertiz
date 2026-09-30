@@ -579,7 +579,15 @@ ${currentUrl}`;
                     </div>
                     <div className="flex justify-between py-1 border-b border-slate-200">
                       <span className="font-medium">Ekspertiz Şerh Durumu:</span>
-                      <strong className="text-emerald-700">Teminata Uygun (Temiz)</strong>
+                      <strong className="text-amber-700 font-bold">
+                        {data.serhStatus === "temiz"
+                          ? "Alıcı Beyanı: Temiz (Tapu Teyidi Gerekir)"
+                          : data.serhStatus === "ipotek_var"
+                          ? "İpotek / Rehinli (Tapudan Sorulacak)"
+                          : data.serhStatus === "haciz_serh_var"
+                          ? "Haciz / Şerhli (Tapudan Sorulacak)"
+                          : "Tapu Müdürlüğü'nden Sorulacaktır"}
+                      </strong>
                     </div>
                     <div className="flex justify-between py-1 border-b border-slate-200">
                       <span className="font-medium">Zorunlu Sigortalar:</span>
@@ -645,12 +653,20 @@ ${currentUrl}`;
                 {isArsa && (
                   <>
                     <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
-                      <div className="text-slate-400 text-[10px] font-bold uppercase">Emsal (KAKS)</div>
-                      <div className="font-extrabold text-slate-900 mt-0.5">{data.arsaKaks}</div>
+                      <div className="text-slate-400 text-[10px] font-bold uppercase">İmar Durumu</div>
+                      <div className="font-extrabold text-amber-800 mt-0.5 text-xs">İlgili Kurumdan Alınmalıdır</div>
                     </div>
                     <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
-                      <div className="text-slate-400 text-[10px] font-bold uppercase">Taban Alanı (TAKS)</div>
-                      <div className="font-extrabold text-slate-900 mt-0.5">{data.arsaTaks}</div>
+                      <div className="text-slate-400 text-[10px] font-bold uppercase">Şerh / İpotek</div>
+                      <div className="font-extrabold text-rose-700 mt-0.5 text-xs">
+                        {data.serhStatus === "temiz"
+                          ? "Şerh Yok (Tapu Teyitli)"
+                          : data.serhStatus === "ipotek_var"
+                          ? "İpotekli (Tapudan Sorulacak)"
+                          : data.serhStatus === "haciz_serh_var"
+                          ? "Hacizli (Tapudan Sorulacak)"
+                          : "Tapu Müdürlüğü'nden Sorulacak"}
+                      </div>
                     </div>
                   </>
                 )}

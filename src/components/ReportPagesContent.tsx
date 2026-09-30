@@ -255,45 +255,84 @@ export const ReportPagesContent: React.FC<ReportPagesContentProps> = ({
           <div>
             <div className="border-b-2 border-slate-200 pb-3 mb-4 flex items-center justify-between">
               <h2 className="text-xl font-black text-slate-900 font-heading">
-                {effectiveCategory === "arazi" ? "Arazi Özellikleri" : effectiveCategory === "arsa" ? "Arsa Özellikleri" : "Konut Özellikleri"}
+                {effectiveCategory === "arazi" ? "Arazi Özellikleri" : effectiveCategory === "arsa" ? "İmar, Kadastro ve Mülkiyet Durumu" : "Konut Özellikleri"}
               </h2>
               <div className="px-3 py-1 bg-rose-50 text-[#E11D48] rounded-lg text-xs font-black">
                 {effectiveCategory === "arsa"
-                  ? `İmarlı Arsa • ${effectiveAreaM2} m² • Emsal (KAKS): 1.50 / TAKS: 0.35`
+                  ? `İmarlı Arsa • ${Number(effectiveAreaM2).toLocaleString("tr-TR")} m²`
                   : effectiveCategory === "arazi"
-                  ? `Tarla & Arazi • ${effectiveAreaM2} m² • Kadastral Yol Cepheli`
+                  ? `Tarla & Arazi • ${Number(effectiveAreaM2).toLocaleString("tr-TR")} m² • Kadastral Yol Cepheli`
                   : `${roomCount}+${livingRoomCount} • ${effectiveAreaM2} m² • ${floorNumber === 0 ? "Zemin Kat" : floorNumber === 0.5 ? "Yüksek Giriş" : floorNumber === -1 ? "Bodrum" : `${floorNumber}. Kat`}`}
               </div>
             </div>
 
             {/* ÖZELLİK TABLOLARI */}
             {effectiveCategory === "arsa" ? (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
-                  <div className="font-extrabold text-slate-900 border-b border-slate-200 pb-1">İmar & Kadastro Kriterleri</div>
-                  <div className="flex justify-between text-slate-600"><span>İmar Durumu:</span><strong className="text-emerald-700">Konut + Ticari İmarlı</strong></div>
-                  <div className="flex justify-between text-slate-600"><span>Emsal (KAKS):</span><strong>1.50</strong></div>
-                  <div className="flex justify-between text-slate-600"><span>Taban Alanı (TAKS):</span><strong>0.35</strong></div>
-                  <div className="flex justify-between text-slate-600"><span>Maksimum Kat:</span><strong>5 Kat (15.50m)</strong></div>
-                  <div className="flex justify-between text-slate-600"><span>Yola Terk Oranı:</span><strong>~%20 Terk Öngörüsü</strong></div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                {/* 1. İMAR & KADASTRO DURUMU */}
+                <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+                  <div className="font-extrabold text-slate-900 border-b border-slate-200 pb-1.5 flex items-center justify-between">
+                    <span>İmar & Kadastro Durumu</span>
+                    <span className="text-[10px] text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full font-bold">Belediye Teyidi Gerekir</span>
+                  </div>
+                  <div className="flex justify-between text-slate-600">
+                    <span>İmar Durumu:</span>
+                    <strong className="text-amber-800 font-extrabold">İlgili Kurum / Belediyeden Alınmalıdır</strong>
+                  </div>
+                  <div className="flex justify-between text-slate-600">
+                    <span>Yapılaşma Şartları:</span>
+                    <strong className="text-slate-800">Resmi İmar Çapı Esastır</strong>
+                  </div>
+                  <div className="flex justify-between text-slate-600">
+                    <span>Kadastro Yolu:</span>
+                    <strong className="text-emerald-700 font-bold">Resmi Yola Cepheli / Ulaşım Mevcut</strong>
+                  </div>
+                  <div className="flex justify-between text-slate-600">
+                    <span>Yola Terk / Parselasyon:</span>
+                    <strong className="text-slate-800">Belediye İmar Müdürlüğü Teyidi</strong>
+                  </div>
+                  <div className="mt-2.5 p-2.5 bg-amber-50/80 border border-amber-200 rounded-lg text-[11px] text-amber-950 leading-snug">
+                    ℹ️ <strong>İmar ve Yapılaşma Bilgilendirmesi:</strong> Parselin güncel imar fonksiyonu, çekme mesafeleri, kot ve yapılaşma hakları yetkili ilçe belediyesi İmar ve Şehircilik Müdürlüğü&apos;nden temin edilecek resmi İmar Durum Belgesi (İmar Çapı) ile netleşir. Raporumuzda afaki KAKS/TAKS veya inşaat kapasitesi tahmini yapılmamaktadır.
+                  </div>
                 </div>
 
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
-                  <div className="font-extrabold text-slate-900 border-b border-slate-200 pb-1">İnşaat Kapasitesi</div>
-                  <div className="flex justify-between text-slate-600"><span>Arsa Alanı:</span><strong>{effectiveAreaM2} m²</strong></div>
-                  <div className="flex justify-between text-slate-600"><span>Net İnşaat Alanı:</span><strong className="text-blue-700 font-mono">~{Math.round(effectiveAreaM2 * 1.50)} m²</strong></div>
-                  <div className="flex justify-between text-slate-600"><span>Taban Oturumu:</span><strong>~{Math.round(effectiveAreaM2 * 0.35)} m²</strong></div>
-                  <div className="flex justify-between text-slate-600"><span>Yol Cephesi:</span><Check className="w-3.5 h-3.5 text-emerald-600" /></div>
-                  <div className="flex justify-between text-slate-600"><span>Altyapı (Elektrik/Su):</span><Check className="w-3.5 h-3.5 text-emerald-600" /></div>
-                </div>
-
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
-                  <div className="font-extrabold text-slate-900 border-b border-slate-200 pb-1">Topografya & Mülkiyet</div>
-                  <div className="flex justify-between text-slate-600"><span>Zemin Eğimi:</span><strong>Düz / Hafif Eğim (%2)</strong></div>
-                  <div className="flex justify-between text-slate-600"><span>Parsel Geometrisi:</span><strong>Düzgün Dikdörtgen</strong></div>
-                  <div className="flex justify-between text-slate-600"><span>Ulaşım:</span><strong>Asfalt Yol Bağlantılı</strong></div>
-                  <div className="flex justify-between text-slate-600"><span>Hukuki Durum:</span><strong className="text-emerald-700">Müstakil Parsel</strong></div>
-                  <div className="flex justify-between text-slate-600"><span>Şerh / İpotek:</span><span className="text-emerald-600 font-bold">Temiz / Sorunsuz</span></div>
+                {/* 2. MÜLKİYET, TOPOGRAFYA & TAPU TAKYİDAT DURUMU */}
+                <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+                  <div className="font-extrabold text-slate-900 border-b border-slate-200 pb-1.5 flex items-center justify-between">
+                    <span>Mülkiyet & Tapu Takyidat Durumu</span>
+                    <span className="text-[10px] text-rose-700 bg-rose-100 px-2 py-0.5 rounded-full font-bold">Tapudan Sorulacak</span>
+                  </div>
+                  <div className="flex justify-between text-slate-600">
+                    <span>Hukuki Mülkiyet:</span>
+                    <strong className="text-emerald-700 font-bold">Müstakil Parsel</strong>
+                  </div>
+                  <div className="flex justify-between text-slate-600">
+                    <span>Parsel Geometrisi:</span>
+                    <strong className="text-slate-800">Düzgün Dikdörtgen</strong>
+                  </div>
+                  <div className="flex justify-between text-slate-600">
+                    <span>Zemin Eğimi / Topografya:</span>
+                    <strong className="text-slate-800">Düz / Hafif Eğim (%2)</strong>
+                  </div>
+                  <div className="flex justify-between text-slate-600">
+                    <span>Ulaşım / Altyapı:</span>
+                    <strong className="text-slate-800">Asfalt Yol Bağlantılı / Tam Altyapı</strong>
+                  </div>
+                  <div className="flex justify-between text-slate-600">
+                    <span>Şerh / İpotek / Haciz:</span>
+                    <strong className="text-rose-700 font-extrabold">
+                      {formData?.serhStatus === "temiz"
+                        ? "Alıcı Beyanı: Şerh Yok (Tapu Teyidi Gerekir)"
+                        : formData?.serhStatus === "ipotek_var"
+                        ? "Alıcı Beyanı: İpotek Var (Tapudan Sorulacak)"
+                        : formData?.serhStatus === "haciz_serh_var"
+                        ? "Alıcı Beyanı: Haciz / Şerh Var (Tapudan Sorulacak)"
+                        : "Tapu Müdürlüğü'nden Sorulacaktır (Alıcı Teyidi)"}
+                    </strong>
+                  </div>
+                  <div className="mt-2.5 p-2.5 bg-rose-50/80 border border-rose-200 rounded-lg text-[11px] text-rose-950 leading-snug">
+                    ⚠️ <strong>Tapu Takyidat Sorgulaması:</strong> Taşınmaz üzerindeki ipotek, haciz, kamu haczi, intifa veya satış vaadi gibi ayni hak ve şerhler yalnızca Tapu ve Kadastro Genel Müdürlüğü (WebTapu) veya yetkili Tapu Müdürlüğü&apos;nden alıcı/malik tarafından resmi olarak sorgulanmalıdır.
+                  </div>
                 </div>
               </div>
             ) : effectiveCategory === "arazi" ? (
