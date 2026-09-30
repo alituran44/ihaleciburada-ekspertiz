@@ -25,16 +25,30 @@ import {
   User,
   Check,
   Crosshair,
-  ExternalLink
+  ExternalLink,
+  Home,
+  Info
 } from "lucide-react";
 import { TURKEY_PROVINCES_AND_DISTRICTS, getProvinceCoordinates, getDistrictCoordinates } from "@/lib/turkeyLocations";
+import { 
+  REAL_ESTATE_TAXONOMY, 
+  TRANSACTION_TYPES, 
+  TENDER_METHODS, 
+  SELLER_TYPES, 
+  DEED_STATUS_OPTIONS, 
+  PROPERTY_TAGS 
+} from "@/lib/taxonomy";
 
 export interface StartValuationPayload {
   mode: "expertiz" | "emlak_bul" | "ilan_ver";
-  mainCategory: "satilik" | "kiralik" | "takas" | "diger";
-  customMainCategory?: string;
+  transactionType: "satilik" | "kiralik" | "kat_karsiligi" | "devren_satilik" | "devren_kiralik";
+  mainCategory: "konut" | "arsa" | "ticari" | "bina" | "turizm" | "ozel_amacli";
   subCategory: string;
   customSubCategory?: string;
+  deedStatus: "mustakil" | "hisseli" | "kat_mulkiyeti" | "kat_irtifaki";
+  tenderMethod?: "sabit_fiyat" | "teklif_al" | "acik_artirma";
+  sellerType?: "sahibinden" | "emlak_ofisi" | "insaat_firmasi" | "kurum";
+  tags?: string[];
   mapAction: "isaretle" | "ilanlari_bul";
   searchRadiusMeters?: number;
   category: "konut" | "arsa" | "arazi" | "ticari";
@@ -84,15 +98,55 @@ export const StartValuationModal: React.FC<StartValuationModalProps> = ({
   // 1. Mod Seçimi (EXPERTİZ vs EMLAK BUL vs İLAN VER)
   const [activeMode, setActiveMode] = useState<"expertiz" | "emlak_bul" | "ilan_ver">(initialMode);
 
-  // 2. Ana Kategori (Gayrimenkul İlanı)
-  const [mainCategory, setMainCategory] = useState<"satilik" | "kiralik" | "takas" | "diger">("satilik");
-  const [customMainCategory, setCustomMainCategory] = useState<string>("");
-  const [showCustomMainCategory, setShowCustomMainCategory] = useState<boolean>(false);
+  // 2. İşlem Türü (Satılık, Kiralık, Kat Karşılığı, Devren Satılık, Devren Kiralık)
+  const [transactionType, setTransactionType] = useState<"satilik" | "kiralik" | "kat_karsiligi" | "devren_satilik" | "devren_kiralik">("satilik");
 
-  // 3. Alt Kategori (Arsa Niteliği)
-  const [subCategory, setSubCategory] = useState<string>("konut_imarli");
+  // 3. Ana Kategori (6 Standart Taşınmaz Türü)
+  const [mainCategory, setMainCategory] = useState<"konut" | "arsa" | "ticari" | "bina" | "turizm" | "ozel_amacli">(
+    initialCategory === "konut" ? "konut" : initialCategory === "ticari" ? "ticari" : "arsa"
+  );
+
+  // 4. Alt Kategori (Seçili ana kategoriye göre dinamik)
+  const [subCategory, setSubCategory] = useState<string>(
+    initialCategory === "konut" ? "daire" : "konut_imarli"
+  );
   const [customSubCategory, setCustomSubCategory] = useState<string>("");
   const [showCustomSubCategory, setShowCustomSubCategory] = useState<boolean>(false);
+
+  // 5. Tapu & Hisse Durumu (Mülkiyet Durumu - Kesinlikle taşınmaz türü değil)
+  const [deedStatus, setDeedStatus] = useState<"mustakil" | "hisseli" | "kat_mulkiyeti" | "kat_irtifaki">("mustakil");
+
+  // 6. Teklif Yöntemi & İlan Veren
+  const [tenderMethod, setTenderMethod] = useState<"sabit_fiyat" | "teklif_al" | "acik_artirma">("sabit_fiyat");
+  const [sellerType, setSellerType] = useState<"sahibinden" | "emlak_ofisi" | "insaat_firmasi" | "kurum">("sahibinden");
+
+  // 7. Özellik & Filtre Etiketleri (Denize Yakın, Yatırımlık vb.)
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+
+  const toggleTag = (tagId: string) => {
+    setSelectedTags((prev) =>
+      prev.includes(tagId) ? prev.filter((t) => t !== tagId) : [...prev, tagId]
+    );
+  };
+
+  const getCategoryIcon = (id: string) => {
+    switch (id) {
+      case "konut":
+        return <Home className="w-4 h-4 shrink-0" />;
+      case "arsa":
+        return <Trees className="w-4 h-4 shrink-0" />;
+      case "ticari":
+        return <Store className="w-4 h-4 shrink-0" />;
+      case "bina":
+        return <Building2 className="w-4 h-4 shrink-0" />;
+      case "turizm":
+        return <Building className="w-4 h-4 shrink-0" />;
+      case "ozel_amacli":
+        return <ShieldCheck className="w-4 h-4 shrink-0" />;
+      default:
+        return <Layers className="w-4 h-4 shrink-0" />;
+    }
+  };
 
   // 4. Kiralık / Satılık Aynı Menü (Lokasyon & Ada / Parsel)
   const [city, setCity] = useState(initialCity);
@@ -387,8 +441,11 @@ export const StartValuationModal: React.FC<StartValuationModalProps> = ({
   // Hazır Test Şablonları
   const applyPreset = (preset: {
     mode: "expertiz" | "emlak_bul";
-    mainCat: "satilik" | "kiralik" | "takas" | "diger";
+    transactionType: "satilik" | "kiralik" | "kat_karsiligi" | "devren_satilik" | "devren_kiralik";
+    mainCat: "konut" | "arsa" | "ticari" | "bina" | "turizm" | "ozel_amacli";
     subCat: string;
+    deedStatus: "mustakil" | "hisseli" | "kat_mulkiyeti" | "kat_irtifaki";
+    tags?: string[];
     city: string;
     dist: string;
     neigh: string;
@@ -400,8 +457,11 @@ export const StartValuationModal: React.FC<StartValuationModalProps> = ({
     lng: number;
   }) => {
     setActiveMode(preset.mode);
+    setTransactionType(preset.transactionType);
     setMainCategory(preset.mainCat);
     setSubCategory(preset.subCat);
+    setDeedStatus(preset.deedStatus);
+    setSelectedTags(preset.tags || []);
     setCity(preset.city);
     setDistrict(preset.dist);
     setNeighborhood(preset.neigh);
@@ -451,18 +511,30 @@ export const StartValuationModal: React.FC<StartValuationModalProps> = ({
       }
     }
 
-    // Kategori eşleştirme
-    const resolvedCategory: "konut" | "arsa" | "arazi" | "ticari" = 
-      subCategory === "konut_imarli" ? "arsa" :
-      subCategory === "isyeri_imarli" ? "arsa" :
-      subCategory === "tarla" || subCategory === "zeytinlik" || subCategory === "meyvelik" ? "arazi" : "arsa";
+    // Motor için 4 temel kategoriye eşleme
+    let resolvedCategory: "konut" | "arsa" | "arazi" | "ticari" = "arsa";
+    if (mainCategory === "konut" || mainCategory === "bina") {
+      resolvedCategory = "konut";
+    } else if (mainCategory === "ticari" || mainCategory === "turizm" || mainCategory === "ozel_amacli") {
+      resolvedCategory = "ticari";
+    } else if (mainCategory === "arsa") {
+      if (["tarla", "bag", "bahce", "zeytinlik", "imarsiz_arazi"].includes(subCategory)) {
+        resolvedCategory = "arazi";
+      } else {
+        resolvedCategory = "arsa";
+      }
+    }
 
     const payload: StartValuationPayload = {
       mode: activeMode,
+      transactionType,
       mainCategory,
-      customMainCategory: showCustomMainCategory ? customMainCategory : undefined,
       subCategory,
       customSubCategory: showCustomSubCategory ? customSubCategory : undefined,
+      deedStatus,
+      tenderMethod,
+      sellerType,
+      tags: selectedTags,
       mapAction,
       searchRadiusMeters: searchRadius,
       category: resolvedCategory,
@@ -658,35 +730,29 @@ export const StartValuationModal: React.FC<StartValuationModalProps> = ({
             </div>
           )}
 
-          {/* 1. ANA KATEGORİ (GAYRİMENKUL İLANI) */}
-          <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
-            <div className="flex items-center justify-between mb-2">
+          {/* 1. İŞLEM TÜRÜ (SATILIK, KİRALIK, KAT KARŞILIĞI VB.) */}
+          <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
+            <div className="flex items-center justify-between">
               <label className="text-[11px] font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                <span>Ana Kategori (Gayrimenkul İlanı)</span>
+                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                <span>1. İşlem Türü</span>
               </label>
-              <span className="text-[10px] text-slate-400 font-bold">Hasan Bey Şablonu</span>
+              <span className="text-[10px] text-slate-500 font-bold">
+                Satılık, Kiralık veya Kat Karşılığı
+              </span>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-              {[
-                { id: "satilik", label: "SATILIK" },
-                { id: "kiralik", label: "KİRALIK" },
-                { id: "takas", label: "TAKAS" },
-                { id: "diger", label: "DİĞER" },
-              ].map((item) => {
-                const isSelected = mainCategory === item.id;
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
+              {TRANSACTION_TYPES.map((item) => {
+                const isSelected = transactionType === item.id;
                 return (
                   <button
                     key={item.id}
                     type="button"
-                    onClick={() => {
-                      setMainCategory(item.id as any);
-                      setShowCustomMainCategory(item.id === "diger");
-                    }}
-                    className={`py-2 px-2.5 rounded-lg border text-xs font-black transition cursor-pointer text-center ${
+                    onClick={() => setTransactionType(item.id as any)}
+                    className={`py-2 px-2 rounded-lg border text-xs font-black transition cursor-pointer text-center ${
                       isSelected
-                        ? "border-[#0B1E3B] bg-[#0B1E3B] text-amber-400 shadow-2xs"
+                        ? "border-[#0B1E3B] bg-[#0B1E3B] text-amber-400 shadow-xs ring-1 ring-[#0B1E3B]"
                         : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
                     }`}
                   >
@@ -695,68 +761,91 @@ export const StartValuationModal: React.FC<StartValuationModalProps> = ({
                 );
               })}
             </div>
-
-            {/* Elle Girilsin Kutusu */}
-            {(showCustomMainCategory || mainCategory === "diger") && (
-              <div className="mt-2.5 animate-in fade-in duration-150">
-                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">
-                  Elle Girilsin (Özel İlan Türü)
-                </label>
-                <input
-                  type="text"
-                  value={customMainCategory}
-                  onChange={(e) => setCustomMainCategory(e.target.value)}
-                  placeholder="Örn: Kat Karşılığı Satış, Devren, İpotekli İhale vb."
-                  className="w-full px-3 py-1.5 bg-white border border-amber-400 rounded-lg text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-amber-200"
-                />
-              </div>
-            )}
           </div>
 
-          {/* 2. ALT KATEGORİ (ARSA NİTELİĞİ) */}
-          <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
-            <div className="flex items-center justify-between mb-2">
+          {/* 2. ANA KATEGORİ (6 STANDART TAŞINMAZ TÜRÜ) */}
+          <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
+            <div className="flex items-center justify-between">
               <label className="text-[11px] font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                <span>Alt Kategori (Arsa Niteliği)</span>
+                <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                <span>2. Taşınmaz Ana Türü</span>
+              </label>
+              <span className="text-[10px] text-slate-400 font-bold">6 Temel Kategori</span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {Object.values(REAL_ESTATE_TAXONOMY).map((cat) => {
+                const isSelected = mainCategory === cat.id;
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => {
+                      setMainCategory(cat.id as any);
+                      setShowCustomSubCategory(false);
+                      const firstSub = cat.subCategories[0];
+                      if (firstSub) {
+                        setSubCategory(firstSub.id);
+                        setTapuNiteligi(firstSub.tapuNitelikDefault || firstSub.label);
+                      }
+                    }}
+                    className={`p-2.5 rounded-xl border text-left flex items-center gap-2.5 transition cursor-pointer ${
+                      isSelected
+                        ? "border-amber-500 bg-[#0B1E3B] text-amber-400 shadow-sm ring-1 ring-amber-500"
+                        : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100 hover:border-slate-300"
+                    }`}
+                  >
+                    <div className={`p-2 rounded-lg shrink-0 ${isSelected ? "bg-amber-400/20 text-amber-400" : "bg-slate-100 text-slate-600"}`}>
+                      {getCategoryIcon(cat.id)}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-xs font-black truncate">{cat.label}</div>
+                      <div className={`text-[10px] ${isSelected ? "text-amber-200/80" : "text-slate-400"} truncate`}>
+                        {cat.subCategories.length} alt tür
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 3. DİNAMİK ALT KATEGORİ (SEÇİLİ TAŞINMAZ TÜRÜNE GÖRE) */}
+          <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-[11px] font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                <span>3. Alt Kategori ({REAL_ESTATE_TAXONOMY[mainCategory]?.label || "Seçim"})</span>
               </label>
               <button
                 type="button"
                 onClick={() => setShowCustomSubCategory(!showCustomSubCategory)}
-                className="text-[10px] text-blue-600 hover:underline font-bold"
+                className="text-[10px] text-blue-600 hover:underline font-bold cursor-pointer"
               >
                 + Elle Girilsin
               </button>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-              {[
-                { id: "konut_imarli", label: "KONUT İMARLI" },
-                { id: "isyeri_imarli", label: "İŞYERİ İMARLI" },
-                { id: "tarla", label: "TARLA" },
-                { id: "zeytinlik", label: "ZEYTİNLİK" },
-                { id: "meyvelik", label: "MEYVELİK" },
-                { id: "diger", label: "DİĞER" },
-              ].map((item) => {
-                const isSelected = subCategory === item.id;
+              {REAL_ESTATE_TAXONOMY[mainCategory]?.subCategories.map((sub) => {
+                const isSelected = subCategory === sub.id && !showCustomSubCategory;
                 return (
                   <button
-                    key={item.id}
+                    key={sub.id}
                     type="button"
                     onClick={() => {
-                      setSubCategory(item.id);
-                      setTapuNiteligi(item.label);
-                      if (item.id === "diger") {
-                        setShowCustomSubCategory(true);
-                      }
+                      setSubCategory(sub.id);
+                      setShowCustomSubCategory(false);
+                      setTapuNiteligi(sub.tapuNitelikDefault || sub.label);
                     }}
-                    className={`py-2 px-2.5 rounded-lg border text-xs font-black transition cursor-pointer text-center ${
+                    className={`py-2 px-2.5 rounded-lg border text-xs font-bold transition cursor-pointer text-center truncate ${
                       isSelected
-                        ? "border-emerald-600 bg-emerald-50 text-emerald-950 ring-1 ring-emerald-600"
+                        ? "border-emerald-600 bg-emerald-50 text-emerald-950 font-black ring-1 ring-emerald-600"
                         : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
                     }`}
+                    title={sub.label}
                   >
-                    {item.label}
+                    {sub.label}
                   </button>
                 );
               })}
@@ -766,7 +855,7 @@ export const StartValuationModal: React.FC<StartValuationModalProps> = ({
             {showCustomSubCategory && (
               <div className="mt-2.5 animate-in fade-in duration-150">
                 <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">
-                  Elle Girilsin (Özel Arsa Niteliği)
+                  Elle Girilsin (Özel Alt Tür / Tapu Niteliği)
                 </label>
                 <input
                   type="text"
@@ -775,11 +864,126 @@ export const StartValuationModal: React.FC<StartValuationModalProps> = ({
                     setCustomSubCategory(e.target.value);
                     setTapuNiteligi(e.target.value);
                   }}
-                  placeholder="Örn: Sanayi İmarlı, Bağ Evi, Hisseli Tarla vb."
+                  placeholder="Örn: Zeytinlikli Tarla, Fabrika Binası, Çiftlik Evi vb."
                   className="w-full px-3 py-1.5 bg-white border border-emerald-400 rounded-lg text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-emerald-200"
                 />
               </div>
             )}
+          </div>
+
+          {/* 4. TAPU VE HİSSE DURUMU (MÜLKİYET DURUMU) */}
+          <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-[11px] font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-purple-500"></span>
+                <span>4. Tapu ve Hisse Durumu</span>
+              </label>
+              <span className="text-[10px] text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200 font-semibold">
+                Taşınmaz türü değil, mülkiyet durumudur
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+              {DEED_STATUS_OPTIONS.map((item) => {
+                const isSelected = deedStatus === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setDeedStatus(item.id as any)}
+                    className={`py-2 px-2 rounded-lg border text-xs font-bold transition cursor-pointer text-center ${
+                      isSelected
+                        ? "border-purple-600 bg-purple-50 text-purple-950 font-black ring-1 ring-purple-600 shadow-2xs"
+                        : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
+                    }`}
+                  >
+                    {item.badge}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 5. TEKLİF YÖNTEMİ & İLAN VEREN */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-1.5">
+              <label className="text-[10px] font-black text-slate-700 uppercase tracking-wider block">
+                Teklif / Satış Yöntemi
+              </label>
+              <div className="grid grid-cols-3 gap-1">
+                {TENDER_METHODS.map((tm) => (
+                  <button
+                    key={tm.id}
+                    type="button"
+                    onClick={() => setTenderMethod(tm.id as any)}
+                    className={`py-1.5 px-1 rounded-lg border text-[11px] font-bold transition cursor-pointer text-center truncate ${
+                      tenderMethod === tm.id
+                        ? "border-[#0B1E3B] bg-[#0B1E3B] text-amber-400 font-black shadow-2xs"
+                        : "border-slate-300 bg-white text-slate-600 hover:bg-slate-100"
+                    }`}
+                  >
+                    {tm.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-1.5">
+              <label className="text-[10px] font-black text-slate-700 uppercase tracking-wider block">
+                İlan Veren / Satıcı Türü
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1">
+                {SELLER_TYPES.map((st) => (
+                  <button
+                    key={st.id}
+                    type="button"
+                    onClick={() => setSellerType(st.id as any)}
+                    className={`py-1.5 px-1 rounded-lg border text-[10px] font-bold transition cursor-pointer text-center truncate ${
+                      sellerType === st.id
+                        ? "border-[#0B1E3B] bg-[#0B1E3B] text-amber-400 font-black shadow-2xs"
+                        : "border-slate-300 bg-white text-slate-600 hover:bg-slate-100"
+                    }`}
+                    title={st.label}
+                  >
+                    {st.label.replace(" (Belediye / İcra / Banka)", "")}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* 6. ÖZELLİKLER & FİLTRE ETİKETLERİ */}
+          <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-[11px] font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                <Tag className="w-3.5 h-3.5 text-blue-600" />
+                <span>Özellik Etiketleri</span>
+              </label>
+              <span className="text-[10px] text-slate-500 font-semibold">
+                &quot;Denize Yakın&quot;, &quot;Yatırımlık&quot; vb. özellik filtreleridir
+              </span>
+            </div>
+
+            <div className="flex flex-wrap gap-1.5">
+              {PROPERTY_TAGS.map((tag) => {
+                const isChecked = selectedTags.includes(tag.id);
+                return (
+                  <button
+                    key={tag.id}
+                    type="button"
+                    onClick={() => toggleTag(tag.id)}
+                    className={`py-1 px-2.5 rounded-full border text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                      isChecked
+                        ? "bg-blue-600 text-white border-blue-600 shadow-2xs font-black"
+                        : "bg-white text-slate-700 border-slate-300 hover:bg-slate-100"
+                    }`}
+                  >
+                    {isChecked && <Check className="w-3 h-3 text-white" />}
+                    <span>{tag.label}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* 3. KİRALIK / SATILIK AYNI MENÜ (LOKASYON BİLGİSİ: İL, İLÇE, MAHALLE, ADA, PARSEL) */}
@@ -1072,21 +1276,24 @@ export const StartValuationModal: React.FC<StartValuationModalProps> = ({
               type="button"
               onClick={() => applyPreset({
                 mode: "expertiz",
-                mainCat: "satilik",
+                transactionType: "satilik",
+                mainCat: "arsa",
                 subCat: "konut_imarli",
+                deedStatus: "mustakil",
+                tags: ["yatirimlik"],
                 city: "Çanakkale",
                 dist: "Merkez",
                 neigh: "Kepez",
                 ada: "117",
                 parsel: "9",
                 area: 135,
-                nit: "Kat Mülkiyeti / Mesken",
+                nit: "İmarlı Arsa",
                 lat: 40.0985,
                 lng: 26.3980,
               })}
               className="text-left px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-amber-50 border border-slate-200 text-[11px] text-slate-700 transition cursor-pointer flex items-center justify-between w-full"
             >
-              <span>🏠 <strong>Çanakkale Kepez</strong> (117 Ada / 9 Parsel - 8-10M TL Rayiç)</span>
+              <span>🏛️ <strong>Çanakkale Kepez</strong> (117 Ada / 9 Parsel - 135 m² Konut İmarlı Arsa)</span>
               <span className="text-amber-700 font-bold text-[10px]">Doldur ➔</span>
             </button>
           </div>

@@ -19,7 +19,7 @@ export type RoomCount = "1+0" | "1+1" | "2+1" | "3+1" | "4+1" | "5+1" | "villa_Ã
 export type BuildingAge = "0" | "1-5" | "6-10" | "11-15" | "16-20" | "21+";
 export type FloorLocation = "bahce_giris" | "ara_kat" | "en_ust_kat" | "cati_dubleks" | "kot_bodrum" | "mustakil";
 export type HeatingType = "dogalgaz_kombi" | "merkezi_payolcer" | "yerden_isitma" | "klima" | "soba";
-export type DeedStatus = "kat_mulkiyeti" | "kat_irtifaki" | "arsa_payli" | "hisseli";
+export type DeedStatus = "mustakil" | "kat_mulkiyeti" | "kat_irtifaki" | "arsa_payli" | "hisseli";
 
 export interface ParcelInput {
   category: PropertyCategory; // "arsa" | "konut"

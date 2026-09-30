@@ -188,7 +188,7 @@ export default function Home() {
     setShowStartValuationModal(false);
     const isRes = payload.category === "konut";
     const newCoords = payload.coordinates;
-    const cat: PropertyCategory = isRes ? "konut" : "arsa";
+    const cat: PropertyCategory = payload.category;
 
     if (payload.searchRadiusMeters) {
       setSearchRadius(payload.searchRadiusMeters);
@@ -203,6 +203,7 @@ export default function Home() {
       ada: payload.ada,
       parsel: payload.parsel,
       areaM2: payload.areaM2,
+      deedStatus: payload.deedStatus,
       serhStatus: payload.serhStatus || prev.serhStatus || "tapudan_sorulacak",
       coordinates: newCoords || prev.coordinates,
     }));
@@ -220,11 +221,12 @@ export default function Home() {
 
     // İlan ver moduysa anlık olarak yerel listeye ve harita emsal havuzuna ekle
     if (payload.mode === "ilan_ver" && payload.listingPriceTL) {
+      const isRental = payload.transactionType === "kiralik" || payload.transactionType === "devren_kiralik";
       const newCustomListing: ComparableListing = {
         id: `user-listing-${Date.now()}`,
         title: payload.listingTitle || `${payload.neighborhood || payload.district} İhaleciBurada Portföy İlanı`,
         category: cat,
-        type: (payload.mainCategory === "kiralik" ? "kiralik" : "satilik") as "satilik" | "kiralik",
+        type: (isRental ? "kiralik" : "satilik") as "satilik" | "kiralik",
         areaM2: payload.areaM2,
         pricePerM2TL: Math.round(payload.listingPriceTL / (payload.areaM2 || 1)),
         priceTL: payload.listingPriceTL,
