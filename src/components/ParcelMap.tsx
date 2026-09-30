@@ -267,8 +267,8 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
   const lng = coordinates?.lng || 26.4142;
 
   const currentCad = useMemo(() => getCadastreForCoordinates(lat, lng), [lat, lng]);
-  const activeAda = (ada && ada !== "248") ? ada : currentCad.ada;
-  const activeParsel = (parsel && parsel !== "12") ? parsel : currentCad.parsel;
+  const activeAda = (ada && ada.trim()) ? ada.trim() : currentCad.ada;
+  const activeParsel = (parsel && parsel.trim()) ? parsel.trim() : currentCad.parsel;
 
   const isResidential = category === "konut";
 
@@ -469,9 +469,11 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
     };
 
     const locCad = getCadastreForCoordinates(cLat, cLng);
-    const targetAda = customAda || (ada && ada !== "248" ? ada : locCad.ada);
-    const targetParsel = customParsel || (parsel && parsel !== "12" ? parsel : locCad.parsel);
-    const targetArea = areaM2 || 1650;
+    const targetAda = (customAda && customAda.trim()) ? customAda.trim() : (ada && ada.trim()) ? ada.trim() : locCad.ada;
+    const targetParsel = (customParsel && customParsel.trim()) ? customParsel.trim() : (parsel && parsel.trim()) ? parsel.trim() : locCad.parsel;
+    const targetArea = areaM2 
+      ? (areaM2 % 1 === 0 ? areaM2.toLocaleString("tr-TR") : areaM2.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })) 
+      : "1.650";
 
     // Merkez Hedef Altıgen (Sarı Vurgulu Petek + Kadastro Çerçevesi)
     const centerHexCorners = getHexCorners(cLat, cLng, hexRadius);
@@ -499,6 +501,22 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
       </div>`,
       { permanent: false, direction: "top", opacity: 0.98 }
     );
+
+    centerPolygon.on("click", (e) => {
+      L.DomEvent.stopPropagation(e);
+      setParcelNotice(`🏛️ Ada ${targetAda} / Parsel ${targetParsel} • ${targetPrice.toLocaleString("tr-TR")} ₺/m²`);
+      if (onLocationSelect) {
+        onLocationSelect({
+          city: cCity,
+          district: cDist,
+          neighborhood: cNeigh || "",
+          coordinates: { lat: cLat, lng: cLng },
+          unitPrice: targetPrice,
+          ada: targetAda,
+          parsel: targetParsel,
+        });
+      }
+    });
 
     // 1. Merkezde Yüzen Ada / Parsel ve m² Rozeti (Pim üstünde - Yatay, temiz ve tekil)
     const centerBadgeIcon = L.divIcon({
@@ -772,33 +790,43 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
       lastInteractedCoordRef.current = { lat: clickLat, lng: clickLng };
 
       // 1. ANINDA 0ms YEREL 973 İLÇE ANALİZİ
+      // Merkez hedef altıgenin üzerine veya yakınına tıklandıysa (< 75 metre), mevcut ada/parsel ve lokasyonu koru!
+      const distFromCenterM = Math.hypot(clickLat - lat, clickLng - lng) * 111000;
+      const isCenterClick = distFromCenterM < 75;
+
       const fastLoc = findFastLocationFromCoords(clickLat, clickLng);
-      const fastVal = getDistrictValuation(fastLoc.city, fastLoc.district, unitM2Price);
+      const effectiveCity = isCenterClick ? city : fastLoc.city;
+      const effectiveDist = isCenterClick ? (district || activeDistrict) : fastLoc.district;
+      const effectiveNeigh = isCenterClick ? (neighborhood || activeNeighborhood) : fastLoc.neighborhood;
+
+      const fastVal = getDistrictValuation(effectiveCity, effectiveDist, unitM2Price);
       const resolvedPrice = fastVal.pricePerM2TL;
-      const clickCad = getCadastreForCoordinates(clickLat, clickLng);
+      const clickCad = isCenterClick
+        ? { ada: activeAda, parsel: activeParsel }
+        : getCadastreForCoordinates(clickLat, clickLng);
 
       // 2. Tıklanan noktaya anında bal peteğini ve emsal ilanları çiz
       const generatedComps = drawParcelHoneycomb(
         clickLat,
         clickLng,
         resolvedPrice,
-        fastLoc.city,
-        fastLoc.district,
-        fastLoc.neighborhood,
+        effectiveCity,
+        effectiveDist,
+        effectiveNeigh || undefined,
         clickCad.ada,
         clickCad.parsel
       );
 
-      setParcelNotice(`📍 ${fastLoc.district} / ${fastLoc.city} • Ada ${clickCad.ada} / Parsel ${clickCad.parsel} • ${resolvedPrice.toLocaleString("tr-TR")} ₺/m²`);
-      setActiveDistrict(fastLoc.district);
-      setActiveNeighborhood(fastLoc.neighborhood);
+      setParcelNotice(`📍 ${effectiveDist} / ${effectiveCity}${effectiveNeigh ? ` • ${effectiveNeigh}` : ""} • Ada ${clickCad.ada} / Parsel ${clickCad.parsel} • ${resolvedPrice.toLocaleString("tr-TR")} ₺/m²`);
+      setActiveDistrict(effectiveDist);
+      if (effectiveNeigh) setActiveNeighborhood(effectiveNeigh);
 
       // 3. Sol paneli ve tüm uygulamayı 0ms gecikmeyle güncelle!
       if (onLocationSelect) {
         onLocationSelect({
-          city: fastLoc.city,
-          district: fastLoc.district,
-          neighborhood: fastLoc.neighborhood,
+          city: effectiveCity,
+          district: effectiveDist,
+          neighborhood: effectiveNeigh || "",
           coordinates: { lat: clickLat, lng: clickLng },
           unitPrice: resolvedPrice,
           ada: clickCad.ada,
@@ -873,21 +901,11 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
     if (!mapInstanceRef.current) return;
     if (isInternalClickRef.current) return;
 
-    if (lastInteractedCoordRef.current) {
-      const diff = Math.hypot(
-        lastInteractedCoordRef.current.lat - lat,
-        lastInteractedCoordRef.current.lng - lng
-      );
-      if (diff < 0.001) {
-        return;
-      }
-    }
-
     const map = mapInstanceRef.current;
     const center = map.getCenter();
     const dist = Math.hypot(center.lat - lat, center.lng - lng);
 
-    if (dist > 0.0005) {
+    if (dist > 0.0003) {
       map.flyTo([lat, lng], 15, { duration: 1.0 });
     }
 
@@ -901,7 +919,7 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
       activeAda,
       activeParsel
     );
-  }, [lat, lng, unitM2Price, city, activeDistrict, searchRadius, activeAda, activeParsel]);
+  }, [lat, lng, unitM2Price, city, activeDistrict, activeNeighborhood, searchRadius, activeAda, activeParsel, areaM2]);
 
   // Dışarıdan seçilen ilanı haritada odakla ve popup aç
   useEffect(() => {

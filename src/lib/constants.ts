@@ -2,6 +2,42 @@ import { ParcelInput } from "@/types";
 
 export const SAMPLE_SCENARIOS: { label: string; description: string; data: ParcelInput }[] = [
   {
+    label: "TKGM Resmi Parsel: Çanakkale Karacaören 117/9",
+    description: "TKGM Kayıtlı 4.961,37 m² Arsa — Kat İrtifakı — Enderesi Mevkii (Pafta: H16c09c1a/1B)",
+    data: {
+      category: "arsa",
+      title: "Çanakkale Merkez Karacaören 117 Ada 9 Parsel (Enderesi)",
+      city: "Çanakkale",
+      district: "Merkez",
+      neighborhood: "Karacaören",
+      ada: "117",
+      parsel: "9",
+      areaM2: 4961.37,
+      roadAccess: "var",
+      roadFrontageM: 42,
+      isCornerParcel: true,
+      topography: "duz",
+      zoningType: "konut",
+      kaks: 1.50,
+      taks: 0.35,
+      gabariM: 15.5,
+      maxFloors: 5,
+      relinquishmentRatio: 10,
+      askedPriceTL: 19800000,
+      isTender: false,
+      tenderAuthority: "Çanakkale Tapu ve Kadastro Müdürlüğü",
+      tenderFileNo: "133826 / H16c09c1a/1B",
+      estimatedLandM2PriceTL: 4200,
+      estimatedUnitSaleM2PriceTL: 38000,
+      contractorSharePercent: 50,
+      coordinates: { lat: 40.169844, lng: 26.430442 },
+      consultantName: "Ali TURAN",
+      consultantPhone: "+90 850 308 00 00",
+      consultantAgency: "İhaleciBurada Gayrimenkul & Değerleme",
+      notes: "TKGM 133826 Zemin Nolu, Enderesi Mevkii, Kat İrtifaklı, 4.961,37 m² İmarlı Arsa.",
+    }
+  },
+  {
     label: "Belediye İhalesi: Çanakkale Kepez Konut Arsası",
     description: "İhale Başlangıç: 14.500.000 TL — Emsal 1.50 — 24 Dairelik Proje Potansiyeli",
     data: {
