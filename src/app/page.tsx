@@ -969,13 +969,6 @@ export default function Home() {
               <span>TKGM</span>
             </button>
 
-            <span className="hidden 2xl:inline-block text-slate-600 hover:text-slate-900 cursor-pointer font-medium whitespace-nowrap">
-              Profesyoneller
-            </span>
-
-            <span className="hidden 2xl:inline-block text-slate-600 hover:text-slate-900 cursor-pointer font-medium whitespace-nowrap">
-              Blog
-            </span>
 
             {/* Hızlı İkonlar: 🔔, 🌙, 🌐 */}
             <div className="hidden xl:flex items-center gap-1 text-slate-400 pl-1 border-l border-slate-200 shrink-0">
