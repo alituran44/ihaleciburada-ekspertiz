@@ -25,6 +25,7 @@ export interface ValuationFormData {
   livingRoomCount: number;
   bathroomCount: number;
   grossAreaM2: number;
+  netAreaM2?: number;
   terraceAreaM2: number;
   buildingAge: number;
   totalFloors: number;
@@ -67,6 +68,7 @@ export interface ValuationFormData {
 
   // 7. Kullanıcı Doğrulama & Notlar
   userEstimatedPriceTL?: number;
+  marketValueEstimate?: number;
   userNote?: string;
 
   // 8. Fotoğraflar

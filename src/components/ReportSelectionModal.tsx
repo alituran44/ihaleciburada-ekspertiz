@@ -67,9 +67,10 @@ export const ReportSelectionModal: React.FC<ReportSelectionModalProps> = ({
       description:
         "Belirlenen kategoride (konut, işyeri, arsa) ayrı ayrı talep edilebilir. Filtreleme yaparak çalışmaktadır. Alt kategori, metrekare büyüklüğü, bina yaşı gibi değere etki eden faktörlerin tümünü analiz edebilmektedir. Genel itibariyle emlak danışmanları, değerleme uzmanları, müteahhitler tarafından kullanılmaktadır. Lokasyonel bazda veri yoğunluğuna göre değişiklik göstermekle birlikte 5-10 sayfa, dikey A4, renkli ve PDF formatında tarafınıza sunulur.",
       pages: "5 - 10 Sayfa",
-      priceTL: 49.99,
-      tokens: 10,
-      badge: "Hızlı Emsal",
+      priceTL: 0,
+      originalPriceTL: 49.99,
+      tokens: 0,
+      badge: "Lansmana Özel Ücretsiz",
       isPopular: false,
     },
     {
@@ -78,9 +79,10 @@ export const ReportSelectionModal: React.FC<ReportSelectionModalProps> = ({
       tag: "Kapsamlı İnceleme",
       description: `${category === "arsa" ? "Arsa ve arazi" : "Konut"} kategorisinde yer alan dataları barındıran resmi analiz raporudur. Rapor içerisinde parsele özgü fiyat/değer, TKGM mülkiyet sınırları, imar durumu ve teknik bilgiler yer alır. Genel olarak gayrimenkul danışmanları ve yatırımcılar tarafından talep edilmektedir. Lokasyonel bazda veri yoğunluğuna göre 20-25 sayfa arasında, dikey A4, renkli ve resmi PDF formatında hazırlanır.`,
       pages: "20 - 25 Sayfa",
-      priceTL: 149.99,
-      tokens: 30,
-      badge: "Detaylı Teknik",
+      priceTL: 0,
+      originalPriceTL: 149.99,
+      tokens: 0,
+      badge: "Detaylı Teknik • Ücretsiz",
       isPopular: false,
     },
     {
@@ -90,9 +92,10 @@ export const ReportSelectionModal: React.FC<ReportSelectionModalProps> = ({
       description:
         "En kapsamlı resmi raporlama standardıdır. İçerisinde satılık, kiralık, konut, arsa ve ticari değer/teknik detaylar ayrı ayrı ve karşılaştırmalı olarak sunulur. İİK m.115 %50 icra tabanı simülasyonu, AFAD PGA deprem risk katsayısı, SPK lisanslı değerleme metodolojileri yer alır. Avukatlar, mali müşavirler, icra yatırımcıları ve kamu yöneticileri tarafından sıklıkla tercih edilmektedir. 13 - 100 sayfa arasında, dikey A4, renkli ve tescilli PDF formatında teslim edilir.",
       pages: "13 - 100 Sayfa",
-      priceTL: 499.99,
-      tokens: 100,
-      badge: "SPK & İİK m.115 Uyumlu",
+      priceTL: 0,
+      originalPriceTL: 499.99,
+      tokens: 0,
+      badge: "En Kapsamlı • SPK & İİK m.115",
       isPopular: true,
     },
   ];
@@ -229,35 +232,62 @@ export const ReportSelectionModal: React.FC<ReportSelectionModalProps> = ({
             })}
 
             {/* Bakiye / Jeton Kutusu */}
-            <div className="hidden md:block mt-auto p-3.5 rounded-xl bg-gradient-to-br from-[#0B1E3B] to-slate-900 text-white border border-slate-800">
-              <div className="flex items-center gap-2 text-[11px] font-bold text-amber-400">
-                <Coins className="w-4 h-4 text-amber-400" />
-                <span>Mevcut Jeton Miktarı</span>
+            <div className="hidden md:block mt-auto p-3.5 rounded-xl bg-gradient-to-br from-emerald-950 via-[#0B1E3B] to-slate-900 text-white border border-emerald-500/30">
+              <div className="flex items-center gap-2 text-[11px] font-bold text-emerald-400">
+                <Sparkles className="w-4 h-4 text-emerald-400" />
+                <span>Lansman Hediyesi</span>
               </div>
-              <div className="text-xl font-black font-mono text-white mt-1">
-                10 Jeton
+              <div className="text-base font-black text-emerald-300 mt-1">
+                %100 Ücretsiz Erişim
               </div>
-              <div className="text-[10px] text-slate-400 mt-0.5">
-                İhaleciBurada Kurumsal Bakiye
+              <div className="text-[10px] text-slate-300 mt-0.5 leading-snug">
+                Geçici tanıtım süresince tüm raporlar için bakiye / jeton aranmaz.
               </div>
             </div>
           </div>
 
           {/* SAĞ RAPOR LİSTESİ (%75 Genişlik - Scroll Edilebilir) */}
-          <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5 bg-white">
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 bg-white">
             
+            {/* Lansman Ücretsizlik Bildirim Şeridi */}
+            <div className="p-3 sm:p-3.5 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md border border-emerald-500/40">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+                  <Sparkles className="w-4 h-4 text-amber-300" />
+                </div>
+                <div>
+                  <div className="text-xs font-black tracking-tight flex items-center gap-2">
+                    <span>Lansman & Tanıtım Kampanyası</span>
+                    <span className="px-2 py-0.2 bg-amber-400 text-slate-950 font-black rounded-full text-[9px] uppercase tracking-wider">
+                      ŞİMDİLİK ÜCRETSİZ
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-emerald-100 font-medium">
+                    Tüm detaylı resmi e-ekspertiz, imar ve piyasa değerleme raporları geçici bir süre ücretsiz olarak sunulmaktadır.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleSelectAndOpen("elit")}
+                className="px-3.5 py-1.5 rounded-xl bg-white text-emerald-900 font-black text-xs hover:bg-emerald-50 transition cursor-pointer shrink-0 shadow-xs active:scale-95 text-center"
+              >
+                Hemen Ücretsiz Raporu Aç (13 Sayfa PDF)
+              </button>
+            </div>
+
             {/* Başlık ve Açıklama */}
-            <div className="border-b border-slate-100 pb-3">
+            <div className="border-b border-slate-100 pb-2">
               <h2 className="text-lg sm:text-xl font-black text-slate-900 font-heading tracking-tight">
-                Emlak Muayenesi Raporları
+                Emlak Muayenesi ve Değerleme Raporları
               </h2>
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="text-xs text-slate-500 mt-0.5">
                 Türkiye&apos;nin her yerinden saniyeler içinde rapor alın, gayrimenkullerinizi resmi kadastro, emsal ve İİK verileriyle detaylı olarak inceleyin.
               </p>
             </div>
 
             {/* 3 Adet Rapor Kartı */}
-            <div className="space-y-4">
+            <div className="space-y-3.5">
               {packages.map((pkg) => {
                 const isSelected = selectedTier === pkg.id;
 
@@ -266,7 +296,7 @@ export const ReportSelectionModal: React.FC<ReportSelectionModalProps> = ({
                     key={pkg.id}
                     className={`p-4 sm:p-5 rounded-2xl border transition-all ${
                       isSelected
-                        ? "border-amber-500 ring-2 ring-amber-400/40 bg-amber-50/20 shadow-md"
+                        ? "border-emerald-500 ring-2 ring-emerald-400/30 bg-emerald-50/20 shadow-md"
                         : "border-slate-200 hover:border-slate-300 hover:bg-slate-50/50 shadow-2xs"
                     }`}
                   >
@@ -281,12 +311,10 @@ export const ReportSelectionModal: React.FC<ReportSelectionModalProps> = ({
                           <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-slate-100 text-slate-700 border border-slate-200">
                             {pkg.pages}
                           </span>
-                          {pkg.isPopular && (
-                            <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1">
-                              <Sparkles className="w-3 h-3 text-amber-600" />
-                              {pkg.badge}
-                            </span>
-                          )}
+                          <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
+                            <Sparkles className="w-3 h-3 text-emerald-600" />
+                            {pkg.badge}
+                          </span>
                         </div>
 
                         <p className="text-xs text-slate-600 leading-relaxed text-justify">
@@ -298,34 +326,39 @@ export const ReportSelectionModal: React.FC<ReportSelectionModalProps> = ({
                           <button
                             type="button"
                             onClick={() => handleSelectAndOpen(pkg.id)}
-                            className="text-xs font-bold text-slate-700 hover:text-blue-600 flex items-center gap-1.5 transition cursor-pointer"
+                            className="text-xs font-bold text-slate-700 hover:text-emerald-700 flex items-center gap-1.5 transition cursor-pointer"
                           >
                             <Eye className="w-3.5 h-3.5 text-slate-400" />
-                            <span>Örnek İncele</span>
+                            <span>Önizlemeyi Başlat (Ücretsiz)</span>
                           </button>
                         </div>
                       </div>
 
                       {/* Sağ: Fiyatlandırma ve Seç Butonu */}
-                      <div className="lg:w-44 shrink-0 flex lg:flex-col items-center lg:items-end justify-between lg:justify-center pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-100">
+                      <div className="lg:w-48 shrink-0 flex lg:flex-col items-center lg:items-end justify-between lg:justify-center pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-100">
                         <div className="text-left lg:text-right">
-                          <div className="text-xl sm:text-2xl font-black text-slate-900 font-mono tracking-tight">
-                            {pkg.priceTL.toFixed(2)} TL
+                          <div className="flex items-baseline gap-2 justify-start lg:justify-end">
+                            <span className="text-xs line-through text-slate-400 font-mono">
+                              {pkg.originalPriceTL.toFixed(2)} TL
+                            </span>
+                            <span className="text-xl sm:text-2xl font-black text-emerald-600 font-mono tracking-tight">
+                              0.00 TL
+                            </span>
                           </div>
-                          <div className="flex items-center gap-1 text-[11px] font-bold text-amber-600 font-mono mt-0.5 justify-start lg:justify-end">
-                            <Coins className="w-3 h-3 text-amber-500" />
-                            <span>{pkg.tokens} jeton</span>
+                          <div className="flex items-center gap-1 text-[11px] font-extrabold text-emerald-700 font-mono mt-0.5 justify-start lg:justify-end">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Şimdilik Ücretsiz</span>
                           </div>
                         </div>
 
-                        {/* Tapusor Stili Sarı/Kehribar "Seç [Kilit]" Butonu */}
+                        {/* Yeşil/Kehribar Ücretsiz Rapor Aç Butonu */}
                         <button
                           type="button"
                           onClick={() => handleSelectAndOpen(pkg.id)}
-                          className="mt-2 py-2 px-5 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-black text-xs shadow-md transition cursor-pointer flex items-center gap-1.5 active:scale-95"
+                          className="mt-2 py-2 px-4 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs shadow-md transition cursor-pointer flex items-center gap-1.5 active:scale-95 whitespace-nowrap"
                         >
-                          <span>Seç</span>
-                          <Lock className="w-3.5 h-3.5 text-slate-950" />
+                          <FileText className="w-3.5 h-3.5 text-white" />
+                          <span>Ücretsiz Raporu Aç (PDF)</span>
                         </button>
                       </div>
                     </div>

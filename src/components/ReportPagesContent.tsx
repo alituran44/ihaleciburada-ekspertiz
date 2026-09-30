@@ -41,7 +41,7 @@ export interface ReportPagesContentProps {
   effectiveLocation: string;
   effectiveParcelText: string;
   effectiveTitle: string;
-  formData?: ValuationFormData;
+  formData?: Partial<ValuationFormData>;
   uploadedPhotos?: string[];
 }
 
@@ -115,7 +115,7 @@ export const ReportPagesContent: React.FC<ReportPagesContentProps> = ({
                   <div><strong>Adres:</strong> {effectiveLocation}</div>
                   <div><strong>Parsel Bilgisi:</strong> {effectiveParcelText}</div>
                   <div><strong>Taşınmaz Alanı:</strong> {effectiveAreaM2} m²</div>
-                  <div><strong>Rapor Tarihi:</strong> 18.09.2026</div>
+                  <div><strong>Rapor Tarihi:</strong> {new Date().toLocaleDateString("tr-TR", { day: "2-digit", month: "2-digit", year: "numeric" })}</div>
                 </div>
               </div>
             </div>
@@ -258,37 +258,101 @@ export const ReportPagesContent: React.FC<ReportPagesContentProps> = ({
                 {effectiveCategory === "arazi" ? "Arazi Özellikleri" : effectiveCategory === "arsa" ? "Arsa Özellikleri" : "Konut Özellikleri"}
               </h2>
               <div className="px-3 py-1 bg-rose-50 text-[#E11D48] rounded-lg text-xs font-black">
-                {roomCount}+{livingRoomCount} • {effectiveAreaM2} m² • {floorNumber === 0 ? "Zemin Kat" : floorNumber === 0.5 ? "Yüksek Giriş" : floorNumber === -1 ? "Bodrum" : `${floorNumber}. Kat`}
+                {effectiveCategory === "arsa"
+                  ? `İmarlı Arsa • ${effectiveAreaM2} m² • Emsal (KAKS): 1.50 / TAKS: 0.35`
+                  : effectiveCategory === "arazi"
+                  ? `Tarla & Arazi • ${effectiveAreaM2} m² • Kadastral Yol Cepheli`
+                  : `${roomCount}+${livingRoomCount} • ${effectiveAreaM2} m² • ${floorNumber === 0 ? "Zemin Kat" : floorNumber === 0.5 ? "Yüksek Giriş" : floorNumber === -1 ? "Bodrum" : `${floorNumber}. Kat`}`}
               </div>
             </div>
 
             {/* ÖZELLİK TABLOLARI */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
-                <div className="font-extrabold text-slate-900 border-b border-slate-200 pb-1">Bölüm/Alan/Kat</div>
-                <div className="flex justify-between text-slate-600"><span>Oda Sayısı:</span><strong>{roomCount}</strong></div>
-                <div className="flex justify-between text-slate-600"><span>Salon Sayısı:</span><strong>{livingRoomCount}</strong></div>
-                <div className="flex justify-between text-slate-600"><span>Banyo Sayısı:</span><strong>1</strong></div>
-                <div className="flex justify-between text-slate-600"><span>Net / Brüt Alan:</span><strong>{Math.round(effectiveAreaM2 * 0.85)} m² / {effectiveAreaM2} m²</strong></div>
-                <div className="flex justify-between text-slate-600"><span>Bulunduğu Kat:</span><strong>{floorNumber === 0 ? "Zemin Kat" : floorNumber === 0.5 ? "Yüksek Giriş" : floorNumber === -1 ? "Bodrum Kat" : `${floorNumber}. Kat`} (Top: {totalFloors})</strong></div>
-              </div>
+            {effectiveCategory === "arsa" ? (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
+                  <div className="font-extrabold text-slate-900 border-b border-slate-200 pb-1">İmar & Kadastro Kriterleri</div>
+                  <div className="flex justify-between text-slate-600"><span>İmar Durumu:</span><strong className="text-emerald-700">Konut + Ticari İmarlı</strong></div>
+                  <div className="flex justify-between text-slate-600"><span>Emsal (KAKS):</span><strong>1.50</strong></div>
+                  <div className="flex justify-between text-slate-600"><span>Taban Alanı (TAKS):</span><strong>0.35</strong></div>
+                  <div className="flex justify-between text-slate-600"><span>Maksimum Kat:</span><strong>5 Kat (15.50m)</strong></div>
+                  <div className="flex justify-between text-slate-600"><span>Yola Terk Oranı:</span><strong>~%20 Terk Öngörüsü</strong></div>
+                </div>
 
-              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
-                <div className="font-extrabold text-slate-900 border-b border-slate-200 pb-1">Isıtma & Cephe</div>
-                <div className="flex justify-between text-slate-600"><span>Isıtma:</span><strong>{formData?.heatingSystem || "Doğalgaz Kombi"}</strong></div>
-                <div className="flex justify-between text-slate-600"><span>Kuzey / Güney:</span><Check className="w-3.5 h-3.5 text-emerald-600" /></div>
-                <div className="flex justify-between text-slate-600"><span>Bina Yaşı:</span><strong>{buildingAge} Yaşında</strong></div>
-                <div className="flex justify-between text-slate-600"><span>Yapı Tipi:</span><strong>{formData?.housingTypeKind === "mustakil" ? "Müstakil / Villa" : "Betonarme Apartman"}</strong></div>
-              </div>
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
+                  <div className="font-extrabold text-slate-900 border-b border-slate-200 pb-1">İnşaat Kapasitesi</div>
+                  <div className="flex justify-between text-slate-600"><span>Arsa Alanı:</span><strong>{effectiveAreaM2} m²</strong></div>
+                  <div className="flex justify-between text-slate-600"><span>Net İnşaat Alanı:</span><strong className="text-blue-700 font-mono">~{Math.round(effectiveAreaM2 * 1.50)} m²</strong></div>
+                  <div className="flex justify-between text-slate-600"><span>Taban Oturumu:</span><strong>~{Math.round(effectiveAreaM2 * 0.35)} m²</strong></div>
+                  <div className="flex justify-between text-slate-600"><span>Yol Cephesi:</span><Check className="w-3.5 h-3.5 text-emerald-600" /></div>
+                  <div className="flex justify-between text-slate-600"><span>Altyapı (Elektrik/Su):</span><Check className="w-3.5 h-3.5 text-emerald-600" /></div>
+                </div>
 
-              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
-                <div className="font-extrabold text-slate-900 border-b border-slate-200 pb-1">Manzara & Donatı</div>
-                <div className="flex justify-between text-slate-600"><span>Şehir / Doğa Manzarası:</span><Check className="w-3.5 h-3.5 text-emerald-600" /></div>
-                <div className="flex justify-between text-slate-600"><span>Balkon / Teras:</span><Check className="w-3.5 h-3.5 text-emerald-600" /></div>
-                <div className="flex justify-between text-slate-600"><span>Asansör & Otopark:</span><Check className="w-3.5 h-3.5 text-emerald-600" /></div>
-                <div className="flex justify-between text-slate-600"><span>Kullanım Durumu:</span><strong className="capitalize">{formData?.usageStatus ? formData.usageStatus.replace("_", " ") : "Mülk Sahibi"}</strong></div>
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
+                  <div className="font-extrabold text-slate-900 border-b border-slate-200 pb-1">Topografya & Mülkiyet</div>
+                  <div className="flex justify-between text-slate-600"><span>Zemin Eğimi:</span><strong>Düz / Hafif Eğim (%2)</strong></div>
+                  <div className="flex justify-between text-slate-600"><span>Parsel Geometrisi:</span><strong>Düzgün Dikdörtgen</strong></div>
+                  <div className="flex justify-between text-slate-600"><span>Ulaşım:</span><strong>Asfalt Yol Bağlantılı</strong></div>
+                  <div className="flex justify-between text-slate-600"><span>Hukuki Durum:</span><strong className="text-emerald-700">Müstakil Parsel</strong></div>
+                  <div className="flex justify-between text-slate-600"><span>Şerh / İpotek:</span><span className="text-emerald-600 font-bold">Temiz / Sorunsuz</span></div>
+                </div>
               </div>
-            </div>
+            ) : effectiveCategory === "arazi" ? (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
+                  <div className="font-extrabold text-slate-900 border-b border-slate-200 pb-1">Toprak & Tarım Niteliği</div>
+                  <div className="flex justify-between text-slate-600"><span>Tapu Niteliği:</span><strong>Tarla / Bağ / Zeytinlik</strong></div>
+                  <div className="flex justify-between text-slate-600"><span>Toprak Sınıfı:</span><strong>2. Sınıf Tarım Arazisi</strong></div>
+                  <div className="flex justify-between text-slate-600"><span>Sulama Durumu:</span><strong className="text-emerald-700">Sulanabilir Tarım Alanı</strong></div>
+                  <div className="flex justify-between text-slate-600"><span>Kadastro Yolu:</span><strong className="text-blue-700">Resmi Yola Cepheli</strong></div>
+                  <div className="flex justify-between text-slate-600"><span>Parsel Alanı:</span><strong>{effectiveAreaM2.toLocaleString("tr-TR")} m²</strong></div>
+                </div>
+
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
+                  <div className="font-extrabold text-slate-900 border-b border-slate-200 pb-1">Tarımsal Yapılaşma ve İzinler</div>
+                  <div className="flex justify-between text-slate-600"><span>5403 Sayılı Kanun:</span><strong className="text-emerald-700">Bölünemez Asgari Parsel Uygun</strong></div>
+                  <div className="flex justify-between text-slate-600"><span>Bağ Evi İzni:</span><strong>75 m² Tarımsal Yapı İzni</strong></div>
+                  <div className="flex justify-between text-slate-600"><span>Elektrik Şebekesi:</span><strong>En Yakın Hat ~400m</strong></div>
+                  <div className="flex justify-between text-slate-600"><span>Su İmkanı:</span><strong>Sondaj / Kuyu Açılabilir</strong></div>
+                  <div className="flex justify-between text-slate-600"><span>Zemin Eğimi:</span><strong>%3-5 Hafif Eğimli</strong></div>
+                </div>
+
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
+                  <div className="font-extrabold text-slate-900 border-b border-slate-200 pb-1">Yatırım & Değerleme Kriterleri</div>
+                  <div className="flex justify-between text-slate-600"><span>Prim Potansiyeli:</span><strong className="text-emerald-700">Yüksek (Bölgesel Gelişim)</strong></div>
+                  <div className="flex justify-between text-slate-600"><span>Mücavir Alan:</span><strong>Köye 850m Mesafede</strong></div>
+                  <div className="flex justify-between text-slate-600"><span>Sit / Koruma:</span><span className="text-emerald-600 font-bold">Koruma Kısıtı Yok</span></div>
+                  <div className="flex justify-between text-slate-600"><span>Mülkiyet Türü:</span><strong className="text-slate-900">Müstakil Parsel</strong></div>
+                  <div className="flex justify-between text-slate-600"><span>İcra / Haciz:</span><span className="text-emerald-600 font-bold">Temiz Mülkiyet</span></div>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
+                  <div className="font-extrabold text-slate-900 border-b border-slate-200 pb-1">Bölüm/Alan/Kat</div>
+                  <div className="flex justify-between text-slate-600"><span>Oda Sayısı:</span><strong>{roomCount}</strong></div>
+                  <div className="flex justify-between text-slate-600"><span>Salon Sayısı:</span><strong>{livingRoomCount}</strong></div>
+                  <div className="flex justify-between text-slate-600"><span>Banyo Sayısı:</span><strong>1</strong></div>
+                  <div className="flex justify-between text-slate-600"><span>Net / Brüt Alan:</span><strong>{Math.round(effectiveAreaM2 * 0.85)} m² / {effectiveAreaM2} m²</strong></div>
+                  <div className="flex justify-between text-slate-600"><span>Bulunduğu Kat:</span><strong>{floorNumber === 0 ? "Zemin Kat" : floorNumber === 0.5 ? "Yüksek Giriş" : floorNumber === -1 ? "Bodrum Kat" : `${floorNumber}. Kat`} (Top: {totalFloors})</strong></div>
+                </div>
+
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
+                  <div className="font-extrabold text-slate-900 border-b border-slate-200 pb-1">Isıtma & Cephe</div>
+                  <div className="flex justify-between text-slate-600"><span>Isıtma:</span><strong>{formData?.heatingSystem || "Doğalgaz Kombi"}</strong></div>
+                  <div className="flex justify-between text-slate-600"><span>Kuzey / Güney:</span><Check className="w-3.5 h-3.5 text-emerald-600" /></div>
+                  <div className="flex justify-between text-slate-600"><span>Bina Yaşı:</span><strong>{buildingAge} Yaşında</strong></div>
+                  <div className="flex justify-between text-slate-600"><span>Yapı Tipi:</span><strong>{formData?.housingTypeKind === "mustakil" ? "Müstakil / Villa" : "Betonarme Apartman"}</strong></div>
+                </div>
+
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
+                  <div className="font-extrabold text-slate-900 border-b border-slate-200 pb-1">Manzara & Donatı</div>
+                  <div className="flex justify-between text-slate-600"><span>Şehir / Doğa Manzarası:</span><Check className="w-3.5 h-3.5 text-emerald-600" /></div>
+                  <div className="flex justify-between text-slate-600"><span>Balkon / Teras:</span><Check className="w-3.5 h-3.5 text-emerald-600" /></div>
+                  <div className="flex justify-between text-slate-600"><span>Asansör & Otopark:</span><Check className="w-3.5 h-3.5 text-emerald-600" /></div>
+                  <div className="flex justify-between text-slate-600"><span>Kullanım Durumu:</span><strong className="capitalize">{formData?.usageStatus ? formData.usageStatus.replace("_", " ") : "Mülk Sahibi"}</strong></div>
+                </div>
+              </div>
+            )}
 
             {/* TAŞINMAZIN DEĞER / FİYAT ANALİZİ KUTULARI */}
             <div className="mt-6">

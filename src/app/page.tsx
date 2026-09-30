@@ -892,7 +892,21 @@ export default function Home() {
               Harita <span className="hidden sm:inline">& Bölge</span>
             </button>
 
-            {/* 3. Resmi TKGM Parsel Sorgu Butonu */}
+            {/* 3. Ekspertiz Raporu Sekmesi (Lansmana Özel Ücretsiz) */}
+            <button
+              type="button"
+              onClick={() => setShowElectronicReportModal(true)}
+              className="py-1 px-2.5 transition relative cursor-pointer font-heading font-extrabold whitespace-nowrap shrink-0 flex items-center gap-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-950 rounded-full border border-emerald-300 shadow-2xs active:scale-95"
+              title="13 Sayfalık Resmi Detaylı Elektronik Ekspertiz Raporunu Aç ve PDF İndir"
+            >
+              <FileText className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Ekspertiz Raporu</span>
+              <span className="px-1.5 py-0.2 text-[9px] font-black uppercase rounded-full bg-emerald-600 text-white tracking-wide">
+                Ücretsiz
+              </span>
+            </button>
+
+            {/* 4. Resmi TKGM Parsel Sorgu Butonu */}
             <button
               type="button"
               onClick={handleOpenTkgmGlobal}
@@ -967,6 +981,7 @@ export default function Home() {
             calc={calculation}
             onBack={() => setActiveTab("endeks")}
             onOpenShareModal={() => setShareModalOpen(true)}
+            onOpenDetailedReport={() => setShowElectronicReportModal(true)}
           />
         </main>
       ) : activeTab === "degerleme" ? (
@@ -1463,7 +1478,7 @@ export default function Home() {
                   className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-black text-xs shadow-md transition cursor-pointer flex items-center justify-center gap-2 active:scale-95"
                 >
                   <FileText className="w-4 h-4 text-slate-950" />
-                  <span>Hemen Ekspertiz Raporu Al (13 Sayfa PDF)</span>
+                  <span>Hemen Ekspertiz Raporu Al (13 Sayfa PDF • Ücretsiz)</span>
                 </button>
               </div>
 
@@ -1673,8 +1688,8 @@ export default function Home() {
                       onClick={() => setShowElectronicReportModal(true)}
                       className="py-3 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-sm flex items-center justify-center gap-2 transition cursor-pointer"
                     >
-                      <Printer className="w-4 h-4" />
-                      <span>Kapsamlı Raporu Aç (PDF)</span>
+                      <Printer className="w-4 h-4 text-emerald-400" />
+                      <span>Kapsamlı Raporu Aç (PDF • Ücretsiz)</span>
                     </button>
 
                     <button
@@ -1785,6 +1800,29 @@ export default function Home() {
         parcelText={`${parcelData.city}, ${parcelData.district}, ${parcelData.neighborhood || "Merkez"}, ${parcelData.ada || "48507"} Ada, ${parcelData.parsel || "1"} Parsel`}
         marketValueTL={calculation.fairMarketValueTL || 7900000}
         areaM2={parcelData.areaM2 || 110}
+        formData={{
+          service: parcelData.category,
+          city: parcelData.city,
+          district: parcelData.district,
+          neighborhood: parcelData.neighborhood || "Merkez",
+          ada: parcelData.ada || "117",
+          parsel: parcelData.parsel || "9",
+          pafta: "H17-D-04-B",
+          coordinates: parcelData.coordinates || { lat: 40.1172, lng: 26.4022 },
+          grossAreaM2: parcelData.areaM2 || 125,
+          netAreaM2: parcelData.netAreaM2 || Math.round((parcelData.areaM2 || 125) * 0.85),
+          arsaAreaM2: parcelData.category === "arsa" ? parcelData.areaM2 : undefined,
+          araziAreaM2: parcelData.category === "arazi" ? parcelData.areaM2 : undefined,
+          roomCount: parcelData.roomCount ? parseInt(parcelData.roomCount.split("+")[0]) || 3 : 3,
+          livingRoomCount: parcelData.roomCount && parcelData.roomCount.includes("+") ? parseInt(parcelData.roomCount.split("+")[1]) || 1 : 1,
+          buildingAge: parcelData.buildingAge === "0" ? 0 : parcelData.buildingAge === "1-5" ? 3 : parcelData.buildingAge === "6-10" ? 8 : 12,
+          floorNumber: parcelData.floorLocation === "kot_bodrum" ? -1 : parcelData.floorLocation === "bahce_giris" ? 0 : (parcelData.floorLocation === "en_ust_kat" || parcelData.floorLocation === "cati_dubleks") ? 5 : 2,
+          totalFloors: parcelData.totalFloorsInBuilding || parcelData.maxFloors || 5,
+          heatingSystem: parcelData.heatingType === "dogalgaz_kombi" ? "Doğalgaz Kombi" : parcelData.heatingType === "merkezi_payolcer" ? "Merkezi Pay Ölçer" : parcelData.heatingType === "yerden_isitma" ? "Yerden Isıtma" : "Doğalgaz Kombi",
+          housingTypeKind: (parcelData.housingType === "villa" || parcelData.housingType === "mustakil") ? "mustakil" : "apartman",
+          pgaSeismicHazard: "0.220g",
+          marketValueEstimate: calculation.fairMarketValueTL || 7900000,
+        }}
       />
 
       {/* Yeni Ekspertiz ve Değerleme Başlat Modalı (Hasan Hüseyin Yıldırım Modeli: Expertiz & Emlak Bul) */}

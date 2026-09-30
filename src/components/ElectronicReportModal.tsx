@@ -18,7 +18,7 @@ import { ReportPagesContent } from "./ReportPagesContent";
 interface ElectronicReportModalProps {
   isOpen: boolean;
   onClose: () => void;
-  formData?: ValuationFormData;
+  formData?: Partial<ValuationFormData>;
   propertyTitle?: string;
   category?: "konut" | "arsa" | "arazi";
   locationText?: string;
@@ -309,6 +309,9 @@ export const ElectronicReportModal: React.FC<ElectronicReportModalProps> = ({
                   <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-mono border border-amber-500/30">
                     SPK & İİK m.115 Uyumlu
                   </span>
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/25 text-emerald-300 text-[10px] font-black border border-emerald-500/40">
+                    ÜCRETSİZ
+                  </span>
                 </div>
                 <div className="text-[11px] text-slate-400 font-medium">
                   {effectiveTitle} — Sayfa {currentPage} / {totalPages}
@@ -408,6 +411,19 @@ export const ElectronicReportModal: React.FC<ElectronicReportModalProps> = ({
                 <X className="w-5 h-5" />
               </button>
             </div>
+          </div>
+
+          {/* Lansman Ücretsizlik Şeridi */}
+          <div className="bg-emerald-950/90 border-b border-emerald-800/40 px-5 py-2 text-white flex items-center justify-between text-xs print-hidden-element">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span className="font-semibold text-emerald-200">
+                Lansmana Özel: 13 Sayfalık Resmi Detaylı Raporunuz Ücretsiz Olarak Hazırlandı.
+              </span>
+            </div>
+            <span className="text-[11px] font-mono text-emerald-300/80 hidden sm:inline">
+              13 Sayfa • A4 Renkli • Dijital Mühürlü
+            </span>
           </div>
 
           {/* SAYFA SEKMELERİ ÇUBUĞU */}

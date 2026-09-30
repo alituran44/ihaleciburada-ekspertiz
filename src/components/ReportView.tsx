@@ -12,6 +12,7 @@ import {
   MapPin, 
   Coins, 
   FileCheck2,
+  FileText,
   Calendar,
   CheckCircle2,
   AlertTriangle,
@@ -43,6 +44,7 @@ interface ReportViewProps {
   calc: CalculationResult;
   onBack: () => void;
   onOpenShareModal: () => void;
+  onOpenDetailedReport?: () => void;
 }
 
 export const ReportView: React.FC<ReportViewProps> = ({
@@ -50,6 +52,7 @@ export const ReportView: React.FC<ReportViewProps> = ({
   calc,
   onBack,
   onOpenShareModal,
+  onOpenDetailedReport,
 }) => {
   const isResidential = input.category === "konut";
 
@@ -67,7 +70,7 @@ export const ReportView: React.FC<ReportViewProps> = ({
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-4xl mx-auto space-y-5">
       {/* Üst Eylem Çubuğu (Yazdırma sırasında gizlenir) */}
       <div className="no-print bg-white p-4 rounded-2xl border border-slate-300 shadow-premium flex flex-wrap items-center justify-between gap-3 sticky top-20 z-30">
         <button
@@ -79,7 +82,18 @@ export const ReportView: React.FC<ReportViewProps> = ({
           <span>Düzenleyiciye Dön</span>
         </button>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2">
+          {onOpenDetailedReport && (
+            <button
+              type="button"
+              onClick={onOpenDetailedReport}
+              className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs flex items-center gap-1.5 transition shadow-xs cursor-pointer active:scale-95"
+            >
+              <FileText className="w-4 h-4" />
+              <span>13 Sayfa Resmi PDF (Ücretsiz)</span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={onOpenShareModal}
@@ -99,6 +113,35 @@ export const ReportView: React.FC<ReportViewProps> = ({
           </button>
         </div>
       </div>
+
+      {/* 13 Sayfalık Resmi Rapor Tanıtım Kartı (Ücretsiz) */}
+      {onOpenDetailedReport && (
+        <div className="no-print p-4 rounded-2xl bg-gradient-to-r from-emerald-950 via-[#0B1E3B] to-slate-900 border border-emerald-500/40 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0">
+              <FileText className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-xs font-black tracking-tight text-white flex items-center gap-2">
+                <span>13 Sayfalık Resmi Elektronik Ekspertiz Raporu</span>
+                <span className="px-2 py-0.5 rounded-full bg-emerald-500 text-slate-950 font-black text-[9px] uppercase tracking-wider">
+                  ŞİMDİLİK ÜCRETSİZ
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-300 mt-0.5">
+                SPK ve BDDK standartlarında 13 sayfa A4 renkli, emsal kıyaslama, demografi ve AFAD risk analizli resmi e-raporu hemen inceleyin veya indirin.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onOpenDetailedReport}
+            className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs transition cursor-pointer shrink-0 shadow-md active:scale-95 text-center whitespace-nowrap"
+          >
+            13 Sayfa Raporu Aç
+          </button>
+        </div>
+      )}
 
       {/* RAPOR DOKÜMANI (A4 Uyumlu & Kurumsal Tasarım) */}
       <div className="bg-white border border-slate-300 shadow-premium rounded-2xl p-6 sm:p-10 space-y-8 text-slate-800 card-print">
