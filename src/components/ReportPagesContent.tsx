@@ -167,7 +167,7 @@ export const ReportPagesContent: React.FC<ReportPagesContentProps> = ({
             <div className="mt-8 space-y-3">
               <h4 className="text-sm font-black text-slate-900 border-b border-slate-100 pb-1">Hakkımda</h4>
               <p className="text-xs text-slate-600 leading-relaxed">
-                14 yılı aşkın süredir {city} ve Marmara/Ege bölgesinde konut, ticari mülk, imarlı arsa ve icra değerlemeleri alanında hizmet vermekteyim. İhaleciBurada büyük veri algoritmaları, İİK m.115 ihale tabanları ve SPK değerleme ilkelerini harmanlayarak taşınmazların piyasa gerçekleriyle birebir örtüşen kıymet takdirlerini sunmaktayım.
+                14 yılı aşkın süredir Türkiye genelinde ve {city} başta olmak üzere tüm bölgelerde konut, ticari mülk, imarlı arsa ve icra değerlemeleri alanında hizmet vermekteyim. İhaleciBurada büyük veri algoritmaları, İİK m.115 ihale tabanları ve SPK değerleme ilkelerini harmanlayarak taşınmazların piyasa gerçekleriyle birebir örtüşen kıymet takdirlerini sunmaktayım.
               </p>
             </div>
 
