@@ -86,6 +86,7 @@ export default function Home() {
   const [subTab, setSubTab] = useState<"deger" | "trend" | "rayic" | "best_use">("deger");
   const [valuationMode, setValuationMode] = useState<"otomatik" | "manuel">("otomatik");
   const [searchRadius, setSearchRadius] = useState<number>(1000);
+  const [layoutMapPosition, setLayoutMapPosition] = useState<"left" | "right">("left");
   const [focusedCompId, setFocusedCompId] = useState<string | null>(null);
   const [listingFilter, setListingFilter] = useState<"all" | "satilik" | "kiralik">("all");
   const [isEmsalOpen, setIsEmsalOpen] = useState<boolean>(true);
@@ -224,7 +225,8 @@ export default function Home() {
       setActiveTab("endeks");
       setSubTab("rayic");
     } else {
-      setActiveTab("degerleme");
+      setActiveTab("endeks");
+      setSubTab("deger");
     }
 
     // İlan ver moduysa anlık olarak yerel listeye ve harita emsal havuzuna ekle
@@ -765,38 +767,35 @@ export default function Home() {
               <div className="hidden xl:flex items-center gap-1.5 shrink-0">
                 <button
                   type="button"
-                  onClick={() => {
-                    setStartValuationInitialMode("expertiz");
-                    setShowStartValuationModal(true);
-                  }}
+                  onClick={() => setShowElectronicReportModal(true)}
                   className="flex items-center gap-1.5 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white text-xs font-black px-3.5 py-1.5 rounded-full shadow-xs transition active:scale-95 cursor-pointer whitespace-nowrap"
                 >
                   <FileText className="w-3.5 h-3.5" />
-                  <span>Ekspertiz</span>
+                  <span>Ekspertiz Raporu</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => {
-                    setStartValuationInitialMode("emlak_bul");
-                    setShowStartValuationModal(true);
+                    setActiveTab("endeks");
+                    setSubTab("rayic");
                   }}
                   className="flex items-center gap-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-black px-3.5 py-1.5 rounded-full shadow-xs transition active:scale-95 cursor-pointer whitespace-nowrap"
                 >
                   <Search className="w-3.5 h-3.5" />
-                  <span>Emlak Bul</span>
+                  <span>Emlak & Emsal Bul</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => {
-                    setStartValuationInitialMode("ilan_ver");
-                    setShowStartValuationModal(true);
+                    setActiveTab("endeks");
+                    setSubTab("deger");
                   }}
                   className="flex items-center gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-black px-3 py-1.5 rounded-full shadow-xs transition active:scale-95 cursor-pointer whitespace-nowrap"
                 >
-                  <PlusCircle className="w-3.5 h-3.5" />
-                  <span>İlan Ver</span>
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Değerleme Yap</span>
                 </button>
               </div>
 
@@ -804,20 +803,17 @@ export default function Home() {
               <div className="hidden md:flex xl:hidden items-center gap-1 shrink-0">
                 <button
                   type="button"
-                  onClick={() => {
-                    setStartValuationInitialMode("expertiz");
-                    setShowStartValuationModal(true);
-                  }}
+                  onClick={() => setShowElectronicReportModal(true)}
                   className="p-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-full shadow-2xs transition active:scale-95 cursor-pointer"
-                  title="Ekspertiz Başlat"
+                  title="Ekspertiz Raporunu Aç"
                 >
                   <FileText className="w-3.5 h-3.5" />
                 </button>
                 <button
                   type="button"
                   onClick={() => {
-                    setStartValuationInitialMode("emlak_bul");
-                    setShowStartValuationModal(true);
+                    setActiveTab("endeks");
+                    setSubTab("rayic");
                   }}
                   className="p-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full shadow-2xs transition active:scale-95 cursor-pointer"
                   title="Emlak Bul"
@@ -827,13 +823,13 @@ export default function Home() {
                 <button
                   type="button"
                   onClick={() => {
-                    setStartValuationInitialMode("ilan_ver");
-                    setShowStartValuationModal(true);
+                    setActiveTab("endeks");
+                    setSubTab("deger");
                   }}
                   className="p-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-full shadow-2xs transition active:scale-95 cursor-pointer"
-                  title="İlan Ver"
+                  title="Değerleme Yap"
                 >
-                  <PlusCircle className="w-3.5 h-3.5" />
+                  <Sparkles className="w-3.5 h-3.5" />
                 </button>
               </div>
             </form>
@@ -908,9 +904,12 @@ export default function Home() {
             {/* 1. Değerleme Sekmesi */}
             <button
               type="button"
-              onClick={() => setActiveTab("degerleme")}
+              onClick={() => {
+                setActiveTab("endeks");
+                setSubTab("deger");
+              }}
               className={`py-1.5 px-2 transition relative cursor-pointer font-heading font-extrabold whitespace-nowrap shrink-0 ${
-                activeTab === "degerleme"
+                activeTab === "endeks" && subTab === "deger"
                   ? "text-blue-600 after:absolute after:bottom-[-16px] after:left-0 after:right-0 after:h-[2.5px] after:bg-blue-600 after:rounded-full"
                   : "text-slate-600 hover:text-slate-900"
               }`}
@@ -921,14 +920,28 @@ export default function Home() {
             {/* 2. Harita & Bölge Sekmesi */}
             <button
               type="button"
-              onClick={() => setActiveTab("endeks")}
+              onClick={() => {
+                setActiveTab("endeks");
+                setSubTab("rayic");
+              }}
               className={`py-1.5 px-2 transition relative cursor-pointer font-heading font-extrabold whitespace-nowrap shrink-0 ${
-                activeTab === "endeks"
+                activeTab === "endeks" && subTab !== "deger"
                   ? "text-blue-600 after:absolute after:bottom-[-16px] after:left-0 after:right-0 after:h-[2.5px] after:bg-blue-600 after:rounded-full"
                   : "text-slate-600 hover:text-slate-900"
               }`}
             >
               Harita <span className="hidden sm:inline">& Bölge</span>
+            </button>
+
+            {/* 2.5 Harita Solda / Sağda Düzen Değiştirici */}
+            <button
+              type="button"
+              onClick={() => setLayoutMapPosition(prev => prev === "left" ? "right" : "left")}
+              className="flex items-center gap-1.5 py-1 px-2.5 rounded-full border border-slate-300 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition shadow-2xs active:scale-95 cursor-pointer shrink-0"
+              title="Harita ve Değerleme Paneli Konumunu Değiştir (Solda / Sağda)"
+            >
+              <SlidersHorizontal className="w-3 h-3 text-amber-600" />
+              <span>{layoutMapPosition === "left" ? "Harita Solda" : "Harita Sağda"}</span>
             </button>
 
             {/* 3. Ekspertiz Raporu Sekmesi (Lansmana Özel Ücretsiz) */}
@@ -991,7 +1004,10 @@ export default function Home() {
 
             {/* Kullanıcı Profili Rozeti: Ali Turan */}
             <div 
-              onClick={() => setActiveTab("degerleme")}
+              onClick={() => {
+                setActiveTab("endeks");
+                setSubTab("deger");
+              }}
               className="flex items-center gap-2 bg-[#0B1E3B] hover:bg-slate-900 text-amber-400 border border-amber-500/30 pl-1.5 pr-3 py-1 rounded-full shadow-xs cursor-pointer select-none transition active:scale-95 shrink-0"
               title="Kullanıcı: Ali Turan (İhaleciBurada Pro Hesap)"
             >
@@ -1023,31 +1039,133 @@ export default function Home() {
             onOpenDetailedReport={() => setShowElectronicReportModal(true)}
           />
         </main>
-      ) : activeTab === "degerleme" ? (
-        /* 3. DEĞERİNİ ÖĞREN EKRANI (GÖRSELDEKİ BİREBİR ENDEKSA SİHİRBAZI) */
-        <EndeksaValuationModal
-          input={parcelData}
-          onChange={setParcelData}
-          onClose={() => setActiveTab("endeks")}
-          onNavigateToMap={() => setActiveTab("endeks")}
-        />
       ) : (
         /* 4. ENDEKSA İKİYE BÖLÜNMÜŞ (SPLIT-SCREEN) BÖLGEYİ İNCELE ALANI */
         <div className="flex-1 flex flex-row overflow-hidden">
           
           {/* Sol Kenar Çubuğu (Icon Sidebar) */}
           <EndeksaSidebar
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
+            activeTab={activeTab === "endeks" && subTab === "deger" ? "degerleme" : activeTab}
+            onTabChange={(tab) => {
+              if (tab === "degerleme") {
+                setActiveTab("endeks");
+                setSubTab("deger");
+              } else {
+                setActiveTab(tab as any);
+                if (tab === "endeks") setSubTab("rayic");
+              }
+            }}
             category={parcelData.category}
             onCategoryChange={handleCategorySwitch}
           />
 
-          {/* İkili Çalışma Alanı: Sol Analitik (%50) + Sağ Harita (%50) */}
+          {/* İkili Çalışma Alanı: Harita (Varsayılan Solda) + Değerleme & Analiz Paneli (Sağda) */}
           <div className="flex-1 flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden">
             
-            {/* SOL ANALİTİK & VERİ PANELİ (Tapusor Genişliği %32) */}
-            <div className="w-full lg:w-[38%] xl:w-[32%] min-w-[360px] lg:h-[calc(100vh-64px)] overflow-y-auto p-3 sm:p-5 space-y-5 border-r border-slate-200 bg-white relative z-10">
+            {/* DEĞERLEME & ANALİZ PANELİ */}
+            <div className={`w-full lg:w-[420px] xl:w-[460px] shrink-0 lg:h-[calc(100vh-64px)] overflow-y-auto p-3 sm:p-5 space-y-4 bg-white relative z-10 ${
+              layoutMapPosition === "left" 
+                ? "lg:order-2 border-l border-slate-200" 
+                : "lg:order-1 border-r border-slate-200"
+            }`}>
+
+              {/* RESMİ KADASTRO & AKILLI DEĞERLEME HIZLI GİRİŞ KARTI */}
+              <div className="bg-gradient-to-br from-slate-900 via-[#0B1E3B] to-slate-950 text-white p-3.5 rounded-2xl border border-slate-800 shadow-md space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                      <Sparkles className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-xs font-black text-white font-heading uppercase tracking-wide">
+                        Kadastro & Akıllı Değerleme
+                      </h3>
+                      <p className="text-[10px] text-slate-300">
+                        {parcelData.city} / {parcelData.district} / {parcelData.neighborhood || "Merkez"}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleCategorySwitch(isResidential ? "arsa" : "konut")}
+                    className="px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-black hover:bg-amber-500/30 transition cursor-pointer flex items-center gap-1"
+                  >
+                    <span>{isResidential ? "🏠 Konut & Daire" : "📐 Arsa & Arazi"}</span>
+                    <ChevronDown className="w-3 h-3 text-amber-400" />
+                  </button>
+                </div>
+
+                {/* Ada, Parsel, Alan Girişleri */}
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-300 uppercase block mb-1">
+                      Ada No
+                    </label>
+                    <input
+                      type="text"
+                      value={parcelData.ada || ""}
+                      onChange={(e) => setParcelData(prev => ({ ...prev, ada: e.target.value }))}
+                      placeholder="48507"
+                      className="w-full bg-slate-900/90 border border-slate-700 focus:border-amber-400 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-white outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-300 uppercase block mb-1">
+                      Parsel No
+                    </label>
+                    <input
+                      type="text"
+                      value={parcelData.parsel || ""}
+                      onChange={(e) => setParcelData(prev => ({ ...prev, parsel: e.target.value }))}
+                      placeholder="1"
+                      className="w-full bg-slate-900/90 border border-slate-700 focus:border-amber-400 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-white outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-300 uppercase block mb-1">
+                      Alan (m²)
+                    </label>
+                    <input
+                      type="number"
+                      value={parcelData.areaM2 || ""}
+                      onChange={(e) => setParcelData(prev => ({ ...prev, areaM2: Number(e.target.value) || 0 }))}
+                      placeholder="120"
+                      className="w-full bg-slate-900/90 border border-slate-700 focus:border-amber-400 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-amber-400 outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Butonlar: TKGM Parsel Sorgu & Değerle */}
+                <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-800">
+                  <button
+                    type="button"
+                    onClick={handleOpenTkgmGlobal}
+                    className="py-2 px-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/30 font-bold text-[11px] transition flex items-center justify-center gap-1 cursor-pointer"
+                    title="Resmi TKGM Kadastro Parsel Sorgu sayfasını aç"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                    <span className="truncate">🏛️ TKGM Sorgu</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSubTab("deger")}
+                    className={`py-2 px-2.5 rounded-lg font-black text-[11px] transition flex items-center justify-center gap-1 cursor-pointer ${
+                      subTab === "deger"
+                        ? "bg-amber-500 text-slate-950 shadow-sm"
+                        : "bg-amber-600 hover:bg-amber-500 text-white"
+                    }`}
+                  >
+                    <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                    <span>⚡ Değerleme</span>
+                  </button>
+                </div>
+
+                {/* Resmi Uyarı Notu */}
+                <div className="text-[10px] text-slate-300 bg-slate-900/60 p-2 rounded-lg border border-slate-800/80 leading-snug">
+                  📌 <strong>Resmi Bilgi:</strong> İmar durumu yetkili belediyeden resmi imar çapı ile, şerh ve takyidat bilgileri tapu müdürlüğünden teyit edilmelidir. Sitemiz afaki inşaat hesabı yapmaz.
+                </div>
+              </div>
               
               {/* İHALECİ BURADA FİLTRE HAPLARI */}
               <div className="flex flex-wrap items-center gap-2 pb-1 border-b border-slate-200/80">
@@ -1359,7 +1477,7 @@ export default function Home() {
                         Resmi İmar Durum Belgesi (Çap) Esastır
                       </div>
                       <div className="text-[11px] text-slate-300 mt-1 leading-relaxed">
-                        Arsa yapılaşma koşulları, emsal (KAKS), taban alanı (TAKS) ve kat adedi verileri yetkili ilçe belediyesi imar biriminden temin edilecek imar çapı ile netleşir. Sistemimiz afaki inşaat kapasitesi hesabı yapmaz.
+                        Arsa yapılaşma koşulları ve güncel imar fonksiyonu verileri yetkili ilçe belediyesi imar biriminden temin edilecek resmi imar çapı ile netleşir. Sistemimiz afaki inşaat kapasitesi hesabı yapmaz.
                       </div>
                     </div>
 
@@ -1750,8 +1868,12 @@ export default function Home() {
               )}
             </div>
 
-            {/* SAĞ HARİTA PANELİ (Geniş Tapusor & GIS Uydu Haritası %68) */}
-            <div className="w-full lg:w-[62%] xl:w-[68%] lg:h-[calc(100vh-64px)] relative z-0 isolate bg-slate-100 flex flex-col">
+            {/* HARİTA PANELİ (Geniş Tapusor & GIS Uydu Haritası) */}
+            <div className={`w-full lg:flex-1 lg:h-[calc(100vh-64px)] relative z-0 isolate bg-slate-100 flex flex-col ${
+              layoutMapPosition === "left"
+                ? "lg:order-1 border-r border-slate-200"
+                : "lg:order-2"
+            }`}>
               <ParcelMap
                 city={parcelData.city}
                 district={parcelData.district}

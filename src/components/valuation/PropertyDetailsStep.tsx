@@ -491,7 +491,7 @@ export const PropertyDetailsStep: React.FC<PropertyDetailsStepProps> = ({
                 </span>
               </div>
               <p className="text-xs text-amber-900 leading-relaxed">
-                Taşınmazın güncel imar fonksiyonu, çekme mesafeleri, kat adedi ve yapılaşma hakları <strong>yetkili ilçe veya büyükşehir belediyesi imar müdürlüğünden</strong> temin edilecek resmi imar çapı ile belirlenir. Sistemimiz afaki KAKS / TAKS hesabı yapmamaktadır.
+                Taşınmazın güncel imar fonksiyonu, çekme mesafeleri, kat adedi ve yapılaşma hakları <strong>yetkili ilçe veya büyükşehir belediyesi imar müdürlüğünden</strong> temin edilecek resmi imar çapı ile belirlenir. Sistemimiz afaki inşaat kapasitesi hesabı yapmaz.
               </p>
             </div>
 

@@ -206,8 +206,6 @@ export const InvestmentScoreCard: React.FC<InvestmentScoreCardProps> = ({
     unitM2: 45000,
     growth: 35,
     region: "Marmara",
-    typicalKaks: 1.5,
-    typicalTaks: 0.35,
   };
 
   const rawDistricts = useMemo(() => {

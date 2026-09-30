@@ -323,44 +323,24 @@ export const ReportView: React.FC<ReportViewProps> = ({
               </table>
             </div>
           ) : (
-            /* ARSA İMAR TABLOSU */
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs text-left border border-slate-200 rounded-xl overflow-hidden">
-                <thead className="bg-[#0F223D] text-white text-[11px] uppercase tracking-wider">
-                  <tr>
-                    <th className="p-2.5 font-bold">İmar Parametresi</th>
-                    <th className="p-2.5 font-bold text-center">Yasal / Plan Oranı</th>
-                    <th className="p-2.5 font-bold text-right">Hesaplanan Alan</th>
-                    <th className="p-2.5 font-bold">Açıklama & Not</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200">
-                  <tr className="bg-white">
-                    <td className="p-2.5 font-bold text-slate-900">Fonksiyon</td>
-                    <td className="p-2.5 text-center font-semibold text-blue-700 uppercase">{input.zoningType}</td>
-                    <td className="p-2.5 text-right font-semibold">-</td>
-                    <td className="p-2.5 text-slate-500">1/1000 Uygulama İmar Planı Kararı</td>
-                  </tr>
-                  <tr className="bg-slate-50/70">
-                    <td className="p-2.5 font-bold text-slate-900">KAKS / Emsal</td>
-                    <td className="p-2.5 text-center font-bold text-blue-700">{input.kaks}</td>
-                    <td className="p-2.5 text-right font-black text-slate-900">{formatNumber(calc.zoningAllowedConstructionM2)} m²</td>
-                    <td className="p-2.5 text-slate-500">Emsale dahil yapı inşaat alanı</td>
-                  </tr>
-                  <tr className="bg-white">
-                    <td className="p-2.5 font-bold text-slate-900">TAKS (Taban Oturumu)</td>
-                    <td className="p-2.5 text-center font-bold text-slate-700">{input.taks}</td>
-                    <td className="p-2.5 text-right font-black text-slate-900">{formatNumber(calc.footprintAreaM2)} m²</td>
-                    <td className="p-2.5 text-slate-500">Maksimum bina taban oturumu</td>
-                  </tr>
-                  <tr className="bg-blue-50/80 font-bold text-blue-950">
-                    <td className="p-2.5">Satılabilir Brüt Alan</td>
-                    <td className="p-2.5 text-center">Emsal Dışı İlavelere Açık</td>
-                    <td className="p-2.5 text-right font-black text-base text-blue-700">{formatNumber(calc.totalSellableGrossM2)} m²</td>
-                    <td className="p-2.5 text-blue-900 font-medium">Balkon, çatı ve bodrum eklentileri dahil</td>
-                  </tr>
-                </tbody>
-              </table>
+            /* ARSA İMAR VE HUKUKİ DURUM BİLGİLENDİRMESİ (KAKS VE TAKS KALDIRILDI) */
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+              <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
+                <span className="text-amber-500 font-black">🏛️</span>
+                <span>İmar ve Şerh / Takyidat Bilgilendirmesi</span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                <div className="bg-white p-3 rounded-lg border border-slate-200 space-y-1">
+                  <div className="text-[10px] font-bold text-slate-500 uppercase">Resmi İmar Durumu</div>
+                  <div className="font-bold text-slate-900">İlgili İlçe Belediyesi İmar ve Şehircilik Müdürlüğü&apos;nden Resmi İmar Çapı Alınmalıdır</div>
+                  <p className="text-[11px] text-slate-500">Parselin güncel yapılaşma şartları ve fonksiyonu yetkili belediye imar biriminden teyit edilmelidir. Raporumuzda afaki inşaat kapasitesi hesabı yapılmaz.</p>
+                </div>
+                <div className="bg-white p-3 rounded-lg border border-slate-200 space-y-1">
+                  <div className="text-[10px] font-bold text-slate-500 uppercase">Takyidat / Şerh / İpotek Durumu</div>
+                  <div className="font-bold text-rose-700">Tapu Müdürlüğü&apos;nden Sorulmalıdır (Alıcı Teyidi)</div>
+                  <p className="text-[11px] text-slate-500">Taşınmaz üzerinde haciz, ipotek, intifa veya kamu şerhi bulunup bulunmadığı resmi Tapu Sicil Müdürlüğü kayıtlarından sorgulanmalıdır.</p>
+                </div>
+              </div>
             </div>
           )}
         </div>

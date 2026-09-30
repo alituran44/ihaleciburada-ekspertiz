@@ -292,7 +292,7 @@ export const ReportPagesContent: React.FC<ReportPagesContentProps> = ({
                     <strong className="text-slate-800">Belediye İmar Müdürlüğü Teyidi</strong>
                   </div>
                   <div className="mt-2.5 p-2.5 bg-amber-50/80 border border-amber-200 rounded-lg text-[11px] text-amber-950 leading-snug">
-                    ℹ️ <strong>İmar ve Yapılaşma Bilgilendirmesi:</strong> Parselin güncel imar fonksiyonu, çekme mesafeleri, kot ve yapılaşma hakları yetkili ilçe belediyesi İmar ve Şehircilik Müdürlüğü&apos;nden temin edilecek resmi İmar Durum Belgesi (İmar Çapı) ile netleşir. Raporumuzda afaki KAKS/TAKS veya inşaat kapasitesi tahmini yapılmamaktadır.
+                    ℹ️ <strong>İmar ve Yapılaşma Bilgilendirmesi:</strong> Parselin güncel imar fonksiyonu, çekme mesafeleri, kot ve yapılaşma hakları yetkili ilçe belediyesi İmar ve Şehircilik Müdürlüğü&apos;nden temin edilecek resmi İmar Durum Belgesi (İmar Çapı) ile netleşir. Raporumuzda afaki inşaat kapasitesi tahmini yapılmamaktadır.
                   </div>
                 </div>
 

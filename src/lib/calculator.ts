@@ -402,7 +402,6 @@ export function calculateFeasibility(input: ParcelInput): CalculationResult {
   if (input.isCornerParcel) score += 5;
   if (input.topography === "duz") score += 4;
   if (input.topography === "dik_egimli") score -= 12;
-  if (input.kaks >= 1.5) score += 4;
 
   const investmentScore = Math.max(15, Math.min(99, Math.round(score)));
 
@@ -422,9 +421,6 @@ export function calculateFeasibility(input: ParcelInput): CalculationResult {
   }
   if (discountRatio > 10) {
     advantages.push(`İstenen fiyat, bölgedeki adil piyasa değerine göre yaklaşık %${discountRatio} iskontolu görünmektedir.`);
-  }
-  if (input.kaks >= 1.2) {
-    advantages.push(`KAKS (Emsal: ${input.kaks}) değeri yüksek inşaat yoğunluğuna izin vermekte, bağımsız bölüm potansiyelini maksimize etmektedir.`);
   }
   if (input.topography === "duz") {
     advantages.push("Düz arazi yapısı, ekstra hafriyat ve istinat duvarı maliyetlerini minimize eder.");

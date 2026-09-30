@@ -764,111 +764,27 @@ export const ValuationWizard: React.FC<ValuationWizardProps> = ({
         )}
 
         {/* ========================================== */}
-        {/* ARSA ÖZEL: İMAR & YAPILAŞMA HAKLARI */}
+        {/* ARSA ÖZEL: İMAR & YAPILAŞMA BİLGİLENDİRMESİ (KAKS VE TAKS KALDIRILDI) */}
         {/* ========================================== */}
         {!isResidential && activeTab === "zoning" && (
           <div className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">İmar Fonksiyonu</label>
-                <select
-                  value={input.zoningType}
-                  onChange={(e) => updateField("zoningType", e.target.value as ZoningType)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-900 font-semibold focus:bg-white focus:border-blue-500 focus:outline-none"
-                >
-                  <option value="konut">Konut Alanı</option>
-                  <option value="ticari">Ticaret / Ofis Alanı</option>
-                  <option value="karma">Karma (Konut + Ticaret)</option>
-                  <option value="villa">Düşük Yoğunluklu Villa</option>
-                  <option value="sanayi">Sanayi & Depolama</option>
-                  <option value="tarla_gelisme">Tarla / İmar Gelişme Alanı</option>
-                  <option value="turizm">Turizm & Konaklama Tesisi</option>
-                </select>
+            <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+              <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
+                <span className="text-amber-500 font-black">🏛️</span>
+                <span>İmar ve Şerh / Takyidat Bilgilendirmesi</span>
               </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  KAKS / Emsal Oranı
-                </label>
-                <input
-                  type="number"
-                  step="0.05"
-                  min="0.1"
-                  max="5.0"
-                  value={input.kaks || ""}
-                  onChange={(e) => updateField("kaks", Number(e.target.value))}
-                  placeholder="1.50"
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-900 font-bold focus:bg-white focus:border-blue-500 focus:outline-none"
-                />
+              <div className="space-y-2 text-xs">
+                <div className="bg-white p-3 rounded-lg border border-slate-200 space-y-1">
+                  <div className="text-[10px] font-bold text-slate-500 uppercase">Resmi İmar Durumu</div>
+                  <div className="font-bold text-slate-900">İlgili İlçe Belediyesi İmar ve Şehircilik Müdürlüğü&apos;nden Resmi İmar Çapı Alınmalıdır</div>
+                  <p className="text-[11px] text-slate-500">Parselin güncel yapılaşma koşulları yetkili belediye imar biriminden temin edilecek imar çapı ile netleşir. Sistemimiz afaki inşaat kapasitesi hesabı yapmaz.</p>
+                </div>
+                <div className="bg-white p-3 rounded-lg border border-slate-200 space-y-1">
+                  <div className="text-[10px] font-bold text-slate-500 uppercase">Takyidat / Şerh / İpotek Durumu</div>
+                  <div className="font-bold text-rose-700">Tapu Müdürlüğü&apos;nden Sorulmalıdır (Alıcı Teyidi)</div>
+                  <p className="text-[11px] text-slate-500">Taşınmaz üzerinde haciz, ipotek, intifa veya kamu şerhi bulunup bulunmadığı resmi Tapu Sicil Müdürlüğü kayıtlarından sorgulanmalıdır.</p>
+                </div>
               </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  TAKS (Taban Oturumu)
-                </label>
-                <input
-                  type="number"
-                  step="0.05"
-                  min="0.1"
-                  max="0.8"
-                  value={input.taks || ""}
-                  onChange={(e) => updateField("taks", Number(e.target.value))}
-                  placeholder="0.35"
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-900 font-bold focus:bg-white focus:border-blue-500 focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Gabari (Hmax / Metre)
-                </label>
-                <input
-                  type="number"
-                  step="0.5"
-                  min="3"
-                  value={input.gabariM || ""}
-                  onChange={(e) => updateField("gabariM", Number(e.target.value))}
-                  placeholder="15.5"
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-900 font-bold focus:bg-white focus:border-blue-500 focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Maksimum Kat Adedi
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max="50"
-                  value={input.maxFloors || ""}
-                  onChange={(e) => updateField("maxFloors", Number(e.target.value))}
-                  placeholder="5"
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-900 font-bold focus:bg-white focus:border-blue-500 focus:outline-none"
-                />
-              </div>
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="text-xs font-bold text-slate-700">
-                  Tahmini Yola / Kamuya Terk Oranı (%):
-                </label>
-                <span className="text-xs font-mono font-bold text-blue-700">
-                  %{input.relinquishmentRatio} Terk
-                </span>
-              </div>
-              <input
-                type="range"
-                min="0"
-                max="45"
-                step="5"
-                value={input.relinquishmentRatio}
-                onChange={(e) => updateField("relinquishmentRatio", Number(e.target.value))}
-                className="w-full accent-blue-600"
-              />
             </div>
           </div>
         )}

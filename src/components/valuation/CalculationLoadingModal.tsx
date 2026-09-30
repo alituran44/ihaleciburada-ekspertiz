@@ -29,7 +29,7 @@ export const CalculationLoadingModal: React.FC<CalculationLoadingModalProps> = (
         service === "arazi"
           ? "Tarım ve Orman Bakanlığı toprak verimliliği ve rekolte endeksleri inceleniyor..."
           : service === "arsa"
-          ? "Belediye imar planı ve KAKS / TAKS inşaat hakları çözümleniyor..."
+          ? "Belediye imar planı ve resmi kadastro kayıtları çözümleniyor..."
           : "TCMB EVDS Konut Fiyat Endeksi ve Hedonik Fiyat Modeli çalıştırılıyor..."
       );
     }, 600);

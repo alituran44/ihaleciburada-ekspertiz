@@ -18,10 +18,10 @@ const outfit = Outfit({
 export const metadata: Metadata = {
   title: "İhaleciBurada Ekspertiz — Arsa İmar Fizibilitesi ve Değerleme Raporu",
   description: "Arsa satanlar, emlak danışmanları ve ihale katılımcıları için 3 dakikada kapsamlı imar hakları, yapılaşma kapasitesi, maliyet ve değerleme fizibilite raporu.",
-  keywords: "arsa ekspertiz, arsa değerleme, ihale fizibilitesi, imar durumu sorgulama, kaks emsal hesabı, kat karşılığı hesaplama, ihaleciburada",
+  keywords: "arsa ekspertiz, arsa değerleme, ihale fizibilitesi, imar durumu sorgulama, kat karşılığı hesaplama, ihaleciburada",
   openGraph: {
     title: "İhaleciBurada Ekspertiz — Profesyonel Arsa & Gayrimenkul Yatırım Raporu",
-    description: "TKGM uyumlu parsel geometrisi, KAKS/TAKS yapılaşma hakları, inşaat maliyeti ve piyasa değerleme bandı.",
+    description: "TKGM uyumlu parsel geometrisi, resmi kadastro verileri, inşaat maliyeti ve piyasa değerleme bandı.",
     url: "https://ekspertiz.ihaleciburada.com",
     siteName: "İhaleciBurada",
     locale: "tr_TR",

@@ -67,9 +67,9 @@ export const WhatsAppShareModal: React.FC<WhatsAppShareModalProps> = ({
     : `*İHALECİBURADA ARSA EKSPERTİZ & FİZİBİLİTE ÖZETİ*
 📍 *Konum:* ${input.city} / ${input.district} / ${input.neighborhood}
 📌 *Ada/Parsel:* Ada ${input.ada}, Parsel ${input.parsel}
-📐 *Tapu Alanı:* ${formatNumber(input.areaM2)} m² (Net İnşaat: ${formatNumber(calc.netAreaM2)} m²)
-🏗️ *İmar:* ${input.zoningType.toUpperCase()} | Emsal (KAKS): ${input.kaks} | TAKS: ${input.taks} | ${input.maxFloors} Kat
-🏢 *Satılabilir Alan:* ${formatNumber(calc.totalSellableGrossM2)} m² (~${calc.estimatedUnitCount} Bağımsız Bölüm)
+📐 *Tapu Alanı:* ${formatNumber(input.areaM2)} m²
+🏛️ *İmar Durumu:* İlgili ilçe belediyesi imar biriminden resmi imar çapı belgesi alınmalıdır.
+📋 *Şerh / Takyidat:* Tapu Sicil Müdürlüğü'nden alıcı teyidiyle sorulmalıdır.
 
 💰 *FİNANSAL DEĞERLEME:*
 • İstenen / Başlangıç Fiyatı: ${formatTL(input.askedPriceTL)}
