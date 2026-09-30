@@ -1881,6 +1881,7 @@ export default function Home() {
         parcelText={`${parcelData.city}, ${parcelData.district}, ${parcelData.neighborhood || "Merkez"}, ${parcelData.ada || "48507"} Ada, ${parcelData.parsel || "1"} Parsel`}
         marketValueTL={calculation.fairMarketValueTL || 7900000}
         areaM2={parcelData.areaM2 || 110}
+        comparables={parcelData.comparables}
         formData={{
           service: parcelData.category,
           city: parcelData.city,

@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { ValuationFormData } from "./valuation/types";
 import { ReportPagesContent } from "./ReportPagesContent";
+import { ComparableListing } from "@/types";
 
 interface ElectronicReportModalProps {
   isOpen: boolean;
@@ -25,6 +26,7 @@ interface ElectronicReportModalProps {
   parcelText?: string;
   marketValueTL?: number;
   areaM2?: number;
+  comparables?: ComparableListing[];
 }
 
 export const ElectronicReportModal: React.FC<ElectronicReportModalProps> = ({
@@ -37,6 +39,7 @@ export const ElectronicReportModal: React.FC<ElectronicReportModalProps> = ({
   parcelText,
   marketValueTL,
   areaM2,
+  comparables,
 }) => {
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState<boolean>(false);
@@ -112,6 +115,7 @@ export const ElectronicReportModal: React.FC<ElectronicReportModalProps> = ({
     effectiveTitle,
     formData,
     uploadedPhotos: formData?.uploadedPhotos,
+    comparables,
   };
 
   const handlePrint = () => {
