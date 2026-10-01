@@ -124,6 +124,26 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [showLayerMenu, setShowLayerMenu] = useState<boolean>(false);
   const [parcelNotice, setParcelNotice] = useState<string | null>(null);
+  const [mapLayerType, setMapLayerType] = useState<"satellite" | "streets">("satellite");
+
+  const handleSwitchLayer = (type: "satellite" | "streets") => {
+    setMapLayerType(type);
+    if (!mapInstanceRef.current || !tileLayerRef.current) return;
+    const L = (window as any).L;
+    if (!L) return;
+
+    mapInstanceRef.current.removeLayer(tileLayerRef.current);
+    const newUrl = type === "satellite"
+      ? "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"
+      : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+
+    const newLayer = L.tileLayer(newUrl, {
+      maxZoom: type === "satellite" ? 21 : 19,
+      attribution: type === "satellite" ? '© Google Uydu • TKGM Kadastro' : '© OpenStreetMap • İhaleciBurada GIS',
+    }).addTo(mapInstanceRef.current);
+
+    tileLayerRef.current = newLayer;
+  };
 
   const handleZoomIn = () => {
     if (mapInstanceRef.current) {
@@ -832,11 +852,14 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
     // Katman Gruplarını Haritaya Ekle
     parcelLayerGroupRef.current = L.layerGroup().addTo(map);
 
-    // Tile Katmanı: KULLANICININ İSTEDİĞİ GİBİ SADECE SOKAK GÖRÜNTÜSÜ (OpenStreetMap)
-    const tileUrl = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
-    tileLayerRef.current = L.tileLayer(tileUrl, {
-      maxZoom: 19,
-      attribution: '© OpenStreetMap • İhaleciBurada GIS',
+    // Tile Katmanı (Varsayılan Uydu Hibrit veya Sokak)
+    const initialTileUrl = mapLayerType === "satellite"
+      ? "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"
+      : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+
+    tileLayerRef.current = L.tileLayer(initialTileUrl, {
+      maxZoom: mapLayerType === "satellite" ? 21 : 19,
+      attribution: mapLayerType === "satellite" ? '© Google Uydu • TKGM Kadastro' : '© OpenStreetMap • İhaleciBurada GIS',
     }).addTo(map);
 
     // =====================================================================
@@ -1169,7 +1192,7 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
 
         {/* SAĞ KENAR DİKEY YÜZEN ARAÇ ÇUBUĞU (TAPUSOR DİZAYNI) */}
         <div className="absolute top-4 right-3 z-[450] flex flex-col items-center gap-1.5 select-none pointer-events-auto">
-          {/* Katman Göstergesi: Sokak Haritası */}
+          {/* Katman Göstergesi: Uydu & Sokak Haritası */}
           <div className="relative">
             <button
               type="button"
@@ -1177,24 +1200,60 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
               className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shadow-lg border transition cursor-pointer ${
                 showLayerMenu ? "bg-[#0B1E3B] text-amber-400 border-amber-500/40" : "bg-white hover:bg-slate-50 text-slate-700 border-slate-200"
               }`}
-              title="Aktif Katman: Sokak Haritası (Net Kadastro Yolları)"
+              title={mapLayerType === "satellite" ? "Aktif Katman: Uydu Görünümü" : "Aktif Katman: Sokak Haritası"}
             >
               <Layers className="w-4 h-4" />
             </button>
 
             {showLayerMenu && (
-              <div className="absolute right-12 top-0 bg-slate-900 text-white border border-slate-700 rounded-xl shadow-2xl p-2.5 w-48 space-y-1.5 z-50 text-xs font-bold animate-in fade-in zoom-in-95 duration-150">
+              <div className="absolute right-12 top-0 bg-slate-900 text-white border border-slate-700 rounded-xl shadow-2xl p-2.5 w-52 space-y-2 z-50 text-xs font-bold animate-in fade-in zoom-in-95 duration-150">
                 <div className="text-[10px] text-slate-400 px-1 uppercase tracking-wider font-mono">
-                  Aktif Katman
+                  Harita Katmanı Seçimi
                 </div>
-                <div className="w-full text-left px-2.5 py-1.5 rounded-lg bg-amber-500 text-slate-950 font-black flex items-center justify-between shadow-xs">
-                  <span className="flex items-center gap-1.5">
+
+                {/* 1. UYDU GÖRÜNÜMÜ */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleSwitchLayer("satellite");
+                    setShowLayerMenu(false);
+                  }}
+                  className={`w-full text-left px-2.5 py-2 rounded-lg font-black flex items-center justify-between transition cursor-pointer ${
+                    mapLayerType === "satellite"
+                      ? "bg-amber-500 text-slate-950 shadow-xs"
+                      : "bg-slate-800 text-slate-200 hover:bg-slate-700"
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <span>🛰️</span>
+                    <span>Uydu Görünümü</span>
+                  </span>
+                  {mapLayerType === "satellite" && <span className="text-[11px] font-black">✓</span>}
+                </button>
+                <div className="text-[9px] text-slate-400 px-1 leading-tight -mt-1">
+                  Gerçek arazi, binalar ve Google hibrit uydu görüntüsü.
+                </div>
+
+                {/* 2. SOKAK HARİTASI */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleSwitchLayer("streets");
+                    setShowLayerMenu(false);
+                  }}
+                  className={`w-full text-left px-2.5 py-2 rounded-lg font-black flex items-center justify-between transition cursor-pointer ${
+                    mapLayerType === "streets"
+                      ? "bg-amber-500 text-slate-950 shadow-xs"
+                      : "bg-slate-800 text-slate-200 hover:bg-slate-700"
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
                     <span>🛣️</span>
                     <span>Sokak Haritası</span>
                   </span>
-                  <span className="text-[11px] font-black">✓</span>
-                </div>
-                <div className="text-[9.5px] text-slate-400 px-1 font-normal leading-tight">
+                  {mapLayerType === "streets" && <span className="text-[11px] font-black">✓</span>}
+                </button>
+                <div className="text-[9px] text-slate-400 px-1 leading-tight -mt-1">
                   Tüm sokak, cadde ve resmi kadastro yolları nettir.
                 </div>
               </div>

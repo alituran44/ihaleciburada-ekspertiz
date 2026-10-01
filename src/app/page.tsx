@@ -7,7 +7,6 @@ import { ValuationWizard } from "@/components/ValuationWizard";
 import { FeasibilityPreview } from "@/components/FeasibilityPreview";
 import { ReportView } from "@/components/ReportView";
 import { WhatsAppShareModal } from "@/components/WhatsAppShareModal";
-import { EndeksaSidebar } from "@/components/EndeksaSidebar";
 import { PriceTrendChart } from "@/components/PriceTrendChart";
 import { InvestmentScoreCard } from "@/components/InvestmentScoreCard";
 import dynamic from "next/dynamic";
@@ -1053,27 +1052,8 @@ export default function Home() {
           />
         </main>
       ) : (
-        /* 4. ENDEKSA İKİYE BÖLÜNMÜŞ (SPLIT-SCREEN) BÖLGEYİ İNCELE ALANI */
-        <div className="flex-1 flex flex-row overflow-hidden">
-          
-          {/* Sol Kenar Çubuğu (Icon Sidebar) */}
-          <EndeksaSidebar
-            activeTab={activeTab === "endeks" && subTab === "deger" ? "degerleme" : activeTab}
-            onTabChange={(tab) => {
-              if (tab === "degerleme") {
-                setActiveTab("endeks");
-                setSubTab("deger");
-              } else {
-                setActiveTab(tab as any);
-                if (tab === "endeks") setSubTab("rayic");
-              }
-            }}
-            category={parcelData.category}
-            onCategoryChange={handleCategorySwitch}
-          />
-
-          {/* İkili Çalışma Alanı: Harita (Varsayılan Solda) + Değerleme & Analiz Paneli (Sağda) */}
-          <div className="flex-1 flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden">
+        /* 4. ÇALIŞMA ALANI: Harita (Varsayılan Solda) + Değerleme & Analiz Paneli (Sağda) */
+        <div className="flex-1 flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden">
             
             {/* DEĞERLEME & ANALİZ PANELİ */}
             <div className={`w-full lg:w-[420px] xl:w-[460px] shrink-0 lg:h-[calc(100vh-64px)] overflow-y-auto p-3 sm:p-5 space-y-4 bg-white relative z-10 ${
@@ -2024,7 +2004,6 @@ export default function Home() {
             </div>
 
           </div>
-        </div>
       )}
 
       {/* WhatsApp Paylaşım Modalı */}
