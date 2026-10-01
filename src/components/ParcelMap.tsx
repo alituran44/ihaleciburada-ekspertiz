@@ -767,17 +767,18 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
 
     const compsToRender = filter === "all" ? localGeneratedComps : localGeneratedComps.filter((c) => c.type === filter);
     compsToRender.forEach((comp) => {
+      const isIhaleci = comp.source?.toLowerCase().includes("ihaleciburada");
       const isSatilik = comp.type === "satilik";
-      const badgeBg = isSatilik ? "#059669" : "#2563EB";
-      const priceLabel = formatShortPrice(comp.priceTL);
+      const badgeBg = isIhaleci ? "#D97706" : (isSatilik ? "#059669" : "#2563EB");
+      const priceLabel = `${isIhaleci ? "🏛️ " : ""}${formatShortPrice(comp.priceTL)}`;
       const typeLabel = isSatilik ? "Satılık" : "Kiralık";
 
       const compIcon = L.divIcon({
         className: "leaflet-comp-pin",
         html: `
           <div style="position: relative; display: flex; flex-direction: column; align-items: center; transform: translate(-50%, -100%); cursor: pointer;">
-            <div style="background: ${badgeBg}; color: #FFFFFF; font-weight: 800; font-size: 10px; padding: 3px 8px; border-radius: 12px; border: 1.5px solid #FFFFFF; box-shadow: 0 3px 10px rgba(0,0,0,0.25); white-space: nowrap; font-family: sans-serif;">
-              ${priceLabel}
+            <div style="background: ${badgeBg}; color: #FFFFFF; font-weight: 800; font-size: 10px; padding: 3px 8px; border-radius: 12px; border: 1.5px solid #FFFFFF; box-shadow: 0 3px 10px rgba(0,0,0,0.25); white-space: nowrap; font-family: sans-serif; display: flex; align-items: center; gap: 3px;">
+              <span>${priceLabel}</span>
             </div>
             <div style="width: 0; height: 0; border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 5px solid ${badgeBg};"></div>
           </div>

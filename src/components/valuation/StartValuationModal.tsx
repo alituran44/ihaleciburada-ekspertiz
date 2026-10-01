@@ -170,9 +170,9 @@ export const StartValuationModal: React.FC<StartValuationModalProps> = ({
     lng: 26.3980,
   });
 
-  // 7. İlan Ver Modu Özel Alanları
+  // 7. İlan Ver Modu Özel Alanları (İhaleciBurada Ali Turan Hesabı)
   const [listingPriceTL, setListingPriceTL] = useState<number>(9425000);
-  const [contactName, setContactName] = useState<string>("Hasan Yıldırım");
+  const [contactName, setContactName] = useState<string>("Ali Turan");
   const [contactPhone, setContactPhone] = useState<string>("0532 000 00 00");
   const [listingTitle, setListingTitle] = useState<string>("");
   const [isListingPublishedSuccess, setIsListingPublishedSuccess] = useState<boolean>(false);
@@ -667,9 +667,34 @@ export const StartValuationModal: React.FC<StartValuationModalProps> = ({
           {/* İLAN VER MODU ÖZEL ALANLARI */}
           {activeMode === "ilan_ver" && (
             <div className="bg-blue-50/70 p-3.5 rounded-xl border border-blue-200 space-y-2.5 animate-in fade-in duration-150">
-              <div className="flex items-center gap-2 text-xs font-black text-blue-900 uppercase">
-                <Tag className="w-4 h-4 text-blue-600" />
-                <span>İlan Yayın Bilgileri</span>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs font-black text-blue-900 uppercase">
+                  <Tag className="w-4 h-4 text-blue-600" />
+                  <span>İlan Yayın Bilgileri</span>
+                </div>
+                <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-black border border-blue-300">
+                  İhaleciBurada Portföyü
+                </span>
+              </div>
+
+              {/* İhaleciBurada Bağlı Hesap Rozeti */}
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-white border border-blue-200 shadow-2xs">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-full bg-[#0B1E3B] text-amber-400 border border-amber-500/40 flex items-center justify-center text-xs font-black shrink-0">
+                    AT
+                  </div>
+                  <div>
+                    <div className="text-xs font-extrabold text-slate-900 flex items-center gap-1.5">
+                      <span>Yayıncı Hesap: <strong>Ali Turan</strong></span>
+                      <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 border border-amber-300 font-bold">Pro Profil</span>
+                    </div>
+                    <div className="text-[10.5px] text-slate-500">İlanınız doğrudan İhaleciBurada kurumsal hesabınızdan yayınlanacaktır</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-200 shrink-0">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                  <span>Bağlı Hesap</span>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
@@ -695,7 +720,7 @@ export const StartValuationModal: React.FC<StartValuationModalProps> = ({
                     value={contactName}
                     onChange={(e) => setContactName(e.target.value)}
                     required
-                    placeholder="Ad Soyad"
+                    placeholder="Ali Turan"
                     className="w-full px-2.5 py-1.5 bg-white border border-blue-300 rounded-lg text-xs font-bold text-slate-900 outline-none focus:border-blue-600"
                   />
                 </div>
@@ -1302,7 +1327,7 @@ export const StartValuationModal: React.FC<StartValuationModalProps> = ({
           {isListingPublishedSuccess && (
             <div className="p-3 bg-emerald-50 border border-emerald-300 rounded-xl flex items-center gap-2 text-emerald-800 text-xs font-bold animate-in zoom-in-95">
               <Check className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>✓ İlanınız başarıyla İhaleciBurada veritabanına eklendi ve haritada yayınlandı!</span>
+              <span>✓ İlanınız İhaleciBurada hesabınızdan (Ali Turan) başarıyla yayınlandı ve haritada listelendi!</span>
             </div>
           )}
 
@@ -1335,7 +1360,7 @@ export const StartValuationModal: React.FC<StartValuationModalProps> = ({
               ) : activeMode === "ilan_ver" ? (
                 <>
                   <PlusCircle className="w-4 h-4" />
-                  <span>İlanı İhaleciBurada&apos;da Yayınla</span>
+                  <span>İhaleciBurada Hesabından İlanı Yayınla</span>
                 </>
               ) : activeMode === "emlak_bul" || mapAction === "ilanlari_bul" ? (
                 <>

@@ -238,20 +238,20 @@ export default function Home() {
 
     setActiveTab("endeks");
 
-    // İlan ver moduysa anlık olarak yerel listeye ve harita emsal havuzuna ekle
+    // İlan ver moduysa anlık olarak yerel listeye ve harita emsal havuzuna ekle (İhaleciBurada Hesabı)
     if (payload.mode === "ilan_ver" && payload.listingPriceTL) {
       const isRental = payload.transactionType === "kiralik" || payload.transactionType === "devren_kiralik";
       const newCustomListing: ComparableListing = {
         id: `user-listing-${Date.now()}`,
-        title: payload.listingTitle || `${payload.neighborhood || payload.district} İhaleciBurada Portföy İlanı`,
+        title: payload.listingTitle || `${payload.neighborhood || payload.district} • İhaleciBurada Portföy İlanı`,
         category: cat,
         type: (isRental ? "kiralik" : "satilik") as "satilik" | "kiralik",
         areaM2: payload.areaM2,
         pricePerM2TL: Math.round(payload.listingPriceTL / (payload.areaM2 || 1)),
         priceTL: payload.listingPriceTL,
-        distanceMeters: 50,
+        distanceMeters: 20,
         coordinates: newCoords || parcelData.coordinates || { lat: 40.0985, lng: 26.3980 },
-        source: "Bölge Emsali",
+        source: "İhaleciBurada (Ali Turan)",
         roomCount: isRes ? "3+1" : undefined,
         zoningType: isRes ? undefined : payload.tapuNiteligi,
         date: "Bugün",
@@ -261,6 +261,8 @@ export default function Home() {
         comparables: [newCustomListing, ...(prev.comparables || [])],
       }));
       setFocusedCompId(newCustomListing.id);
+      setLocationToast("🎉 İlanınız İhaleciBurada hesabınızdan (Ali Turan) başarıyla yayınlandı ve haritada listelendi!");
+      setTimeout(() => setLocationToast(null), 6000);
     }
 
     // Arka planda girilen il, ilçe ve köy/mahalle için anlık emsal ve piyasa verisini güncelle
@@ -2525,13 +2527,17 @@ export default function Home() {
               )}
 
               {/* 3. FOTODAKİ KENDİ İLANINIZI VEYA PORTFÖYÜNÜZÜ EKLEYİN KARTI (EN SON KISIM) */}
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-4 text-center space-y-2 mt-4 shadow-xs">
+              <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-amber-50 border border-blue-200 rounded-2xl p-4 text-center space-y-2 mt-4 shadow-xs">
                 <div className="text-xs font-black text-blue-950 font-heading">
                   Kendi İlanınızı veya Portföyünüzü Ekleyin
                 </div>
                 <p className="text-[11px] text-blue-800 leading-relaxed">
-                  Bu bölgedeki gayrimenkulünüzü veya ihale portföyünüzü ekleyin; haritada ve değerleme havuzunda anında listelensin.
+                  Bu bölgedeki gayrimenkulünüzü veya ihale portföyünüzü ekleyin; <strong>İhaleciBurada</strong> hesabınızdan haritada ve değerleme havuzunda anında listelensin.
                 </p>
+                <div className="flex items-center justify-center gap-1.5 text-[10.5px] text-blue-900 font-bold bg-white/90 py-1 px-3 rounded-full border border-blue-200/80 max-w-fit mx-auto shadow-2xs">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  <span>Bağlı Hesap: <strong>Ali Turan</strong> (İhaleciBurada Pro)</span>
+                </div>
                 <button
                   type="button"
                   onClick={() => {
@@ -2541,7 +2547,7 @@ export default function Home() {
                   className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black shadow-xs transition flex items-center justify-center gap-1.5 mx-auto cursor-pointer active:scale-95"
                 >
                   <PlusCircle className="w-4 h-4" />
-                  <span>İlan Ver / Portföy Ekle</span>
+                  <span>İhaleciBurada Hesabından İlan Ver / Portföy Ekle</span>
                 </button>
               </div>
             </div>

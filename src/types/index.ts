@@ -165,7 +165,7 @@ export interface ComparableListing {
   pricePerM2TL: number;
   distanceMeters: number;
   coordinates: { lat: number; lng: number };
-  source: "Sahibinden" | "Hepsiemlak" | "Emlakjet" | "Bölge Emsali";
+  source: "Sahibinden" | "Hepsiemlak" | "Emlakjet" | "Bölge Emsali" | "İhaleciBurada" | "İhaleciBurada (Ali Turan)" | (string & {});
   roomCount?: string;
   zoningType?: string;
   date: string;
