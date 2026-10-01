@@ -1035,20 +1035,26 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
   useEffect(() => {
     if (!mapInstanceRef.current || !focusTrigger) return;
     mapInstanceRef.current.flyTo([lat, lng], 17, { duration: 1.2 });
+    
+    const effAda = (ada && ada.trim()) ? ada.trim() : activeAda;
+    const effParsel = (parsel && parsel.trim()) ? parsel.trim() : activeParsel;
+    const effDist = district || activeDistrict;
+    const effNeigh = neighborhood || activeNeighborhood;
+
     drawParcelHoneycomb(
       lat,
       lng,
       unitM2Price,
       city,
-      activeDistrict,
-      activeNeighborhood || undefined,
-      activeAda,
-      activeParsel,
+      effDist,
+      effNeigh || undefined,
+      effAda,
+      effParsel,
       areaM2
     );
-    const adaParselDesc = (activeAda && activeParsel) ? `Ada ${activeAda} / Parsel ${activeParsel}` : "Kadastro Parseli";
+    const adaParselDesc = (effAda && effParsel) ? `Ada ${effAda} / Parsel ${effParsel}` : "Kadastro Parseli";
     const areaDesc = areaM2 ? ` • ${formatArea(areaM2)} m²` : "";
-    setParcelNotice(`🏛️ ${activeDistrict} / ${city}${activeNeighborhood ? ` • ${activeNeighborhood}` : ""} • ${adaParselDesc}${areaDesc} • ${unitM2Price.toLocaleString("tr-TR")} ₺/m²`);
+    setParcelNotice(`🏛️ ${effDist} / ${city}${effNeigh ? ` • ${effNeigh}` : ""} • ${adaParselDesc}${areaDesc} • ${unitM2Price.toLocaleString("tr-TR")} ₺/m²`);
   }, [focusTrigger]);
 
   // 2. Koordinat veya ada/parsel değiştiğinde haritayı ve bal peteğini güncelle
@@ -1066,18 +1072,23 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
       map.flyTo([lat, lng], 17, { duration: 0.8 });
     }
 
+    const effAda = (ada && ada.trim()) ? ada.trim() : activeAda;
+    const effParsel = (parsel && parsel.trim()) ? parsel.trim() : activeParsel;
+    const effDist = district || activeDistrict;
+    const effNeigh = neighborhood || activeNeighborhood;
+
     drawParcelHoneycomb(
       lat,
       lng,
       unitM2Price,
       city,
-      activeDistrict,
-      activeNeighborhood || undefined,
-      activeAda,
-      activeParsel,
+      effDist,
+      effNeigh || undefined,
+      effAda,
+      effParsel,
       areaM2
     );
-  }, [lat, lng, unitM2Price, city, activeDistrict, activeNeighborhood, searchRadius, activeAda, activeParsel, areaM2]);
+  }, [lat, lng, unitM2Price, city, district, neighborhood, activeDistrict, activeNeighborhood, searchRadius, ada, parsel, activeAda, activeParsel, areaM2]);
 
   // Dışarıdan seçilen ilanı haritada odakla ve popup aç
   useEffect(() => {

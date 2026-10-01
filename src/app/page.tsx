@@ -603,12 +603,30 @@ export default function Home() {
 
       if (cleanNeigh) {
         try {
-          const locRes = await fetch(`/api/location/search?q=${encodeURIComponent(`${cleanNeigh}, ${cleanDist}, ${cleanCity}`)}`);
+          // Önce "Mahallesi" ekli sorgula
+          const locRes = await fetch(`/api/location/search?q=${encodeURIComponent(`${cleanNeigh} Mahallesi, ${cleanDist}, ${cleanCity}`)}`);
           const locData = await locRes.json();
           if (locData.success && locData.results && locData.results.length > 0) {
-            const best = locData.results[0];
-            if (best.lat && best.lng) {
-              resolvedCoords = { lat: Number(best.lat), lng: Number(best.lng) };
+            const matchedInProvince = locData.results.find((r: any) =>
+              r.province && r.province.toLowerCase().includes(cleanCity.toLowerCase())
+            ) || locData.results.find((r: any) =>
+              !r.province || r.province.toLowerCase() === cleanCity.toLowerCase()
+            );
+            if (matchedInProvince && matchedInProvince.lat && matchedInProvince.lng) {
+              resolvedCoords = { lat: Number(matchedInProvince.lat), lng: Number(matchedInProvince.lng) };
+            }
+          }
+          // Bulunamazsa doğrudan mahalle adıyla dene
+          if (!resolvedCoords) {
+            const locRes2 = await fetch(`/api/location/search?q=${encodeURIComponent(`${cleanNeigh}, ${cleanDist}, ${cleanCity}`)}`);
+            const locData2 = await locRes2.json();
+            if (locData2.success && locData2.results && locData2.results.length > 0) {
+              const matchedInProvince2 = locData2.results.find((r: any) =>
+                r.province && r.province.toLowerCase().includes(cleanCity.toLowerCase())
+              );
+              if (matchedInProvince2 && matchedInProvince2.lat && matchedInProvince2.lng) {
+                resolvedCoords = { lat: Number(matchedInProvince2.lat), lng: Number(matchedInProvince2.lng) };
+              }
             }
           }
         } catch (e) {
@@ -616,15 +634,17 @@ export default function Home() {
         }
       }
 
-      // Eğer mahalleyle bulunamadıysa İlçe + İl ile ara
+      // Eğer mahalleyle bulunamadıysa İlçe + İl ile ara (ve kesinlikle aynı ili doğrula)
       if (!resolvedCoords) {
         try {
           const locRes = await fetch(`/api/location/search?q=${encodeURIComponent(`${cleanDist}, ${cleanCity}`)}`);
           const locData = await locRes.json();
           if (locData.success && locData.results && locData.results.length > 0) {
-            const best = locData.results[0];
-            if (best.lat && best.lng) {
-              resolvedCoords = { lat: Number(best.lat), lng: Number(best.lng) };
+            const matchedInProvince = locData.results.find((r: any) =>
+              r.province && r.province.toLowerCase().includes(cleanCity.toLowerCase())
+            ) || (locData.results[0]?.province?.toLowerCase() === cleanCity.toLowerCase() ? locData.results[0] : null);
+            if (matchedInProvince && matchedInProvince.lat && matchedInProvince.lng) {
+              resolvedCoords = { lat: Number(matchedInProvince.lat), lng: Number(matchedInProvince.lng) };
             }
           }
         } catch (e) {}
@@ -649,14 +669,14 @@ export default function Home() {
       const resolvedLand = !isRes ? preciseVal.pricePerM2TL : parcelData.estimatedLandM2PriceTL;
       const resolvedUnit = isRes ? preciseVal.pricePerM2TL : parcelData.estimatedUnitSaleM2PriceTL;
 
-      // 3. State güncelle
+      // 3. State güncelle (ada ve parsel hiçbir zaman silinmez veya ezilmez!)
       setParcelData((prev) => ({
         ...prev,
         city: cleanCity,
         district: cleanDist,
         neighborhood: cleanNeigh,
-        ada: cleanAda,
-        parsel: cleanParsel,
+        ada: cleanAda || prev.ada,
+        parsel: cleanParsel || prev.parsel,
         areaM2: currentArea,
         coordinates: resolvedCoords!,
         estimatedLandM2PriceTL: resolvedLand,
@@ -700,6 +720,39 @@ export default function Home() {
     return ["Merkez"];
   }, [parcelData.city]);
 
+  // Seçili il ve ilçeye ait mahalle/köy listesi (Türkiye Geneli 50.517 Mahalle)
+  const [neighborhoodNames, setNeighborhoodNames] = useState<string[]>([]);
+  const [isLoadingNeighborhoods, setIsLoadingNeighborhoods] = useState<boolean>(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    const currentCity = parcelData.city || "Çanakkale";
+    const currentDist = parcelData.district || "Merkez";
+
+    setIsLoadingNeighborhoods(true);
+    fetch(`/api/location/neighborhoods?province=${encodeURIComponent(currentCity)}&district=${encodeURIComponent(currentDist)}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (!isMounted) return;
+        if (data.success && Array.isArray(data.neighborhoods)) {
+          setNeighborhoodNames(data.neighborhoods);
+        } else {
+          setNeighborhoodNames([]);
+        }
+      })
+      .catch((err) => {
+        console.warn("Mahalle yükleme hatası:", err);
+        if (isMounted) setNeighborhoodNames([]);
+      })
+      .finally(() => {
+        if (isMounted) setIsLoadingNeighborhoods(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [parcelData.city, parcelData.district]);
+
   // Hızlı Adres Değişikliği (İl, İlçe, Mahalle) ve Harita / Emsal Senkronizasyonu
   const handleAddressChange = useCallback(async (fields: { city?: string; district?: string; neighborhood?: string }) => {
     const updatedCity = fields.city !== undefined ? fields.city : parcelData.city;
@@ -720,11 +773,16 @@ export default function Home() {
       let newCoords = getDistrictCoordinates(updatedCity, updatedDistrict);
       if (updatedNeigh && updatedNeigh.trim()) {
         try {
-          const locRes = await fetch(`/api/location/search?q=${encodeURIComponent(`${updatedNeigh.trim()}, ${updatedDistrict}, ${updatedCity}`)}`);
+          const locRes = await fetch(`/api/location/search?q=${encodeURIComponent(`${updatedNeigh.trim()} Mahallesi, ${updatedDistrict}, ${updatedCity}`)}`);
           const locData = await locRes.json();
           if (locData.success && locData.results && locData.results.length > 0) {
-            const best = locData.results[0];
-            if (best.lat && best.lng) {
+            const matchedInProvince = locData.results.find((r: any) =>
+              r.province && r.province.toLowerCase().includes(updatedCity.toLowerCase())
+            ) || locData.results.find((r: any) =>
+              !r.province || r.province.toLowerCase() === updatedCity.toLowerCase()
+            );
+            const best = matchedInProvince || (locData.results[0]?.province?.toLowerCase() === updatedCity.toLowerCase() ? locData.results[0] : null);
+            if (best && best.lat && best.lng) {
               newCoords = { lat: Number(best.lat), lng: Number(best.lng) };
             }
           }
@@ -759,8 +817,8 @@ export default function Home() {
           district: updatedDistrict,
           neighborhood: updatedNeigh,
           coordinates: finalCoords,
-          ada: cad.ada || prev.ada,
-          parsel: cad.parsel || prev.parsel,
+          ada: (prev.ada && prev.ada.trim()) ? prev.ada : (cad.ada || ""),
+          parsel: (prev.parsel && prev.parsel.trim()) ? prev.parsel : (cad.parsel || ""),
           estimatedLandM2PriceTL: resolvedLand,
           estimatedUnitSaleM2PriceTL: resolvedUnit,
           contractorSharePercent: resData.contractorSharePercent ?? prev.contractorSharePercent,
@@ -777,8 +835,8 @@ export default function Home() {
           district: updatedDistrict,
           neighborhood: updatedNeigh,
           coordinates: finalCoords,
-          ada: cad.ada || prev.ada,
-          parsel: cad.parsel || prev.parsel,
+          ada: (prev.ada && prev.ada.trim()) ? prev.ada : (cad.ada || ""),
+          parsel: (prev.parsel && prev.parsel.trim()) ? prev.parsel : (cad.parsel || ""),
           estimatedLandM2PriceTL: resolvedLand,
           estimatedUnitSaleM2PriceTL: resolvedUnit,
         }));
@@ -1692,42 +1750,37 @@ export default function Home() {
 
                     {/* MAHALLE / KÖY */}
                     <div>
-                      <label className="text-[9px] font-bold text-slate-300 uppercase block mb-0.5">
-                        Mahalle / Köy
-                      </label>
-                      <input
-                        type="text"
+                      <div className="flex items-center justify-between mb-0.5">
+                        <label className="text-[9px] font-bold text-slate-300 uppercase block">
+                          Mahalle / Köy
+                        </label>
+                        {isLoadingNeighborhoods && (
+                          <span className="text-[8px] text-amber-400 font-mono animate-pulse">Yükleniyor...</span>
+                        )}
+                      </div>
+                      <select
                         value={parcelData.neighborhood || ""}
                         onChange={(e) => {
                           const newNeigh = e.target.value;
-                          setParcelData((prev) => {
-                            const val = getDistrictValuation(prev.city, prev.district, 45000, {
-                              category: prev.category,
-                              subCategory: prev.subCategory,
-                              neighborhood: newNeigh,
-                              ada: prev.ada,
-                              parsel: prev.parsel,
-                              areaM2: prev.areaM2,
-                            });
-                            const isRes = prev.category === "konut";
-                            return {
-                              ...prev,
-                              neighborhood: newNeigh,
-                              estimatedLandM2PriceTL: !isRes ? val.pricePerM2TL : prev.estimatedLandM2PriceTL,
-                              estimatedUnitSaleM2PriceTL: isRes ? val.pricePerM2TL : prev.estimatedUnitSaleM2PriceTL,
-                            };
-                          });
+                          handleAddressChange({ neighborhood: newNeigh });
                         }}
-                        onBlur={() => handleAddressChange({ neighborhood: parcelData.neighborhood })}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            handleAddressChange({ neighborhood: parcelData.neighborhood });
-                          }
-                        }}
-                        placeholder="Örn: Cevatpaşa"
-                        className="w-full bg-slate-900/95 border border-slate-700 focus:border-amber-400 rounded-lg px-2 py-1.5 text-xs font-bold text-white outline-none placeholder:text-slate-500 truncate"
-                        title="Mahalle veya köy adını düzenleyip Enter'a basınız"
-                      />
+                        className="w-full bg-slate-900/95 border border-slate-700 focus:border-amber-400 rounded-lg px-2 py-1.5 text-xs font-bold text-white outline-none cursor-pointer truncate"
+                        title="Mahalle veya köy seçiniz"
+                      >
+                        <option value="" className="bg-slate-900 text-slate-400">
+                          {isLoadingNeighborhoods ? "Yükleniyor..." : "Mahalle / Köy Seçin"}
+                        </option>
+                        {parcelData.neighborhood && !neighborhoodNames.includes(parcelData.neighborhood) && (
+                          <option value={parcelData.neighborhood} className="bg-slate-900 text-amber-300">
+                            {parcelData.neighborhood}
+                          </option>
+                        )}
+                        {neighborhoodNames.map((n) => (
+                          <option key={n} value={n} className="bg-slate-900 text-white">
+                            {n}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   </div>
                 </div>
