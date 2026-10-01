@@ -114,8 +114,16 @@ export const REAL_ESTATE_CATEGORIES: MainCategoryConfig[] = [
 export const TRANSACTION_TYPES = [
   { id: "satilik", label: "Satılık" },
   { id: "kiralik", label: "Kiralık" },
+  { id: "kat_karsiligi", label: "Kat Karşılığı" },
   { id: "devren_satilik", label: "Devren Satılık" },
   { id: "devren_kiralik", label: "Devren Kiralık" },
+] as const;
+
+export const DEED_STATUS_OPTIONS = [
+  { id: "mustakil", label: "Müstakil" },
+  { id: "hisseli", label: "Hisseli" },
+  { id: "kat_mulkiyeti", label: "Kat Mülkiyeti" },
+  { id: "kat_irtifaki", label: "Kat İrtifakı" },
 ] as const;
 
 export const OFFER_METHODS = [
@@ -126,7 +134,7 @@ export const OFFER_METHODS = [
 
 export const LISTING_OWNER_TYPES = [
   { id: "sahibinden", label: "Sahibinden" },
-  { id: "emlak_ofisi", label: "Emlak Ofisinden" },
-  { id: "insaat_firmasi", label: "İnşaat Firmasından" },
+  { id: "emlak_ofisi", label: "Emlak Ofisi" },
+  { id: "insaat_firmasi", label: "İnşaat Firması" },
   { id: "kurum", label: "Kurumdan" },
 ] as const;

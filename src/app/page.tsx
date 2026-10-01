@@ -43,6 +43,7 @@ const PROVINCE_NAMES = Object.keys(TURKEY_PROVINCES_AND_DISTRICTS).sort((a, b) =
 import { 
   REAL_ESTATE_CATEGORIES, 
   TRANSACTION_TYPES, 
+  DEED_STATUS_OPTIONS,
   OFFER_METHODS, 
   LISTING_OWNER_TYPES 
 } from "@/lib/categories";
@@ -234,16 +235,7 @@ export default function Home() {
     }));
     setSearchQuery(`${payload.neighborhood}, ${payload.district}, ${payload.city}`);
 
-    if (payload.mode === "emlak_bul" || payload.mapAction === "ilanlari_bul") {
-      setActiveTab("endeks");
-      setSubTab("rayic");
-    } else if (payload.mode === "ilan_ver") {
-      setActiveTab("endeks");
-      setSubTab("rayic");
-    } else {
-      setActiveTab("endeks");
-      setSubTab("deger");
-    }
+    setActiveTab("endeks");
 
     // İlan ver moduysa anlık olarak yerel listeye ve harita emsal havuzuna ekle
     if (payload.mode === "ilan_ver" && payload.listingPriceTL) {
@@ -495,9 +487,8 @@ export default function Home() {
     setIsValuating(true);
     setValuationNotice(null);
 
-    // Sekmeyi doğrudan Değerleme (deger) paneline geçir
+    // Sekmeyi doğrudan Değerleme paneline geçir
     setActiveTab("endeks");
-    setSubTab("deger");
 
     try {
       const cleanCity = parcelData.city || "Çanakkale";
@@ -1273,10 +1264,9 @@ export default function Home() {
               type="button"
               onClick={() => {
                 setActiveTab("endeks");
-                setSubTab("deger");
               }}
               className={`py-1.5 px-2 transition relative cursor-pointer font-heading font-extrabold whitespace-nowrap shrink-0 ${
-                activeTab === "endeks" && subTab === "deger"
+                activeTab === "endeks"
                   ? "text-blue-600 after:absolute after:bottom-[-16px] after:left-0 after:right-0 after:h-[2.5px] after:bg-blue-600 after:rounded-full"
                   : "text-slate-600 hover:text-slate-900"
               }`}
@@ -1284,20 +1274,19 @@ export default function Home() {
               <span className="hidden sm:inline">Akıllı </span>Değerleme
             </button>
 
-            {/* 2. Harita & Bölge Sekmesi */}
+            {/* 2. İhale & Pey Analizi Sekmesi */}
             <button
               type="button"
               onClick={() => {
-                setActiveTab("endeks");
-                setSubTab("rayic");
+                setActiveTab("ihale");
               }}
               className={`py-1.5 px-2 transition relative cursor-pointer font-heading font-extrabold whitespace-nowrap shrink-0 ${
-                activeTab === "endeks" && subTab !== "deger"
+                activeTab === "ihale"
                   ? "text-blue-600 after:absolute after:bottom-[-16px] after:left-0 after:right-0 after:h-[2.5px] after:bg-blue-600 after:rounded-full"
                   : "text-slate-600 hover:text-slate-900"
               }`}
             >
-              Harita <span className="hidden sm:inline">& Bölge</span>
+              İhale & Pey Analizi
             </button>
 
             {/* 2.5 Harita Solda / Sağda Düzen Değiştirici */}
@@ -1366,7 +1355,6 @@ export default function Home() {
             <div 
               onClick={() => {
                 setActiveTab("endeks");
-                setSubTab("deger");
               }}
               className="flex items-center gap-2 bg-[#0B1E3B] hover:bg-slate-900 text-amber-400 border border-amber-500/30 pl-1.5 pr-3 py-1 rounded-full shadow-xs cursor-pointer select-none transition active:scale-95 shrink-0"
               title="Kullanıcı: Ali Turan (İhaleciBurada Pro Hesap)"
@@ -1412,7 +1400,7 @@ export default function Home() {
 
               {/* RESMİ KADASTRO & AKILLI DEĞERLEME HIZLI GİRİŞ KARTI */}
               <div className="bg-gradient-to-br from-slate-900 via-[#0B1E3B] to-slate-950 text-white p-3.5 rounded-2xl border border-slate-800 shadow-md space-y-3">
-                {/* 1. KADASTRO & AKILLI DEĞERLEME BAŞLIĞI VE İŞLEM TÜRÜ */}
+                {/* 1. KADASTRO & AKILLI DEĞERLEME BAŞLIĞI VE KATEGORİ ROZETİ */}
                 <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
                   <div className="flex items-center gap-2">
                     <div className="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
@@ -1428,70 +1416,209 @@ export default function Home() {
                       </p>
                     </div>
                   </div>
-                  {/* Satılık / Kiralık İşlem Türü Seçimi */}
-                  <div className="flex items-center gap-1 bg-slate-800/90 p-0.5 rounded-lg border border-slate-700 text-[10px] font-bold">
-                    {(["satilik", "kiralik"] as const).map((t) => (
-                      <button
-                        key={t}
-                        type="button"
-                        onClick={() => setParcelData(prev => ({ ...prev, transactionType: t }))}
-                        className={`px-2 py-0.5 rounded-md transition cursor-pointer capitalize ${
-                          (parcelData.transactionType || "satilik") === t
-                            ? "bg-amber-500 text-slate-950 font-black shadow-xs"
-                            : "text-slate-400 hover:text-white"
-                        }`}
-                      >
-                        {t === "satilik" ? "Satılık" : "Kiralık"}
-                      </button>
-                    ))}
+                  {/* Seçili Kategori Rozeti (Görsel 2) */}
+                  <div className="flex items-center gap-1 bg-slate-800/90 px-2.5 py-1 rounded-full border border-amber-500/40 text-amber-300 text-xs font-bold">
+                    <span>📐</span>
+                    <span className="font-extrabold">{REAL_ESTATE_CATEGORIES.find(c => c.id === parcelData.category)?.badge || "Arsa & Arazi"}</span>
                   </div>
                 </div>
 
-                {/* 2. EMLAK ANA KATEGORİ VE ALT KATEGORİ (Kullanıcı Şablonu) */}
-                <div className="space-y-1.5 pb-2 border-b border-slate-800/80">
+                {/* 1. İŞLEM TÜRÜ (Satılık, Kiralık, Kat Karşılığı, Devren Satılık, Devren Kiralık) */}
+                <div className="space-y-1.5 pb-2.5 border-b border-slate-800/80">
                   <div className="flex items-center justify-between">
-                    <label className="text-[10px] font-bold text-slate-300 uppercase flex items-center gap-1 tracking-wide">
-                      <Tag className="w-3 h-3 text-amber-400" />
-                      <span>Emlak Kategorisi</span>
-                    </label>
-                    <span className="text-[9px] text-slate-400 font-medium">6 Ana • 40+ Alt Kategori</span>
+                    <span className="text-[10px] font-bold text-slate-300 uppercase flex items-center gap-1.5 tracking-wide">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                      <span>1. İşlem Türü</span>
+                    </span>
+                    <span className="text-[9px] text-slate-400">Satılık, Kiralık veya Kat Karşılığı</span>
+                  </div>
+                  <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
+                    {TRANSACTION_TYPES.map((t) => {
+                      const isActive = (parcelData.transactionType || "satilik") === t.id;
+                      return (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => setParcelData(prev => ({ ...prev, transactionType: t.id as any }))}
+                          className={`py-1.5 px-1.5 rounded-xl text-xs font-bold transition cursor-pointer text-center active:scale-95 border truncate ${
+                            isActive
+                              ? "bg-amber-500 text-slate-950 border-amber-400 font-black shadow-xs"
+                              : "bg-slate-900/90 text-slate-300 hover:text-white hover:bg-slate-800 border-slate-700/80"
+                          }`}
+                        >
+                          {t.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 2. TAŞINMAZ ANA TÜRÜ (6 Temel Kategori) */}
+                <div className="space-y-1.5 pb-2.5 border-b border-slate-800/80">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-slate-300 uppercase flex items-center gap-1.5 tracking-wide">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                      <span>2. Taşınmaz Ana Türü</span>
+                    </span>
+                    <span className="text-[9px] text-slate-400">6 Temel Kategori</span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                    {REAL_ESTATE_CATEGORIES.map((cat) => {
+                      const isActive = parcelData.category === cat.id;
+                      const icons: Record<string, any> = {
+                        konut: HomeIcon,
+                        arsa: Trees,
+                        ticari: Building2,
+                        bina: Building,
+                        turizm: Compass,
+                        ozel: ShieldCheck,
+                      };
+                      const IconComp = icons[cat.id] || Building;
+                      return (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          onClick={() => handleCategorySwitch(cat.id as PropertyCategory)}
+                          className={`p-2 rounded-xl border text-left transition cursor-pointer active:scale-95 flex items-center gap-2 ${
+                            isActive
+                              ? "bg-amber-500/20 border-amber-400 text-white shadow-xs ring-1 ring-amber-400/40"
+                              : "bg-slate-900/70 border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white"
+                          }`}
+                        >
+                          <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${
+                            isActive ? "bg-amber-500 text-slate-950 font-black" : "bg-slate-800 text-slate-400"
+                          }`}>
+                            <IconComp className="w-3.5 h-3.5" />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-[11px] font-bold truncate leading-tight">
+                              {cat.name}
+                            </div>
+                            <div className="text-[8.5px] text-slate-400">
+                              {cat.subCategories.length} alt tür
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 3. ALT KATEGORİ (Seçili türe göre dinamik) */}
+                <div className="space-y-1.5 pb-2.5 border-b border-slate-800/80">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-slate-300 uppercase flex items-center gap-1.5 tracking-wide">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
+                      <span>3. Alt Kategori ({REAL_ESTATE_CATEGORIES.find(c => c.id === parcelData.category)?.name || "Arsa / Arazi"})</span>
+                    </span>
+                    <span className="text-[9px] text-amber-400 font-mono font-semibold truncate max-w-[140px]">
+                      {parcelData.subCategory || currentSubCategories[0]}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto pr-1">
+                    {currentSubCategories.map((sub) => {
+                      const isActive = (parcelData.subCategory || currentSubCategories[0]) === sub;
+                      return (
+                        <button
+                          key={sub}
+                          type="button"
+                          onClick={() => setParcelData(prev => ({ ...prev, subCategory: sub }))}
+                          className={`px-2.5 py-1 rounded-lg text-[10.5px] font-bold transition cursor-pointer active:scale-95 border ${
+                            isActive
+                              ? "bg-emerald-500/25 border-emerald-400 text-emerald-300 shadow-xs font-black"
+                              : "bg-slate-900/90 text-slate-300 hover:text-white hover:bg-slate-800 border-slate-800"
+                          }`}
+                        >
+                          {sub}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 4. TAPU VE HİSSE DURUMU (Mülkiyet Durumu) */}
+                <div className="space-y-1.5 pb-2.5 border-b border-slate-800/80">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-slate-300 uppercase flex items-center gap-1.5 tracking-wide">
+                      <span className="w-1.5 h-1.5 rounded-full bg-purple-400"></span>
+                      <span>4. Tapu ve Hisse Durumu</span>
+                    </span>
+                    <span className="text-[9px] text-amber-400/90">Mülkiyet durumudur</span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                    {DEED_STATUS_OPTIONS.map((ds) => {
+                      const isActive = (parcelData.deedStatus || "mustakil") === ds.id;
+                      return (
+                        <button
+                          key={ds.id}
+                          type="button"
+                          onClick={() => setParcelData(prev => ({ ...prev, deedStatus: ds.id as any }))}
+                          className={`py-1.5 px-2 rounded-xl text-xs font-bold transition cursor-pointer text-center active:scale-95 border ${
+                            isActive
+                              ? "bg-purple-500/25 border-purple-400 text-purple-300 font-black shadow-xs"
+                              : "bg-slate-900/90 text-slate-300 hover:text-white hover:bg-slate-800 border-slate-800"
+                          }`}
+                        >
+                          {ds.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* TEKLİF / SATIŞ YÖNTEMİ & İLAN VEREN / SATICI TÜRÜ */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pb-2.5 border-b border-slate-800/80">
+                  {/* Teklif / Satış Yöntemi */}
+                  <div className="space-y-1">
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wide block">
+                      Teklif / Satış Yöntemi
+                    </span>
+                    <div className="grid grid-cols-3 gap-1">
+                      {OFFER_METHODS.map((om) => {
+                        const isActive = (parcelData.offerMethod || "sabit_fiyat") === om.id;
+                        return (
+                          <button
+                            key={om.id}
+                            type="button"
+                            onClick={() => setParcelData(prev => ({ ...prev, offerMethod: om.id as any }))}
+                            className={`py-1 px-1 rounded-lg text-[9.5px] font-bold transition cursor-pointer text-center border truncate ${
+                              isActive
+                                ? "bg-amber-500/30 border-amber-400 text-amber-300 font-black"
+                                : "bg-slate-900/90 border-slate-800 text-slate-400 hover:text-white"
+                            }`}
+                            title={om.label}
+                          >
+                            {om.label}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2">
-                    {/* Ana Kategori */}
-                    <div>
-                      <label className="text-[9px] font-bold text-slate-300 uppercase block mb-0.5">
-                        Ana Kategori
-                      </label>
-                      <select
-                        value={parcelData.category}
-                        onChange={(e) => handleCategorySwitch(e.target.value as PropertyCategory)}
-                        className="w-full bg-slate-900/95 border border-slate-700 focus:border-amber-400 rounded-lg px-2 py-1.5 text-xs font-bold text-white outline-none cursor-pointer truncate"
-                      >
-                        {REAL_ESTATE_CATEGORIES.map((cat) => (
-                          <option key={cat.id} value={cat.id} className="bg-slate-900 text-white">
-                            {cat.icon} {cat.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Alt Kategori */}
-                    <div>
-                      <label className="text-[9px] font-bold text-slate-300 uppercase block mb-0.5">
-                        Alt Kategori
-                      </label>
-                      <select
-                        value={parcelData.subCategory || currentSubCategories[0] || ""}
-                        onChange={(e) => setParcelData(prev => ({ ...prev, subCategory: e.target.value }))}
-                        className="w-full bg-slate-900/95 border border-slate-700 focus:border-amber-400 rounded-lg px-2 py-1.5 text-xs font-bold text-white outline-none cursor-pointer truncate"
-                      >
-                        {currentSubCategories.map((sub) => (
-                          <option key={sub} value={sub} className="bg-slate-900 text-white">
-                            {sub}
-                          </option>
-                        ))}
-                      </select>
+                  {/* İlan Veren / Satıcı Türü */}
+                  <div className="space-y-1">
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wide block">
+                      İlan Veren / Satıcı Türü
+                    </span>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-1">
+                      {LISTING_OWNER_TYPES.map((lot) => {
+                        const isActive = (parcelData.listingOwnerType || "sahibinden") === lot.id;
+                        return (
+                          <button
+                            key={lot.id}
+                            type="button"
+                            onClick={() => setParcelData(prev => ({ ...prev, listingOwnerType: lot.id as any }))}
+                            className={`py-1 px-1 rounded-lg text-[9px] font-bold transition cursor-pointer text-center border truncate ${
+                              isActive
+                                ? "bg-emerald-500/30 border-emerald-400 text-emerald-300 font-black"
+                                : "bg-slate-900/90 border-slate-800 text-slate-400 hover:text-white"
+                            }`}
+                            title={lot.label}
+                          >
+                            {lot.label}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
@@ -1928,370 +2055,8 @@ export default function Home() {
                   </div>
                 )}
               </div>
-              
-              {/* İHALECİ BURADA FİLTRE HAPLARI */}
-              <div className="flex flex-wrap items-center gap-2 pb-1 border-b border-slate-200/80">
-                {/* Gayrimenkul: Konut / Arsa */}
-                <button
-                  type="button"
-                  onClick={() => handleCategorySwitch(isResidential ? "arsa" : "konut")}
-                  className="flex items-center gap-1 px-3 py-1 rounded-full bg-amber-50 text-amber-900 border border-amber-200 text-xs font-bold hover:bg-amber-100 transition cursor-pointer"
-                >
-                  <span>Portföy: <strong className="text-amber-950">{isResidential ? "Konut & Daire" : "Arsa & Arazi"}</strong></span>
-                  <ChevronDown className="w-3 h-3 text-amber-600" />
-                </button>
-
-                {/* Segment */}
-                <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold border border-slate-200">
-                  Segment: <strong className="text-slate-900">İhale & Serbest Piyasa</strong>
-                </span>
-
-                {/* Kategori */}
-                <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold border border-slate-200">
-                  Tip: <strong className="text-slate-900">{isResidential ? parcelData.housingType || "Daire" : parcelData.zoningType || "İmar"}</strong>
-                </span>
-
-                {/* Oda / Kat */}
-                {isResidential ? (
-                  <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold border border-slate-200">
-                    Oda: <strong className="text-slate-900">{parcelData.roomCount || "3+1"}</strong>
-                  </span>
-                ) : (
-                  <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold border border-slate-200">
-                    İmar: <strong className="text-slate-900">İlgili Kurumdan Alınmalıdır</strong>
-                  </span>
-                )}
-              </div>
-
-              {/* TAPUSOR ESİNTİLİ 4'LÜ ÇALIŞMA SEKMESİ (Görsel 1789501075638) */}
-              <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl text-xs font-bold border border-slate-200">
-                {(["deger", "trend", "rayic", "best_use"] as const).map((tab) => {
-                  const titles: Record<string, string> = {
-                    deger: "Değer",
-                    trend: "Trend",
-                    rayic: "Rayiç & İlanlar",
-                    best_use: "Best-Use",
-                  };
-                  const isActive = subTab === tab;
-                  return (
-                    <button
-                      key={tab}
-                      type="button"
-                      onClick={() => setSubTab(tab)}
-                      className={`flex-1 py-1.5 rounded-lg text-xs font-black transition cursor-pointer ${
-                        isActive
-                          ? "bg-amber-500 text-slate-950 shadow-xs"
-                          : "text-slate-600 hover:text-slate-900"
-                      }`}
-                    >
-                      {titles[tab]}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* SEKME: RAYİÇ & İLANLAR (HASAN HÜSEYİN YILDIRIM: BU ALAN İÇİNDEKİ İLANLARI BUL VE LİSTELE) */}
-              {subTab === "rayic" && (
-                <div className="space-y-4 animate-in fade-in duration-200">
-                  {/* 1. RADAR BAŞLIĞI & YARIÇAP KONTROL KARTI */}
-                  <div className="bg-[#0B1E3B] text-white p-4 rounded-2xl border border-slate-800 shadow-md space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
-                          <Radio className="w-4 h-4 animate-pulse" />
-                        </div>
-                        <div>
-                          <div className="text-xs font-black text-white font-heading uppercase tracking-wide">
-                            Bölgesel İlanlar & Emsal Radarı
-                          </div>
-                          <div className="text-[10px] text-slate-300 font-mono">
-                            {parcelData.neighborhood || "Merkez"}, {parcelData.district}, {parcelData.city}
-                          </div>
-                        </div>
-                      </div>
-                      <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-black border border-emerald-500/30 font-mono">
-                        {searchRadius >= 1000 ? `${searchRadius / 1000} km` : `${searchRadius} m`} Çapında
-                      </span>
-                    </div>
-
-                    {/* YARIÇAP BUTONLARI (500m - 5km) */}
-                    <div className="pt-2.5 border-t border-slate-800/80">
-                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 flex items-center justify-between">
-                        <span>Arama Radar Çapı (Mesafe):</span>
-                        <span className="text-emerald-400 font-mono font-bold">
-                          {searchRadius >= 1000 ? `${searchRadius / 1000} km` : `${searchRadius} m`}
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-4 gap-1.5">
-                        {[
-                          { val: 500, label: "500 m" },
-                          { val: 1000, label: "1 km" },
-                          { val: 3000, label: "3 km" },
-                          { val: 5000, label: "5 km" },
-                        ].map((r) => (
-                          <button
-                            key={r.val}
-                            type="button"
-                            onClick={() => setSearchRadius(r.val)}
-                            className={`py-1.5 px-2 rounded-lg text-xs font-mono font-black border transition cursor-pointer text-center ${
-                              searchRadius === r.val
-                                ? "bg-emerald-600 text-white border-emerald-500 shadow-xs"
-                                : "bg-slate-800/80 text-slate-400 border-slate-700 hover:bg-slate-800 hover:text-white"
-                            }`}
-                          >
-                            {r.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 2. PİYASA İSTATİSTİK ŞERİDİ */}
-                  <div className="grid grid-cols-3 gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200 text-center font-mono">
-                    <div className="bg-white p-2 rounded-lg border border-slate-100 shadow-2xs">
-                      <div className="text-[9px] font-bold text-slate-500 uppercase">Taranan İlan</div>
-                      <div className="text-xs sm:text-sm font-black text-slate-900 mt-0.5">
-                        {displayedListings.length} Adet
-                      </div>
-                    </div>
-                    <div className="bg-white p-2 rounded-lg border border-slate-100 shadow-2xs">
-                      <div className="text-[9px] font-bold text-slate-500 uppercase">Ort. m² Birim</div>
-                      <div className="text-xs sm:text-sm font-black text-emerald-700 mt-0.5">
-                        {avgListingM2Price.toLocaleString("tr-TR")} ₺
-                      </div>
-                    </div>
-                    <div className="bg-white p-2 rounded-lg border border-slate-100 shadow-2xs">
-                      <div className="text-[9px] font-bold text-slate-500 uppercase">Kategori</div>
-                      <div className="text-xs sm:text-sm font-black text-amber-700 mt-0.5 truncate">
-                        {isResidential ? "Konut" : "Arsa"}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 3. FİLTRELEME HAPLARI: TÜMÜ / SATILIK / KİRALIK */}
-                  <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl text-xs font-bold border border-slate-200">
-                    {[
-                      { id: "all", label: `Tümü (${parcelData.comparables?.length || 0})` },
-                      { id: "satilik", label: `Satılık (${satilikCount})` },
-                      { id: "kiralik", label: `Kiralık (${kiralikCount})` },
-                    ].map((f) => (
-                      <button
-                        key={f.id}
-                        type="button"
-                        onClick={() => setListingFilter(f.id as any)}
-                        className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer text-center ${
-                          listingFilter === f.id
-                            ? "bg-white text-slate-900 shadow-xs font-black"
-                            : "text-slate-600 hover:text-slate-900"
-                        }`}
-                      >
-                        {f.label}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* 4. İLAN KARTLARI LİSTESİ */}
-                  <div className="space-y-3">
-                    {displayedListings.length > 0 ? (
-                      displayedListings.map((comp) => {
-                        const isSatilik = comp.type === "satilik";
-                        const isFocused = focusedCompId === comp.id;
-                        return (
-                          <div
-                            key={comp.id}
-                            className={`p-3.5 rounded-xl border transition bg-white shadow-2xs relative ${
-                              isFocused
-                                ? "border-emerald-500 ring-2 ring-emerald-500/30 bg-emerald-50/20"
-                                : "border-slate-200 hover:border-slate-300"
-                            }`}
-                          >
-                            {/* Üst Şerit: Rozetler & Mesafe */}
-                            <div className="flex items-center justify-between gap-2 mb-1.5">
-                              <div className="flex items-center gap-1.5">
-                                <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider ${
-                                  isSatilik ? "bg-emerald-100 text-emerald-800" : "bg-blue-100 text-blue-800"
-                                }`}>
-                                  {isSatilik ? "Satılık" : "Kiralık"}
-                                </span>
-                                <span className="text-[10px] font-semibold text-slate-500">
-                                  {comp.source}
-                                </span>
-                              </div>
-                              <span className="text-[10px] font-mono font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 flex items-center gap-1">
-                                <span>🎯</span>
-                                <span>{comp.distanceMeters || 220} m</span>
-                              </span>
-                            </div>
-
-                            {/* İlan Başlığı */}
-                            <div className="text-xs sm:text-sm font-bold text-slate-900 leading-snug line-clamp-2 mb-2">
-                              {comp.title}
-                            </div>
-
-                            {/* Özellikler */}
-                            <div className="flex flex-wrap items-center gap-2 text-[10px] text-slate-600 pb-2 mb-2 border-b border-slate-100 font-mono">
-                              <span className="bg-slate-100 px-2 py-0.5 rounded font-bold text-slate-800">
-                                {comp.areaM2} m²
-                              </span>
-                              <span>•</span>
-                              <span className="font-bold text-slate-800">
-                                {comp.pricePerM2TL.toLocaleString("tr-TR")} ₺/m²
-                              </span>
-                              <span>•</span>
-                              <span>
-                                {comp.roomCount || comp.zoningType || (isResidential ? "3+1" : "İmarlı")}
-                              </span>
-                              <span>•</span>
-                              <span className="text-slate-400">{comp.date || "Güncel"}</span>
-                            </div>
-
-                            {/* Fiyat & Aksiyon Butonları */}
-                            <div className="flex items-center justify-between gap-2 pt-0.5">
-                              <div>
-                                <div className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">
-                                  İlan Fiyatı
-                                </div>
-                                <div className={`text-base font-black font-mono ${isSatilik ? "text-emerald-700" : "text-blue-700"}`}>
-                                  ₺ {comp.priceTL.toLocaleString("tr-TR")}
-                                </div>
-                              </div>
-
-                              <div className="flex items-center gap-1.5">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setFocusedCompId(comp.id);
-                                  }}
-                                  className="px-2.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer active:scale-95"
-                                  title="Haritada bu ilanın konumuna odaklan"
-                                >
-                                  <MapPin className="w-3.5 h-3.5 text-amber-400" />
-                                  <span>Haritada Gör</span>
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setParcelData((prev) => ({
-                                      ...prev,
-                                      areaM2: comp.areaM2,
-                                      estimatedUnitSaleM2PriceTL: isResidential ? comp.pricePerM2TL : prev.estimatedUnitSaleM2PriceTL,
-                                      estimatedLandM2PriceTL: !isResidential ? comp.pricePerM2TL : prev.estimatedLandM2PriceTL,
-                                    }));
-                                    setSubTab("deger");
-                                  }}
-                                  className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-lg text-xs font-bold transition cursor-pointer active:scale-95"
-                                  title="Bu ilanın verilerini değerleme sihirbazına aktar"
-                                >
-                                  <span>Değerle</span>
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })
-                    ) : (
-                      <div className="p-8 text-center bg-slate-50 border border-dashed border-slate-300 rounded-xl text-slate-500 text-xs">
-                        Seçilen filtrede ilan bulunamadı.
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 5. YENİ İLAN / PORTFÖY EKLE ÇAĞRISI */}
-                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-4 text-center space-y-2">
-                    <div className="text-xs font-black text-blue-950 font-heading">
-                      Kendi İlanınızı veya Portföyünüzü Ekleyin
-                    </div>
-                    <p className="text-[11px] text-blue-800 leading-relaxed">
-                      Bu bölgedeki gayrimenkulünüzü veya ihale portföyünüzü ekleyin; haritada ve değerleme havuzunda anında listelensin.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setStartValuationInitialMode("ilan_ver");
-                        setShowStartValuationModal(true);
-                      }}
-                      className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black shadow-xs transition flex items-center justify-center gap-1.5 mx-auto cursor-pointer active:scale-95"
-                    >
-                      <PlusCircle className="w-4 h-4" />
-                      <span>İlan Ver / Portföy Ekle</span>
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* SEKME: BEST-USE PROJE VE GELİŞTİRME */}
-              {subTab === "best_use" && (
-                <div className="space-y-4 animate-in fade-in duration-200">
-                  <div className="bg-[#0B1E3B] text-white p-4 rounded-2xl border border-slate-800 shadow-md space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-400 text-[10px] font-black border border-amber-500/30 flex items-center gap-1">
-                        <Sparkles className="w-3 h-3 text-amber-400" />
-                        İmar & Geliştirme Bilgisi
-                      </span>
-                      <span className="text-xs font-bold text-amber-400">
-                        İlgili Kurumdan Alınmalıdır
-                      </span>
-                    </div>
-
-                    <div className="pt-2">
-                      <div className="text-lg font-black text-white">
-                        Resmi İmar Durum Belgesi (Çap) Esastır
-                      </div>
-                      <div className="text-[11px] text-slate-300 mt-1 leading-relaxed">
-                        Arsa yapılaşma koşulları ve güncel imar fonksiyonu verileri yetkili ilçe belediyesi imar biriminden temin edilecek resmi imar çapı ile netleşir. Sistemimiz afaki inşaat kapasitesi hesabı yapmaz.
-                      </div>
-                    </div>
-
-                    <div className="p-3 bg-slate-900/80 rounded-xl border border-slate-800 text-[11px] space-y-1.5 text-slate-300">
-                      <div className="flex justify-between"><span className="text-slate-400">İmar Durumu:</span><strong className="text-amber-400">Belediye İmar Müdürlüğü</strong></div>
-                      <div className="flex justify-between"><span className="text-slate-400">Takyidat / Şerh:</span><strong className="text-rose-400">Tapu Müdürlüğü&apos;nden Sorulacak</strong></div>
-                      <div className="flex justify-between"><span className="text-slate-400">Kadastro Durumu:</span><strong className="text-emerald-400">Müstakil Parsel Tescilli</strong></div>
-                    </div>
-                  </div>
-
-                  <div className="p-4 bg-white border border-slate-200 rounded-xl space-y-2 text-xs">
-                    <div className="font-bold text-slate-900 font-heading">
-                      En Etkin ve Verimli Kullanım (Highest & Best Use) Özeti
-                    </div>
-                    <p className="text-slate-600 text-[11px] leading-relaxed">
-                      {parcelData.city} ili, {parcelData.district} ilçesi imar plan notları ve piyasa absorpsiyon oranlarına göre, bu parsel üzerinde zemin ticari + üst katlar konut tipolojisi en yüksek yatırım getirisini (IRR %38) sağlamaktadır.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => setShowReportSelectionModal(true)}
-                      className="w-full mt-2 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-lg text-xs transition cursor-pointer"
-                    >
-                      Best-Use Raporunu PDF Olarak İndir
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* SEKME: TREND */}
-              {subTab === "trend" && (
-                <div className="space-y-4 animate-in fade-in duration-200">
-                  <PriceTrendChart
-                    city={parcelData.city}
-                    district={parcelData.district}
-                    neighborhood={parcelData.neighborhood}
-                    category={parcelData.category === "konut" ? "konut" : "arsa"}
-                    currentUnitM2TL={
-                      isResidential 
-                        ? (parcelData.estimatedUnitSaleM2PriceTL || 54090) 
-                        : (parcelData.estimatedLandM2PriceTL || 15000)
-                    }
-                    kfeIndex={parcelData.tcmbOfficialData?.kfeIndex}
-                    kfeAnnualChange={parcelData.tcmbOfficialData?.kfeAnnualChangePercent}
-                    currencyRates={parcelData.currencyRates}
-                  />
-                </div>
-              )}
-
-              {/* SEKME: DEĞER (STANDART TAPUSOR OTOMATİK DEĞERLEME & FİNANS ANALİZ KARTI VE AKORDİYONLAR) */}
-              {subTab === "deger" && (
-                <>
-                  <div id="valuation-result-card" className="bg-gradient-to-br from-slate-900 via-[#0B1E3B] to-slate-950 text-white rounded-2xl p-4 sm:p-5 border border-slate-800 shadow-md space-y-3.5 scroll-mt-24">
+              {/* DEĞERLEME & FİNANS ANALİZ KARTI */}
+              <div id="valuation-result-card" className="bg-gradient-to-br from-slate-900 via-[#0B1E3B] to-slate-950 text-white rounded-2xl p-4 sm:p-5 border border-slate-800 shadow-md space-y-3.5 scroll-mt-24">
                 <div className="flex items-center justify-between">
                   <span className="px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-400 text-[10px] font-black border border-amber-500/30 flex items-center gap-1">
                     <Sparkles className="w-3 h-3 text-amber-400" />
@@ -2659,8 +2424,6 @@ export default function Home() {
                   </div>
                 )}
               </div>
-              </>
-              )}
 
               {/* ÇALIŞMA SEKMELERİ: [PİYASA ANALİZİ] | [İHALE & PEY SİMÜLATÖRÜ] */}
               <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-100 rounded-xl text-xs font-bold">
@@ -2752,6 +2515,27 @@ export default function Home() {
                   />
                 </div>
               )}
+
+              {/* 3. FOTODAKİ KENDİ İLANINIZI VEYA PORTFÖYÜNÜZÜ EKLEYİN KARTI (EN SON KISIM) */}
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-4 text-center space-y-2 mt-4 shadow-xs">
+                <div className="text-xs font-black text-blue-950 font-heading">
+                  Kendi İlanınızı veya Portföyünüzü Ekleyin
+                </div>
+                <p className="text-[11px] text-blue-800 leading-relaxed">
+                  Bu bölgedeki gayrimenkulünüzü veya ihale portföyünüzü ekleyin; haritada ve değerleme havuzunda anında listelensin.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStartValuationInitialMode("ilan_ver");
+                    setShowStartValuationModal(true);
+                  }}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black shadow-xs transition flex items-center justify-center gap-1.5 mx-auto cursor-pointer active:scale-95"
+                >
+                  <PlusCircle className="w-4 h-4" />
+                  <span>İlan Ver / Portföy Ekle</span>
+                </button>
+              </div>
             </div>
 
             {/* HARİTA PANELİ (Geniş Tapusor & GIS Uydu Haritası) */}
@@ -2784,7 +2568,6 @@ export default function Home() {
                 focusedCompId={focusedCompId}
                 onSelectComparable={(comp) => {
                   setFocusedCompId(comp.id);
-                  setSubTab("rayic");
                 }}
                 onLocationFound={(coords) => {
                   setParcelData((prev) => ({

@@ -24,7 +24,7 @@ export type DeedStatus = "mustakil" | "kat_mulkiyeti" | "kat_irtifaki" | "arsa_p
 export interface ParcelInput {
   category: PropertyCategory; // "arsa" | "konut" | "ticari" | "bina" | "turizm" | "ozel"
   subCategory?: string; // Alt Kategori (Daire, Tarla, Dükkân, vb.)
-  transactionType?: "satilik" | "kiralik" | "devren_satilik" | "devren_kiralik";
+  transactionType?: "satilik" | "kiralik" | "kat_karsiligi" | "devren_satilik" | "devren_kiralik";
   offerMethod?: "sabit_fiyat" | "teklif_al" | "acik_artirma";
   listingOwnerType?: "sahibinden" | "emlak_ofisi" | "insaat_firmasi" | "kurum";
   images?: string[]; // Kullanıcı tarafından yüklenen ev/arsa fotoğrafları
