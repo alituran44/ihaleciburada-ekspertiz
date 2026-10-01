@@ -1498,26 +1498,53 @@ export default function Home() {
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
                       <span>1. İşlem Türü</span>
                     </span>
-                    <span className="text-[9px] text-slate-400">Satılık, Kiralık veya Kat Karşılığı</span>
+                    <span className="text-[9px] text-slate-400">Satılık, Kiralık veya Devren</span>
                   </div>
-                  <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
-                    {TRANSACTION_TYPES.map((t) => {
-                      const isActive = (parcelData.transactionType || "satilik") === t.id;
-                      return (
-                        <button
-                          key={t.id}
-                          type="button"
-                          onClick={() => setParcelData(prev => ({ ...prev, transactionType: t.id as any }))}
-                          className={`py-1.5 px-1.5 rounded-xl text-xs font-bold transition cursor-pointer text-center active:scale-95 border truncate ${
-                            isActive
-                              ? "bg-amber-500 text-slate-950 border-amber-400 font-black shadow-xs"
-                              : "bg-slate-900/90 text-slate-300 hover:text-white hover:bg-slate-800 border-slate-700/80"
-                          }`}
-                        >
-                          {t.label}
-                        </button>
-                      );
-                    })}
+                  
+                  {/* Buton Grubu: Kesilme (ellipsis) olmadan tam okunaklı 3 + 2 dengeli yerleşim */}
+                  <div className="space-y-1.5">
+                    {/* Üst Satır: Temel İşlemler (Satılık, Kiralık, Kat Karşılığı) */}
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {TRANSACTION_TYPES.slice(0, 3).map((t) => {
+                        const isActive = (parcelData.transactionType || "satilik") === t.id;
+                        return (
+                          <button
+                            key={t.id}
+                            type="button"
+                            onClick={() => setParcelData(prev => ({ ...prev, transactionType: t.id as any }))}
+                            className={`py-2 px-1 rounded-xl text-xs font-bold transition cursor-pointer text-center active:scale-95 border whitespace-nowrap flex items-center justify-center ${
+                              isActive
+                                ? "bg-amber-500 text-slate-950 border-amber-400 font-black shadow-xs ring-1 ring-amber-400/50"
+                                : "bg-slate-900/90 text-slate-300 hover:text-white hover:bg-slate-800 border-slate-700/80"
+                            }`}
+                          >
+                            {t.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Alt Satır: Devren İşlemler (Devren Satılık, Devren Kiralık) */}
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {TRANSACTION_TYPES.slice(3).map((t) => {
+                        const isActive = (parcelData.transactionType || "satilik") === t.id;
+                        return (
+                          <button
+                            key={t.id}
+                            type="button"
+                            onClick={() => setParcelData(prev => ({ ...prev, transactionType: t.id as any }))}
+                            className={`py-2 px-2.5 rounded-xl text-xs font-bold transition cursor-pointer text-center active:scale-95 border whitespace-nowrap flex items-center justify-center gap-1.5 ${
+                              isActive
+                                ? "bg-amber-500 text-slate-950 border-amber-400 font-black shadow-xs ring-1 ring-amber-400/50"
+                                : "bg-slate-900/90 text-slate-300 hover:text-white hover:bg-slate-800 border-slate-700/80"
+                            }`}
+                          >
+                            <span className={`w-1.5 h-1.5 rounded-full ${isActive ? "bg-slate-950" : "bg-amber-400"}`}></span>
+                            <span>{t.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
 

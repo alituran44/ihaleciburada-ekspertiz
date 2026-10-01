@@ -763,28 +763,53 @@ export const StartValuationModal: React.FC<StartValuationModalProps> = ({
                 <span>1. İşlem Türü</span>
               </label>
               <span className="text-[10px] text-slate-500 font-bold">
-                Satılık, Kiralık veya Kat Karşılığı
+                Satılık, Kiralık veya Devren
               </span>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
-              {TRANSACTION_TYPES.map((item) => {
-                const isSelected = transactionType === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => setTransactionType(item.id as any)}
-                    className={`py-2 px-2 rounded-lg border text-xs font-black transition cursor-pointer text-center ${
-                      isSelected
-                        ? "border-[#0B1E3B] bg-[#0B1E3B] text-amber-400 shadow-xs ring-1 ring-[#0B1E3B]"
-                        : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
-                    }`}
-                  >
-                    {item.label}
-                  </button>
-                );
-              })}
+            <div className="space-y-1.5">
+              {/* Üst Satır: Temel İşlemler */}
+              <div className="grid grid-cols-3 gap-1.5">
+                {TRANSACTION_TYPES.slice(0, 3).map((item) => {
+                  const isSelected = transactionType === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setTransactionType(item.id as any)}
+                      className={`py-2 px-1.5 rounded-lg border text-xs font-black transition cursor-pointer text-center whitespace-nowrap flex items-center justify-center ${
+                        isSelected
+                          ? "border-[#0B1E3B] bg-[#0B1E3B] text-amber-400 shadow-xs ring-1 ring-[#0B1E3B]"
+                          : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Alt Satır: Devren İşlemler */}
+              <div className="grid grid-cols-2 gap-1.5">
+                {TRANSACTION_TYPES.slice(3).map((item) => {
+                  const isSelected = transactionType === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setTransactionType(item.id as any)}
+                      className={`py-2 px-2.5 rounded-lg border text-xs font-black transition cursor-pointer text-center whitespace-nowrap flex items-center justify-center gap-1.5 ${
+                        isSelected
+                          ? "border-[#0B1E3B] bg-[#0B1E3B] text-amber-400 shadow-xs ring-1 ring-[#0B1E3B]"
+                          : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
+                      }`}
+                    >
+                      <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? "bg-amber-400" : "bg-slate-400"}`}></span>
+                      <span>{item.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
