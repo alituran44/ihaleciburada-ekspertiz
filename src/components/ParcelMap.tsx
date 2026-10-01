@@ -1211,7 +1211,7 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
             <span className="text-slate-500 font-mono text-[11px] font-normal shrink-0">/ {activeAda} ada / {activeParsel} parsel</span>
           </div>
           <div className="flex items-center flex-wrap gap-2 text-[10.5px] text-slate-600 mt-1 font-semibold">
-            <span>{areaM2} m²</span>
+            <span>{formatArea(areaM2)} m²</span>
             <span>•</span>
             <span>{category === "konut" ? "Konut & Daire" : "İmarlı Arsa"}</span>
             <span>•</span>

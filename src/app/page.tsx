@@ -346,8 +346,7 @@ export default function Home() {
   const handleCategorySwitch = (cat: PropertyCategory) => {
     const foundCat = REAL_ESTATE_CATEGORIES.find((c) => c.id === cat);
     const defaultSub = foundCat?.subCategories[0] || (cat === "konut" ? "Daire" : "Konut İmarlı Arsa");
-    const isLand = cat === "arsa" || cat === "arazi";
-    const newArea = isLand ? 1000 : 120;
+    const currentArea = parcelData.areaM2 || 478.15;
 
     const val = getDistrictValuation(parcelData.city, parcelData.district, 45000, {
       category: cat,
@@ -355,55 +354,64 @@ export default function Home() {
       neighborhood: parcelData.neighborhood,
       ada: parcelData.ada,
       parsel: parcelData.parsel,
-      areaM2: newArea,
+      areaM2: currentArea,
     });
 
     if (cat === "konut") {
-      setParcelData((prev) => ({
-        ...prev,
-        category: "konut",
-        subCategory: defaultSub,
-        title: "Konut & Daire Portföyü",
-        areaM2: 120,
-        netAreaM2: 100,
-        roomCount: "3+1",
-        buildingAge: "1-5",
-        floorLocation: "ara_kat",
-        housingType: "daire",
-        heatingType: "dogalgaz_kombi",
-        deedStatus: "kat_mulkiyeti",
-        hasElevator: true,
-        hasParking: true,
-        hasBalcony: true,
-        estimatedUnitSaleM2PriceTL: val.pricePerM2TL,
-        monthlyRentEstimateTL: Math.round(val.pricePerM2TL * 120 * 0.0055),
-        askedPriceTL: val.pricePerM2TL * 120,
-      }));
+      setParcelData((prev) => {
+        const area = prev.areaM2 || currentArea;
+        return {
+          ...prev,
+          category: "konut",
+          subCategory: defaultSub,
+          title: "Konut & Daire Portföyü",
+          areaM2: area,
+          netAreaM2: Math.round(area * 0.85),
+          roomCount: "3+1",
+          buildingAge: "1-5",
+          floorLocation: "ara_kat",
+          housingType: "daire",
+          heatingType: "dogalgaz_kombi",
+          deedStatus: "kat_mulkiyeti",
+          hasElevator: true,
+          hasParking: true,
+          hasBalcony: true,
+          estimatedUnitSaleM2PriceTL: val.pricePerM2TL,
+          monthlyRentEstimateTL: Math.round(val.pricePerM2TL * area * 0.0055),
+          askedPriceTL: val.pricePerM2TL * area,
+        };
+      });
     } else if (cat === "arsa" || cat === "arazi") {
-      setParcelData((prev) => ({
-        ...prev,
-        category: cat,
-        subCategory: defaultSub,
-        title: cat === "arazi" ? "Tarla & Arazi Portföyü" : "İmarlı Arsa Portföyü",
-        areaM2: 1000, // Değeri 1000'lik dönüm olarak esas al
-        zoningType: "konut",
-        maxFloors: 5,
-        estimatedLandM2PriceTL: val.pricePerM2TL,
-        askedPriceTL: val.pricePerM2TL * 1000,
-      }));
+      setParcelData((prev) => {
+        const area = prev.areaM2 || currentArea;
+        return {
+          ...prev,
+          category: cat,
+          subCategory: defaultSub,
+          title: cat === "arazi" ? "Tarla & Arazi Portföyü" : "İmarlı Arsa Portföyü",
+          areaM2: area,
+          zoningType: "konut",
+          maxFloors: 5,
+          estimatedLandM2PriceTL: val.pricePerM2TL,
+          askedPriceTL: val.pricePerM2TL * area,
+        };
+      });
     } else {
-      setParcelData((prev) => ({
-        ...prev,
-        category: cat,
-        subCategory: defaultSub,
-        title: `${foundCat?.name || "Ticari"} Portföyü`,
-        areaM2: 250,
-        zoningType: "ticari",
-        maxFloors: 4,
-        estimatedLandM2PriceTL: val.pricePerM2TL,
-        estimatedUnitSaleM2PriceTL: val.pricePerM2TL,
-        askedPriceTL: val.pricePerM2TL * 250,
-      }));
+      setParcelData((prev) => {
+        const area = prev.areaM2 || currentArea;
+        return {
+          ...prev,
+          category: cat,
+          subCategory: defaultSub,
+          title: `${foundCat?.name || "Ticari"} Portföyü`,
+          areaM2: area,
+          zoningType: "ticari",
+          maxFloors: 4,
+          estimatedLandM2PriceTL: val.pricePerM2TL,
+          estimatedUnitSaleM2PriceTL: val.pricePerM2TL,
+          askedPriceTL: val.pricePerM2TL * area,
+        };
+      });
     }
   };
 
@@ -494,7 +502,7 @@ export default function Home() {
       const cleanCity = parcelData.city || "Çanakkale";
       const cleanDist = parcelData.district || "Merkez";
       const cleanNeigh = parcelData.neighborhood || "";
-      const currentArea = parcelData.areaM2 || (parcelData.category === "arsa" || parcelData.category === "arazi" ? 1000 : 120);
+      const currentArea = parcelData.areaM2 || 478.15;
       const newCoords = parcelData.coordinates || getDistrictCoordinates(cleanCity, cleanDist);
 
       const url = `/api/emsal?il=${encodeURIComponent(cleanCity)}&ilce=${encodeURIComponent(cleanDist)}&mahalle=${encodeURIComponent(cleanNeigh)}&kategori=${parcelData.category}${newCoords ? `&lat=${newCoords.lat}&lng=${newCoords.lng}` : ""}`;
@@ -554,8 +562,7 @@ export default function Home() {
       }
 
       const totalVal = unitPrice * currentArea;
-      const donumVal = unitPrice * 1000;
-      setValuationNotice(`⚡ Değerleme Başarıyla Hesaplandı! • 1.000 m² Dönüm: ${donumVal.toLocaleString("tr-TR")} ₺ • Toplam Değer: ${totalVal.toLocaleString("tr-TR")} ₺`);
+      setValuationNotice(`⚡ Değerleme Başarıyla Hesaplandı! • TKGM Parsel Alanı: ${formatArea(currentArea)} m² • Toplam Değer: ${Math.round(totalVal).toLocaleString("tr-TR")} ₺`);
       setTimeout(() => setValuationNotice(null), 6000);
 
       // Sonuç kartına odaklan
@@ -588,7 +595,7 @@ export default function Home() {
       const cleanNeigh = (parcelData.neighborhood || "").trim();
       const cleanAda = (parcelData.ada || "").trim();
       const cleanParsel = (parcelData.parsel || "").trim();
-      const currentArea = parcelData.areaM2 || (parcelData.category === "arsa" || parcelData.category === "arazi" ? 1000 : 120);
+      const currentArea = parcelData.areaM2 || 478.15;
 
       // 1. Koordinat tespiti (Önce Mahalle + İlçe + İl ile detaylı geocoding)
       let resolvedCoords: { lat: number; lng: number } | null = null;
@@ -1808,35 +1815,6 @@ export default function Home() {
                         <label className="text-[9px] font-bold text-slate-300 uppercase block">
                           Alan (m²)
                         </label>
-                        {/* 1000'lik Dönüm Seçim Butonu */}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsEditingArea(false);
-                            setAreaInputStr("1.000");
-                            setParcelData((prev) => {
-                              const val = getDistrictValuation(prev.city, prev.district, 45000, {
-                                category: prev.category,
-                                subCategory: prev.subCategory,
-                                neighborhood: prev.neighborhood,
-                                ada: prev.ada,
-                                parsel: prev.parsel,
-                                areaM2: 1000,
-                              });
-                              const isRes = prev.category === "konut";
-                              return {
-                                ...prev,
-                                areaM2: 1000,
-                                estimatedLandM2PriceTL: !isRes ? val.pricePerM2TL : prev.estimatedLandM2PriceTL,
-                                estimatedUnitSaleM2PriceTL: isRes ? val.pricePerM2TL : prev.estimatedUnitSaleM2PriceTL,
-                              };
-                            });
-                          }}
-                          className="text-[9px] text-amber-400 hover:text-amber-300 font-bold underline cursor-pointer"
-                          title="Alan değerini 1.000 m² (1 Dönüm) olarak ayarla"
-                        >
-                          1.000 m²
-                        </button>
                       </div>
                       <input
                         type="text"
@@ -1882,7 +1860,7 @@ export default function Home() {
                             handleShowOnMap();
                           }
                         }}
-                        placeholder="1.000"
+                        placeholder="Örn: 478,15"
                         className="w-full bg-slate-900/90 border border-slate-700 focus:border-amber-400 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-amber-400 outline-none"
                       />
                     </div>
@@ -1950,18 +1928,18 @@ export default function Home() {
                   </div>
                 )}
 
-                {/* HIZLI DEĞERLEME ÖZETİ (1.000 m² ve Toplam Rayiç) */}
+                {/* HIZLI DEĞERLEME ÖZETİ (Birim Fiyat ve TKGM Parsel Toplam Değeri) */}
                 <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800/90 grid grid-cols-2 gap-2 text-center">
                   <div className="border-r border-slate-800 pr-1">
-                    <div className="text-[9px] uppercase tracking-wide text-amber-300 font-bold">1.000 m² (1 Dönüm) Değeri</div>
+                    <div className="text-[9px] uppercase tracking-wide text-amber-300 font-bold">Birim m² Fiyatı</div>
                     <div className="text-xs sm:text-sm font-black font-mono text-amber-400 mt-0.5">
-                      {Math.round((isResidential ? (parcelData.estimatedUnitSaleM2PriceTL || 54085) : (parcelData.estimatedLandM2PriceTL || 18500)) * 1000).toLocaleString("tr-TR")} ₺
+                      {(isResidential ? (parcelData.estimatedUnitSaleM2PriceTL || 54085) : (parcelData.estimatedLandM2PriceTL || 18500)).toLocaleString("tr-TR")} ₺/m²
                     </div>
                   </div>
                   <div className="pl-1">
-                    <div className="text-[9px] uppercase tracking-wide text-slate-400 font-bold">Toplam Değer ({formatArea(parcelData.areaM2 || 1000)} m²)</div>
+                    <div className="text-[9px] uppercase tracking-wide text-slate-400 font-bold">Toplam Değer ({formatArea(parcelData.areaM2 || 478.15)} m²)</div>
                     <div className="text-xs sm:text-sm font-black font-mono text-emerald-400 mt-0.5">
-                      {Math.round((isResidential ? (parcelData.estimatedUnitSaleM2PriceTL || 54085) : (parcelData.estimatedLandM2PriceTL || 18500)) * (parcelData.areaM2 || 1000)).toLocaleString("tr-TR")} ₺
+                      {Math.round((isResidential ? (parcelData.estimatedUnitSaleM2PriceTL || 54085) : (parcelData.estimatedLandM2PriceTL || 18500)) * (parcelData.areaM2 || 478.15)).toLocaleString("tr-TR")} ₺
                     </div>
                   </div>
                 </div>
@@ -2208,43 +2186,19 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* 1.000 m² (1 Dönüm) Esas Değeri & Seçili Parsel Değeri */}
-                <div className="grid grid-cols-2 gap-2 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30">
-                  <div className="border-r border-amber-500/20 pr-1">
-                    <div className="text-[10px] uppercase font-bold text-amber-300">1.000 m² (1 Dönüm) Değeri</div>
-                    <div className="text-sm sm:text-base font-black text-amber-400 font-mono mt-0.5">
-                      {Math.round((isResidential ? (parcelData.estimatedUnitSaleM2PriceTL || 54085) : (parcelData.estimatedLandM2PriceTL || 18500)) * 1000).toLocaleString("tr-TR")} ₺
+                {/* Resmi TKGM Parsel Değerleme Özeti */}
+                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-between">
+                  <div>
+                    <div className="text-[10px] uppercase font-bold text-slate-300">Resmi TKGM Parsel Alanı</div>
+                    <div className="text-sm sm:text-base font-black text-white font-mono mt-0.5">
+                      {formatArea(parcelData.areaM2 || 478.15)} m²
                     </div>
                   </div>
-                  <div className="pl-1 text-right">
-                    <div className="text-[10px] uppercase font-bold text-slate-400">Seçili Parsel ({formatArea(parcelData.areaM2 || 1000)} m²)</div>
-                    <div className="text-sm sm:text-base font-black text-emerald-400 font-mono mt-0.5">
-                      {Math.round((isResidential ? (parcelData.estimatedUnitSaleM2PriceTL || 54085) : (parcelData.estimatedLandM2PriceTL || 18500)) * (parcelData.areaM2 || 1000)).toLocaleString("tr-TR")} ₺
+                  <div className="text-right">
+                    <div className="text-[10px] uppercase font-bold text-emerald-400">Toplam Parsel Değeri</div>
+                    <div className="text-base sm:text-lg font-black text-emerald-400 font-mono mt-0.5">
+                      {Math.round((isResidential ? (parcelData.estimatedUnitSaleM2PriceTL || 54085) : (parcelData.estimatedLandM2PriceTL || 18500)) * (parcelData.areaM2 || 478.15)).toLocaleString("tr-TR")} ₺
                     </div>
-                  </div>
-                </div>
-
-                {/* Tapusor Brüt m² Girişi & Toplam Değer */}
-                <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-800/80 border border-slate-700/80">
-                  <div className="text-[11px] text-slate-300 font-bold">
-                    <span>Taşınmaz Alanı (Brüt):</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <input
-                      type="number"
-                      min={10}
-                      max={100000}
-                      value={parcelData.areaM2 || 100}
-                      onChange={(e) => {
-                        const val = parseInt(e.target.value) || 0;
-                        setParcelData((prev) => ({
-                          ...prev,
-                          areaM2: val > 0 ? val : 1,
-                        }));
-                      }}
-                      className="w-20 bg-slate-900 border border-slate-600 rounded-lg px-2 py-1 text-right text-xs font-mono font-black text-amber-400 focus:border-amber-400 outline-none"
-                    />
-                    <span className="text-xs font-bold text-slate-400">m²</span>
                   </div>
                 </div>
 
@@ -2269,7 +2223,7 @@ export default function Home() {
                   <div className="flex justify-between items-center text-[10px] text-slate-400 mt-2 font-mono">
                     <span>Toplam Piyasa Değeri:</span>
                     <strong className="text-white font-black text-xs">
-                      {Math.round((isResidential ? (parcelData.estimatedUnitSaleM2PriceTL || 54085) : (parcelData.estimatedLandM2PriceTL || 18500)) * (parcelData.areaM2 || 100)).toLocaleString("tr-TR")} ₺
+                      {Math.round((isResidential ? (parcelData.estimatedUnitSaleM2PriceTL || 54085) : (parcelData.estimatedLandM2PriceTL || 18500)) * (parcelData.areaM2 || 478.15)).toLocaleString("tr-TR")} ₺
                     </strong>
                   </div>
                 </div>
@@ -2398,16 +2352,16 @@ export default function Home() {
                       <span className="font-bold text-slate-900">{parcelData.district} / {parcelData.neighborhood || "Merkez"} • {parcelData.ada || "48507"}/{parcelData.parsel || "1"}</span>
                     </div>
                     <div className="flex justify-between items-center py-1 border-b border-slate-100">
-                      <span className="text-slate-500">Piyasa Değeri ({formatArea(parcelData.areaM2 || 110)} m²):</span>
-                      <span className="font-bold text-slate-900 font-mono">₺ {Math.round((isResidential ? (parcelData.estimatedUnitSaleM2PriceTL || 54085) : (parcelData.estimatedLandM2PriceTL || 18500)) * (parcelData.areaM2 || 110)).toLocaleString("tr-TR")}</span>
+                      <span className="text-slate-500">Piyasa Değeri ({formatArea(parcelData.areaM2 || 478.15)} m²):</span>
+                      <span className="font-bold text-slate-900 font-mono">₺ {Math.round((isResidential ? (parcelData.estimatedUnitSaleM2PriceTL || 54085) : (parcelData.estimatedLandM2PriceTL || 18500)) * (parcelData.areaM2 || 478.15)).toLocaleString("tr-TR")}</span>
                     </div>
                     <div className="flex justify-between items-center py-1 border-b border-slate-100">
                       <span className="text-emerald-700 font-semibold">İİK m.115 %50 Tabanı:</span>
-                      <span className="font-black text-emerald-700 font-mono">₺ {Math.round((isResidential ? (parcelData.estimatedUnitSaleM2PriceTL || 54085) : (parcelData.estimatedLandM2PriceTL || 18500)) * (parcelData.areaM2 || 110) * 0.5).toLocaleString("tr-TR")}</span>
+                      <span className="font-black text-emerald-700 font-mono">₺ {Math.round((isResidential ? (parcelData.estimatedUnitSaleM2PriceTL || 54085) : (parcelData.estimatedLandM2PriceTL || 18500)) * (parcelData.areaM2 || 478.15) * 0.5).toLocaleString("tr-TR")}</span>
                     </div>
                     <div className="flex justify-between items-center pt-1 text-amber-700 font-black">
                       <span>Potansiyel Arbitraj Kârı:</span>
-                      <span className="font-mono text-sm">₺ {Math.round((isResidential ? (parcelData.estimatedUnitSaleM2PriceTL || 54085) : (parcelData.estimatedLandM2PriceTL || 18500)) * (parcelData.areaM2 || 110) * 0.5).toLocaleString("tr-TR")}</span>
+                      <span className="font-mono text-sm">₺ {Math.round((isResidential ? (parcelData.estimatedUnitSaleM2PriceTL || 54085) : (parcelData.estimatedLandM2PriceTL || 18500)) * (parcelData.areaM2 || 478.15) * 0.5).toLocaleString("tr-TR")}</span>
                     </div>
 
                     <div className="pt-2 border-t border-slate-100">
