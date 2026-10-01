@@ -1,4 +1,4 @@
-export type PropertyCategory = "arsa" | "konut" | "arazi" | "ticari";
+export type PropertyCategory = "arsa" | "konut" | "arazi" | "ticari" | "bina" | "turizm" | "ozel";
 
 export type ZoningType = 
   | "konut" 
@@ -22,7 +22,12 @@ export type HeatingType = "dogalgaz_kombi" | "merkezi_payolcer" | "yerden_isitma
 export type DeedStatus = "mustakil" | "kat_mulkiyeti" | "kat_irtifaki" | "arsa_payli" | "hisseli";
 
 export interface ParcelInput {
-  category: PropertyCategory; // "arsa" | "konut"
+  category: PropertyCategory; // "arsa" | "konut" | "ticari" | "bina" | "turizm" | "ozel"
+  subCategory?: string; // Alt Kategori (Daire, Tarla, Dükkân, vb.)
+  transactionType?: "satilik" | "kiralik" | "devren_satilik" | "devren_kiralik";
+  offerMethod?: "sabit_fiyat" | "teklif_al" | "acik_artirma";
+  listingOwnerType?: "sahibinden" | "emlak_ofisi" | "insaat_firmasi" | "kurum";
+  images?: string[]; // Kullanıcı tarafından yüklenen ev/arsa fotoğrafları
   title: string;
   city: string;
   district: string;

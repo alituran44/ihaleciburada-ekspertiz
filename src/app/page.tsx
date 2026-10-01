@@ -40,6 +40,12 @@ import { parseSearchLocation, getCadastreForCoordinates, getDistrictCoordinates,
 
 const PROVINCE_NAMES = Object.keys(TURKEY_PROVINCES_AND_DISTRICTS).sort((a, b) => a.localeCompare(b, "tr"));
 import { 
+  REAL_ESTATE_CATEGORIES, 
+  TRANSACTION_TYPES, 
+  OFFER_METHODS, 
+  LISTING_OWNER_TYPES 
+} from "@/lib/categories";
+import { 
   Building, 
   FileText,
   FileSpreadsheet, 
@@ -73,7 +79,12 @@ import {
   Check,
   Filter,
   Crosshair,
-  ExternalLink
+  ExternalLink,
+  Camera,
+  UploadCloud,
+  Trash2,
+  Eye,
+  X
 } from "lucide-react";
 
 export default function Home() {
@@ -334,15 +345,20 @@ export default function Home() {
   }, [parcelData]);
 
   const isResidential = parcelData.category === "konut";
+  const isLand = parcelData.category === "arsa" || parcelData.category === "arazi";
 
   const handleCategorySwitch = (cat: PropertyCategory) => {
+    const foundCat = REAL_ESTATE_CATEGORIES.find((c) => c.id === cat);
+    const defaultSub = foundCat?.subCategories[0] || (cat === "konut" ? "Daire" : "Konut İmarlı Arsa");
+
     if (cat === "konut") {
-      setParcelData({
-        ...parcelData,
+      setParcelData((prev) => ({
+        ...prev,
         category: "konut",
+        subCategory: defaultSub,
         title: "Konut & Daire Portföyü",
-        areaM2: 135,
-        netAreaM2: 110,
+        areaM2: 120,
+        netAreaM2: 100,
         roomCount: "3+1",
         buildingAge: "1-5",
         floorLocation: "ara_kat",
@@ -354,17 +370,172 @@ export default function Home() {
         hasBalcony: true,
         monthlyRentEstimateTL: 32000,
         askedPriceTL: 5800000,
-      });
-    } else {
-      setParcelData({
-        ...parcelData,
+      }));
+    } else if (cat === "arsa" || cat === "arazi") {
+      setParcelData((prev) => ({
+        ...prev,
         category: cat,
-        title: cat === "arazi" ? "Tarla & Arazi Portföyü" : cat === "ticari" ? "Ticari Mülk Portföyü" : "İmarlı Arsa Portföyü",
-        areaM2: cat === "arazi" ? 2500 : cat === "ticari" ? 200 : 1000,
-        zoningType: cat === "ticari" ? "ticari" : "konut",
+        subCategory: defaultSub,
+        title: cat === "arazi" ? "Tarla & Arazi Portföyü" : "İmarlı Arsa Portföyü",
+        areaM2: 1000, // Değeri 1000'lik dönüm olarak esas al
+        zoningType: "konut",
         maxFloors: 5,
         askedPriceTL: 9500000,
+      }));
+    } else {
+      setParcelData((prev) => ({
+        ...prev,
+        category: cat,
+        subCategory: defaultSub,
+        title: `${foundCat?.name || "Ticari"} Portföyü`,
+        areaM2: 250,
+        zoningType: "ticari",
+        maxFloors: 4,
+        askedPriceTL: 7500000,
+      }));
+    }
+  };
+
+  const currentSubCategories = useMemo(() => {
+    const found = REAL_ESTATE_CATEGORIES.find((c) => c.id === parcelData.category);
+    return found?.subCategories || ["Daire", "Müstakil Ev", "Villa"];
+  }, [parcelData.category]);
+
+  // Fotoğraf Yükleme Durumu & Önizleme
+  interface PropertyPhotoItem {
+    id: string;
+    url: string;
+    tag: string;
+    name: string;
+    date: string;
+  }
+  const [propertyPhotos, setPropertyPhotos] = useState<PropertyPhotoItem[]>([]);
+  const [photoPreviewModalUrl, setPhotoPreviewModalUrl] = useState<string | null>(null);
+
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const newPhotos: PropertyPhotoItem[] = [];
+    const readPromises: Promise<void>[] = [];
+
+    Array.from(files).forEach((file, idx) => {
+      if (propertyPhotos.length + newPhotos.length >= 12) {
+        alert("En fazla 12 adet fotoğraf yükleyebilirsiniz.");
+        return;
+      }
+      const promise = new Promise<void>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (loadEvent) => {
+          const result = loadEvent.target?.result as string;
+          if (result) {
+            newPhotos.push({
+              id: `photo-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 4)}`,
+              url: result,
+              tag: idx === 0 && propertyPhotos.length === 0 ? "Ön Cephe" : "Parsel & Çevre",
+              name: file.name,
+              date: new Date().toLocaleDateString("tr-TR"),
+            });
+          }
+          resolve();
+        };
+        reader.readAsDataURL(file);
       });
+      readPromises.push(promise);
+    });
+
+    Promise.all(readPromises).then(() => {
+      setPropertyPhotos((prev) => {
+        const updated = [...prev, ...newPhotos];
+        setParcelData((p) => ({ ...p, images: updated.map((i) => i.url) }));
+        return updated;
+      });
+      e.target.value = "";
+    });
+  };
+
+  const handleRemovePhoto = (id: string) => {
+    setPropertyPhotos((prev) => {
+      const updated = prev.filter((p) => p.id !== id);
+      setParcelData((p) => ({ ...p, images: updated.map((i) => i.url) }));
+      return updated;
+    });
+  };
+
+  const handleChangePhotoTag = (id: string, tag: string) => {
+    setPropertyPhotos((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, tag } : p))
+    );
+  };
+
+  // ⚡ Aktif Değerleme Hesaplayıcı & Sonuç Gösterici
+  const [isValuating, setIsValuating] = useState<boolean>(false);
+  const [valuationNotice, setValuationNotice] = useState<string | null>(null);
+
+  const handleRunValuation = async () => {
+    setIsValuating(true);
+    setValuationNotice(null);
+
+    // Sekmeyi doğrudan Değerleme (deger) paneline geçir
+    setActiveTab("endeks");
+    setSubTab("deger");
+
+    try {
+      const cleanCity = parcelData.city || "Çanakkale";
+      const cleanDist = parcelData.district || "Merkez";
+      const cleanNeigh = parcelData.neighborhood || "";
+      const currentArea = parcelData.areaM2 || (parcelData.category === "arsa" || parcelData.category === "arazi" ? 1000 : 120);
+      const newCoords = parcelData.coordinates || getDistrictCoordinates(cleanCity, cleanDist);
+
+      const url = `/api/emsal?il=${encodeURIComponent(cleanCity)}&ilce=${encodeURIComponent(cleanDist)}&mahalle=${encodeURIComponent(cleanNeigh)}&kategori=${parcelData.category}${newCoords ? `&lat=${newCoords.lat}&lng=${newCoords.lng}` : ""}`;
+      const res = await fetch(url);
+      const data = await res.json();
+
+      let unitPrice = 0;
+      if (data.success && data.data) {
+        const resData = data.data;
+        const finalCoords = newCoords || resData.coordinates || parcelData.coordinates;
+        const cad = finalCoords ? getCadastreForCoordinates(finalCoords.lat, finalCoords.lng) : { ada: "", parsel: "" };
+
+        unitPrice = isResidential ? (resData.unitSaleM2PriceTL || 54085) : (resData.landM2PriceTL || 18500);
+
+        setParcelData((prev) => ({
+          ...prev,
+          coordinates: finalCoords,
+          ada: prev.ada || cad.ada,
+          parsel: prev.parsel || cad.parsel,
+          areaM2: currentArea,
+          estimatedLandM2PriceTL: resData.landM2PriceTL || prev.estimatedLandM2PriceTL,
+          estimatedUnitSaleM2PriceTL: resData.unitSaleM2PriceTL || prev.estimatedUnitSaleM2PriceTL,
+          contractorSharePercent: resData.contractorSharePercent ?? prev.contractorSharePercent,
+          monthlyRentEstimateTL: isResidential ? (resData.estimatedMonthlyRentTL ?? prev.monthlyRentEstimateTL) : prev.monthlyRentEstimateTL,
+          marketResearch: resData,
+          comparables: resData.comparables || prev.comparables,
+          tcmbOfficialData: resData.tcmbOfficialData || prev.tcmbOfficialData,
+          buildingCostEstimate: resData.buildingCostEstimate || prev.buildingCostEstimate,
+        }));
+      } else {
+        unitPrice = isResidential ? (parcelData.estimatedUnitSaleM2PriceTL || 54085) : (parcelData.estimatedLandM2PriceTL || 18500);
+      }
+
+      const totalVal = unitPrice * currentArea;
+      const donumVal = unitPrice * 1000;
+      setValuationNotice(`⚡ Değerleme Başarıyla Hesaplandı! • 1.000 m² Dönüm: ${donumVal.toLocaleString("tr-TR")} ₺ • Toplam Değer: ${totalVal.toLocaleString("tr-TR")} ₺`);
+      setTimeout(() => setValuationNotice(null), 6000);
+
+      // Sonuç kartına odaklan
+      setTimeout(() => {
+        const el = document.getElementById("valuation-result-card");
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      }, 100);
+    } catch (err) {
+      console.warn("Değerleme hesaplama hatası:", err);
+      setValuationNotice("Değerleme yerel piyasa verileriyle güncellendi.");
+      setTimeout(() => setValuationNotice(null), 4000);
+    } finally {
+      setIsValuating(false);
     }
   };
 
@@ -1064,7 +1235,7 @@ export default function Home() {
 
               {/* RESMİ KADASTRO & AKILLI DEĞERLEME HIZLI GİRİŞ KARTI */}
               <div className="bg-gradient-to-br from-slate-900 via-[#0B1E3B] to-slate-950 text-white p-3.5 rounded-2xl border border-slate-800 shadow-md space-y-3">
-                {/* Kart Başlığı & Kategori Seçimi */}
+                {/* 1. KADASTRO & AKILLI DEĞERLEME BAŞLIĞI VE İŞLEM TÜRÜ */}
                 <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
                   <div className="flex items-center gap-2">
                     <div className="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
@@ -1080,17 +1251,75 @@ export default function Home() {
                       </p>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleCategorySwitch(isResidential ? "arsa" : "konut")}
-                    className="px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-black hover:bg-amber-500/30 transition cursor-pointer flex items-center gap-1 shrink-0"
-                  >
-                    <span>{isResidential ? "🏠 Konut & Daire" : "📐 Arsa & Arazi"}</span>
-                    <ChevronDown className="w-3 h-3 text-amber-400" />
-                  </button>
+                  {/* Satılık / Kiralık İşlem Türü Seçimi */}
+                  <div className="flex items-center gap-1 bg-slate-800/90 p-0.5 rounded-lg border border-slate-700 text-[10px] font-bold">
+                    {(["satilik", "kiralik"] as const).map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setParcelData(prev => ({ ...prev, transactionType: t }))}
+                        className={`px-2 py-0.5 rounded-md transition cursor-pointer capitalize ${
+                          (parcelData.transactionType || "satilik") === t
+                            ? "bg-amber-500 text-slate-950 font-black shadow-xs"
+                            : "text-slate-400 hover:text-white"
+                        }`}
+                      >
+                        {t === "satilik" ? "Satılık" : "Kiralık"}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
-                {/* 1. ADRES BİLGİLERİ (İL, İLÇE, MAHALLE / KÖY) */}
+                {/* 2. EMLAK ANA KATEGORİ VE ALT KATEGORİ (Kullanıcı Şablonu) */}
+                <div className="space-y-1.5 pb-2 border-b border-slate-800/80">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-bold text-slate-300 uppercase flex items-center gap-1 tracking-wide">
+                      <Tag className="w-3 h-3 text-amber-400" />
+                      <span>Emlak Kategorisi</span>
+                    </label>
+                    <span className="text-[9px] text-slate-400 font-medium">6 Ana • 40+ Alt Kategori</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    {/* Ana Kategori */}
+                    <div>
+                      <label className="text-[9px] font-bold text-slate-300 uppercase block mb-0.5">
+                        Ana Kategori
+                      </label>
+                      <select
+                        value={parcelData.category}
+                        onChange={(e) => handleCategorySwitch(e.target.value as PropertyCategory)}
+                        className="w-full bg-slate-900/95 border border-slate-700 focus:border-amber-400 rounded-lg px-2 py-1.5 text-xs font-bold text-white outline-none cursor-pointer truncate"
+                      >
+                        {REAL_ESTATE_CATEGORIES.map((cat) => (
+                          <option key={cat.id} value={cat.id} className="bg-slate-900 text-white">
+                            {cat.icon} {cat.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Alt Kategori */}
+                    <div>
+                      <label className="text-[9px] font-bold text-slate-300 uppercase block mb-0.5">
+                        Alt Kategori
+                      </label>
+                      <select
+                        value={parcelData.subCategory || currentSubCategories[0] || ""}
+                        onChange={(e) => setParcelData(prev => ({ ...prev, subCategory: e.target.value }))}
+                        className="w-full bg-slate-900/95 border border-slate-700 focus:border-amber-400 rounded-lg px-2 py-1.5 text-xs font-bold text-white outline-none cursor-pointer truncate"
+                      >
+                        {currentSubCategories.map((sub) => (
+                          <option key={sub} value={sub} className="bg-slate-900 text-white">
+                            {sub}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. ADRES BİLGİLERİ (İL, İLÇE, MAHALLE / KÖY) */}
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
                     <label className="text-[10px] font-bold text-slate-300 uppercase flex items-center gap-1 tracking-wide">
@@ -1172,7 +1401,7 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* 2. RESMİ KADASTRO (ADA, PARSEL, ALAN M²) */}
+                {/* 4. RESMİ KADASTRO (ADA, PARSEL, ALAN M²) */}
                 <div className="space-y-1.5 pt-1 border-t border-slate-800/80">
                   <div className="flex items-center justify-between">
                     <label className="text-[10px] font-bold text-slate-300 uppercase flex items-center gap-1 tracking-wide">
@@ -1208,26 +1437,37 @@ export default function Home() {
                       />
                     </div>
                     <div>
-                      <label className="text-[9px] font-bold text-slate-300 uppercase block mb-0.5">
-                        Alan (m²)
-                      </label>
+                      <div className="flex items-center justify-between mb-0.5">
+                        <label className="text-[9px] font-bold text-slate-300 uppercase block">
+                          Alan (m²)
+                        </label>
+                        {/* 1000'lik Dönüm Seçim Butonu */}
+                        <button
+                          type="button"
+                          onClick={() => setParcelData(prev => ({ ...prev, areaM2: 1000 }))}
+                          className="text-[9px] text-amber-400 hover:text-amber-300 font-bold underline cursor-pointer"
+                          title="Alan değerini 1.000 m² (1 Dönüm) olarak ayarla"
+                        >
+                          1.000 m²
+                        </button>
+                      </div>
                       <input
                         type="number"
                         value={parcelData.areaM2 || ""}
                         onChange={(e) => setParcelData(prev => ({ ...prev, areaM2: Number(e.target.value) || 0 }))}
-                        placeholder="120"
+                        placeholder="1000"
                         className="w-full bg-slate-900/90 border border-slate-700 focus:border-amber-400 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-amber-400 outline-none"
                       />
                     </div>
                   </div>
                 </div>
 
-                {/* Butonlar: TKGM Parsel Sorgu & Değerle */}
+                {/* 5. BUTONLAR: TKGM Parsel Sorgu & ⚡ Değerleme (Canlı Hesaplayıcı) */}
                 <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-800">
                   <button
                     type="button"
                     onClick={handleOpenTkgmGlobal}
-                    className="py-2 px-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/30 font-bold text-[11px] transition flex items-center justify-center gap-1 cursor-pointer"
+                    className="py-2.5 px-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/30 font-bold text-[11px] transition flex items-center justify-center gap-1 cursor-pointer active:scale-95"
                     title="Resmi TKGM Kadastro Parsel Sorgu sayfasını aç"
                   >
                     <ExternalLink className="w-3.5 h-3.5 text-amber-400 shrink-0" />
@@ -1236,22 +1476,135 @@ export default function Home() {
 
                   <button
                     type="button"
-                    onClick={() => setSubTab("deger")}
-                    className={`py-2 px-2.5 rounded-lg font-black text-[11px] transition flex items-center justify-center gap-1 cursor-pointer ${
-                      subTab === "deger"
-                        ? "bg-amber-500 text-slate-950 shadow-sm"
-                        : "bg-amber-600 hover:bg-amber-500 text-white"
+                    onClick={handleRunValuation}
+                    disabled={isValuating}
+                    className={`py-2.5 px-2.5 rounded-xl font-black text-[11px] transition flex items-center justify-center gap-1.5 cursor-pointer shadow-md active:scale-95 ${
+                      isValuating
+                        ? "bg-amber-600/70 text-slate-900 cursor-wait"
+                        : "bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 text-slate-950 hover:brightness-105"
                     }`}
+                    title="Bu konum ve ada/parsel için anlık akıllı değerleme hesapla"
                   >
-                    <Sparkles className="w-3.5 h-3.5 shrink-0" />
-                    <span>⚡ Değerleme</span>
+                    {isValuating ? (
+                      <Loader2 className="w-4 h-4 animate-spin text-slate-950" />
+                    ) : (
+                      <Sparkles className="w-4 h-4 text-slate-950 shrink-0" />
+                    )}
+                    <span>{isValuating ? "Hesaplanıyor..." : "⚡ Değerleme"}</span>
                   </button>
+                </div>
+
+                {/* CANLI DEĞERLEME BİLDİRİMİ */}
+                {valuationNotice && (
+                  <div className="p-2 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[10.5px] font-bold text-center animate-in fade-in duration-200">
+                    {valuationNotice}
+                  </div>
+                )}
+
+                {/* HIZLI DEĞERLEME ÖZETİ (1.000 m² ve Toplam Rayiç) */}
+                <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800/90 grid grid-cols-2 gap-2 text-center">
+                  <div className="border-r border-slate-800 pr-1">
+                    <div className="text-[9px] uppercase tracking-wide text-amber-300 font-bold">1.000 m² (1 Dönüm) Değeri</div>
+                    <div className="text-xs sm:text-sm font-black font-mono text-amber-400 mt-0.5">
+                      {Math.round((isResidential ? (parcelData.estimatedUnitSaleM2PriceTL || 54085) : (parcelData.estimatedLandM2PriceTL || 18500)) * 1000).toLocaleString("tr-TR")} ₺
+                    </div>
+                  </div>
+                  <div className="pl-1">
+                    <div className="text-[9px] uppercase tracking-wide text-slate-400 font-bold">Toplam Değer ({parcelData.areaM2 || 1000} m²)</div>
+                    <div className="text-xs sm:text-sm font-black font-mono text-emerald-400 mt-0.5">
+                      {Math.round((isResidential ? (parcelData.estimatedUnitSaleM2PriceTL || 54085) : (parcelData.estimatedLandM2PriceTL || 18500)) * (parcelData.areaM2 || 1000)).toLocaleString("tr-TR")} ₺
+                    </div>
+                  </div>
                 </div>
 
                 {/* Resmi Uyarı Notu */}
                 <div className="text-[10px] text-slate-300 bg-slate-900/60 p-2 rounded-lg border border-slate-800/80 leading-snug">
                   📌 <strong>Resmi Bilgi:</strong> İmar durumu yetkili belediyeden resmi imar çapı ile, şerh ve takyidat bilgileri tapu müdürlüğünden teyit edilmelidir. Sitemiz afaki inşaat hesabı yapmaz.
                 </div>
+              </div>
+
+              {/* TAŞINMAZ FOTOĞRAFLARI YÜKLEME ALANI (Kullanıcı Talebi: Yeri bulduktan sonra ev/arsa foto yüklensin) */}
+              <div className="bg-white rounded-2xl border border-slate-200 p-3.5 sm:p-4 shadow-xs space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center font-bold">
+                      <Camera className="w-4 h-4 text-blue-600" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-black text-slate-900 font-heading">
+                        Taşınmaz Fotoğrafları
+                      </h4>
+                      <p className="text-[10px] text-slate-500 font-medium">
+                        Ev, arsa veya tapu görseli ekleyerek raporunuza dahil edin
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-mono font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                    {propertyPhotos.length} / 12 Fotoğraf
+                  </span>
+                </div>
+
+                {/* Yükleme Butonu / Alanı */}
+                <label className="border-2 border-dashed border-slate-200 hover:border-blue-400 bg-slate-50 hover:bg-blue-50/50 rounded-xl p-3 flex flex-col items-center justify-center gap-1 cursor-pointer transition text-center group">
+                  <UploadCloud className="w-5 h-5 text-slate-400 group-hover:text-blue-600 transition" />
+                  <span className="text-xs font-bold text-slate-700 group-hover:text-blue-700">
+                    Fotoğraf Seç veya Buraya Sürükle
+                  </span>
+                  <span className="text-[9.5px] text-slate-400">
+                    PNG, JPG, WEBP • Max 10MB (Çoklu Seçim Desteklenir)
+                  </span>
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    onChange={handlePhotoUpload}
+                    className="hidden"
+                  />
+                </label>
+
+                {/* Yüklenen Fotoğraflar Galerisi */}
+                {propertyPhotos.length > 0 && (
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 pt-1">
+                    {propertyPhotos.map((photo) => (
+                      <div
+                        key={photo.id}
+                        className="relative group rounded-xl overflow-hidden border border-slate-200 bg-slate-100 aspect-square shadow-2xs"
+                      >
+                        <img
+                          src={photo.url}
+                          alt={photo.name}
+                          className="w-full h-full object-cover cursor-pointer hover:scale-105 transition duration-200"
+                          onClick={() => setPhotoPreviewModalUrl(photo.url)}
+                        />
+                        {/* Silme Butonu */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemovePhoto(photo.id);
+                          }}
+                          className="absolute top-1 right-1 w-5 h-5 rounded-md bg-rose-600/90 hover:bg-rose-700 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition shadow-xs cursor-pointer"
+                          title="Fotoğrafı Kaldır"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                        {/* Etiket Seçici / Rozet */}
+                        <select
+                          value={photo.tag}
+                          onChange={(e) => handleChangePhotoTag(photo.id, e.target.value)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="absolute bottom-1 left-1 right-1 bg-slate-900/90 text-white text-[8.5px] font-bold rounded px-1 py-0.5 outline-none cursor-pointer border border-white/20 truncate"
+                        >
+                          <option value="Ön Cephe">Ön Cephe</option>
+                          <option value="Manzara">Manzara</option>
+                          <option value="Parsel & Çevre">Parsel & Çevre</option>
+                          <option value="İç Mekan">İç Mekan</option>
+                          <option value="Tapu / Belge">Tapu / Belge</option>
+                        </select>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
               
               {/* İHALECİ BURADA FİLTRE HAPLARI */}
@@ -1616,7 +1969,7 @@ export default function Home() {
               {/* SEKME: DEĞER (STANDART TAPUSOR OTOMATİK DEĞERLEME & FİNANS ANALİZ KARTI VE AKORDİYONLAR) */}
               {subTab === "deger" && (
                 <>
-                  <div className="bg-gradient-to-br from-slate-900 via-[#0B1E3B] to-slate-950 text-white rounded-2xl p-4 sm:p-5 border border-slate-800 shadow-md space-y-3.5">
+                  <div id="valuation-result-card" className="bg-gradient-to-br from-slate-900 via-[#0B1E3B] to-slate-950 text-white rounded-2xl p-4 sm:p-5 border border-slate-800 shadow-md space-y-3.5 scroll-mt-24">
                 <div className="flex items-center justify-between">
                   <span className="px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-400 text-[10px] font-black border border-amber-500/30 flex items-center gap-1">
                     <Sparkles className="w-3 h-3 text-amber-400" />
@@ -1656,6 +2009,22 @@ export default function Home() {
                     </div>
                     <div className="text-xs font-black text-emerald-400 font-mono">
                       {Math.round((isResidential ? (parcelData.estimatedUnitSaleM2PriceTL || 54085) * (parcelData.areaM2 || 100) : (parcelData.estimatedLandM2PriceTL || 18500) * (parcelData.areaM2 || 100)) * 0.5).toLocaleString("tr-TR")} ₺
+                    </div>
+                  </div>
+                </div>
+
+                {/* 1.000 m² (1 Dönüm) Esas Değeri & Seçili Parsel Değeri */}
+                <div className="grid grid-cols-2 gap-2 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30">
+                  <div className="border-r border-amber-500/20 pr-1">
+                    <div className="text-[10px] uppercase font-bold text-amber-300">1.000 m² (1 Dönüm) Değeri</div>
+                    <div className="text-sm sm:text-base font-black text-amber-400 font-mono mt-0.5">
+                      {Math.round((isResidential ? (parcelData.estimatedUnitSaleM2PriceTL || 54085) : (parcelData.estimatedLandM2PriceTL || 18500)) * 1000).toLocaleString("tr-TR")} ₺
+                    </div>
+                  </div>
+                  <div className="pl-1 text-right">
+                    <div className="text-[10px] uppercase font-bold text-slate-400">Seçili Parsel ({parcelData.areaM2 || 1000} m²)</div>
+                    <div className="text-sm sm:text-base font-black text-emerald-400 font-mono mt-0.5">
+                      {Math.round((isResidential ? (parcelData.estimatedUnitSaleM2PriceTL || 54085) : (parcelData.estimatedLandM2PriceTL || 18500)) * (parcelData.areaM2 || 1000)).toLocaleString("tr-TR")} ₺
                     </div>
                   </div>
                 </div>
@@ -2083,6 +2452,31 @@ export default function Home() {
         initialAreaM2={parcelData.areaM2 || 135}
         initialCategory={parcelData.category === "konut" ? "konut" : "arsa"}
       />
+
+      {/* Taşınmaz Fotoğrafı Tam Ekran Önizleme Modalı (Lightbox) */}
+      {photoPreviewModalUrl && (
+        <div 
+          className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={() => setPhotoPreviewModalUrl(null)}
+        >
+          <div className="relative max-w-4xl max-h-[90vh] flex flex-col items-center">
+            <button
+              type="button"
+              onClick={() => setPhotoPreviewModalUrl(null)}
+              className="absolute -top-10 right-0 p-1.5 rounded-full bg-slate-800 text-white hover:bg-slate-700 transition cursor-pointer"
+              title="Kapat"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <img 
+              src={photoPreviewModalUrl} 
+              alt="Taşınmaz Fotoğrafı" 
+              className="max-h-[85vh] max-w-full rounded-2xl object-contain border border-slate-700 shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

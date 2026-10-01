@@ -1,4 +1,4 @@
-export type ValuationServiceType = "konut" | "arsa" | "arazi" | "ticari";
+export type ValuationServiceType = "konut" | "arsa" | "arazi" | "ticari" | "bina" | "turizm" | "ozel";
 
 export interface ValuationFormData {
   service: ValuationServiceType;
