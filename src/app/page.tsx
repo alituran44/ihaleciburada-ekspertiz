@@ -1284,7 +1284,7 @@ export default function Home() {
           </div>
 
           {/* Orta Kısım: İhaleci Burada Arama Kutusu & Canlı Konum Autocomplete */}
-          <div className="relative flex-1 max-w-xl mx-2 z-[1100]" ref={searchContainerRef}>
+          <div className="relative flex-1 max-w-md min-w-0 mx-1 sm:mx-2 z-[1100]" ref={searchContainerRef}>
             <form 
               onSubmit={handleSearchSubmit}
               className="w-full flex items-center bg-slate-50 border border-slate-300 rounded-full p-1 shadow-2xs focus-within:ring-2 focus-within:ring-amber-500/20 focus-within:border-amber-500 focus-within:bg-white transition"
@@ -1447,76 +1447,23 @@ export default function Home() {
               <span>{layoutMapPosition === "left" ? "Harita Solda" : "Harita Sağda"}</span>
             </button>
 
-            {/* 2.6 Harita Daraltma / Genişletme Ayarı (Presets) */}
-            <div className="hidden lg:flex items-center bg-slate-100 border border-slate-300 rounded-full p-0.5 text-xs font-bold shrink-0">
-              <span className="text-[10px] font-extrabold text-slate-500 px-2 flex items-center gap-1">
-                <span>🗺️ Harita:</span>
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsSidebarCollapsed(false);
-                  setSidebarWidth(580);
-                  setTimeout(() => window.dispatchEvent(new Event("resize")), 50);
-                }}
-                className={`px-2 py-0.5 rounded-full transition cursor-pointer text-[11px] ${
-                  !isSidebarCollapsed && sidebarWidth >= 520
-                    ? "bg-[#0B1E3B] text-amber-400 font-black shadow-2xs"
-                    : "text-slate-600 hover:text-slate-900"
-                }`}
-                title="Paneli Genişlet, Haritayı Daralt (Panel: 580px)"
-              >
-                Dar
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsSidebarCollapsed(false);
-                  setSidebarWidth(440);
-                  setTimeout(() => window.dispatchEvent(new Event("resize")), 50);
-                }}
-                className={`px-2 py-0.5 rounded-full transition cursor-pointer text-[11px] ${
-                  !isSidebarCollapsed && sidebarWidth >= 380 && sidebarWidth < 520
-                    ? "bg-[#0B1E3B] text-amber-400 font-black shadow-2xs"
-                    : "text-slate-600 hover:text-slate-900"
-                }`}
-                title="Dengeli Standart Boyut (Panel: 440px)"
-              >
-                Dengeli
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsSidebarCollapsed(false);
-                  setSidebarWidth(320);
-                  setTimeout(() => window.dispatchEvent(new Event("resize")), 50);
-                }}
-                className={`px-2 py-0.5 rounded-full transition cursor-pointer text-[11px] ${
-                  !isSidebarCollapsed && sidebarWidth < 380
-                    ? "bg-[#0B1E3B] text-amber-400 font-black shadow-2xs"
-                    : "text-slate-600 hover:text-slate-900"
-                }`}
-                title="Haritayı Genişlet, Paneli Daralt (Panel: 320px)"
-              >
-                Geniş
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsSidebarCollapsed(prev => !prev);
-                  setTimeout(() => window.dispatchEvent(new Event("resize")), 50);
-                }}
-                className={`px-2 py-0.5 rounded-full transition cursor-pointer text-[11px] flex items-center gap-1 ${
-                  isSidebarCollapsed
-                    ? "bg-amber-500 text-slate-950 font-black shadow-2xs"
-                    : "text-slate-600 hover:text-slate-900"
-                }`}
-                title={isSidebarCollapsed ? "Paneli Göster" : "Tam Ekran Harita (Paneli Gizle)"}
-              >
-                {isSidebarCollapsed ? <Minimize2 className="w-3 h-3" /> : <Maximize2 className="w-3 h-3" />}
-                <span>{isSidebarCollapsed ? "Paneli Aç" : "Tam Ekran"}</span>
-              </button>
-            </div>
+            {/* 2.6 Tam Ekran Harita / Paneli Gizle Toggle Butonu */}
+            <button
+              type="button"
+              onClick={() => {
+                setIsSidebarCollapsed(prev => !prev);
+                setTimeout(() => window.dispatchEvent(new Event("resize")), 50);
+              }}
+              className={`flex items-center gap-1.5 py-1 px-2.5 rounded-full border text-xs font-bold transition shadow-2xs active:scale-95 cursor-pointer shrink-0 ${
+                isSidebarCollapsed
+                  ? "bg-amber-500 text-slate-950 border-amber-400 font-black"
+                  : "border-slate-300 bg-slate-100 hover:bg-slate-200 text-slate-800"
+              }`}
+              title={isSidebarCollapsed ? "Değerleme Panelini Göster" : "Haritayı Tam Ekran Genişlet (Paneli Gizle)"}
+            >
+              {isSidebarCollapsed ? <Minimize2 className="w-3 h-3" /> : <Maximize2 className="w-3 h-3 text-amber-600" />}
+              <span>{isSidebarCollapsed ? "Paneli Aç" : "Tam Ekran"}</span>
+            </button>
 
             {/* 3. Ekspertiz Raporu Sekmesi (Lansmana Özel Ücretsiz - Fotoğraf 2) */}
             <button
@@ -1544,8 +1491,8 @@ export default function Home() {
             </button>
 
 
-            {/* Hızlı İkonlar: 🔔, 🌙, 🌐 */}
-            <div className="hidden xl:flex items-center gap-1 text-slate-400 pl-1 border-l border-slate-200 shrink-0">
+            {/* Hızlı İkonlar: 🔔, 🌙, 🌐 (Yalnızca Çok Geniş Ekranlarda) */}
+            <div className="hidden 2xl:flex items-center gap-1 text-slate-400 pl-1 border-l border-slate-200 shrink-0">
               <button 
                 type="button" 
                 aria-label="Bildirimler"
@@ -1569,18 +1516,18 @@ export default function Home() {
               </button>
             </div>
 
-            {/* Kullanıcı Profili Rozeti: Ali Turan */}
+            {/* Kullanıcı Profili Rozeti: Ali Turan (Her zaman tam görünür) */}
             <div 
               onClick={() => {
                 setActiveTab("endeks");
               }}
-              className="flex items-center gap-2 bg-[#0B1E3B] hover:bg-slate-900 text-amber-400 border border-amber-500/30 pl-1.5 pr-3 py-1 rounded-full shadow-xs cursor-pointer select-none transition active:scale-95 shrink-0"
+              className="flex items-center gap-2 bg-[#0B1E3B] hover:bg-slate-900 text-amber-400 border border-amber-500/40 pl-1.5 pr-3 py-1 rounded-full shadow-xs cursor-pointer select-none transition active:scale-95 shrink-0"
               title="Kullanıcı: Ali Turan (İhaleciBurada Pro Hesap)"
             >
-              <div className="w-6 h-6 rounded-full bg-amber-500 text-slate-950 flex items-center justify-center text-[10px] font-black">
+              <div className="w-6 h-6 rounded-full bg-amber-500 text-slate-950 flex items-center justify-center text-[10px] font-black shrink-0">
                 AT
               </div>
-              <span className="text-xs font-extrabold whitespace-nowrap text-white hidden sm:inline">Ali Turan</span>
+              <span className="text-xs font-extrabold whitespace-nowrap text-white">Ali Turan</span>
             </div>
           </div>
         </div>
