@@ -205,11 +205,17 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
 
         // 1. Yerel hızlı eşleme
         const fastLoc = findFastLocationFromCoords(userLat, userLng);
-        const fastVal = getDistrictValuation(fastLoc.city, fastLoc.district, unitM2Price);
-        const resolvedPrice = fastVal.pricePerM2TL;
         const uCad = getCadastreForCoordinates(userLat, userLng);
         const initialAda = uCad.ada || "";
         const initialParsel = uCad.parsel || "";
+        const fastVal = getDistrictValuation(fastLoc.city, fastLoc.district, unitM2Price, {
+          category,
+          neighborhood: fastLoc.neighborhood,
+          ada: initialAda,
+          parsel: initialParsel,
+          areaM2,
+        });
+        const resolvedPrice = fastVal.pricePerM2TL;
         const initialBadge = (initialAda && initialParsel) ? ` • Ada ${initialAda} / Parsel ${initialParsel}` : "";
 
         setActiveDistrict(fastLoc.district);
@@ -881,14 +887,21 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
       const effectiveDist = isCenterClick ? (district || activeDistrict) : fastLoc.district;
       const effectiveNeigh = isCenterClick ? (neighborhood || activeNeighborhood) : fastLoc.neighborhood;
 
-      const fastVal = getDistrictValuation(effectiveCity, effectiveDist, unitM2Price);
-      const resolvedPrice = fastVal.pricePerM2TL;
       const clickCad = isCenterClick
         ? { ada: activeAda, parsel: activeParsel }
         : getCadastreForCoordinates(clickLat, clickLng);
 
       const initialAda = isCenterClick ? activeAda : clickCad.ada;
       const initialParsel = isCenterClick ? activeParsel : clickCad.parsel;
+
+      const fastVal = getDistrictValuation(effectiveCity, effectiveDist, unitM2Price, {
+        category,
+        neighborhood: effectiveNeigh || undefined,
+        ada: initialAda,
+        parsel: initialParsel,
+        areaM2: isCenterClick ? areaM2 : undefined,
+      });
+      const resolvedPrice = fastVal.pricePerM2TL;
 
       // 2. Tıklanan noktaya anında bal peteğini ve emsal ilanları çiz
       const generatedComps = drawParcelHoneycomb(

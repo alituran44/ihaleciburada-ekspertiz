@@ -37,6 +37,7 @@ import { ParcelInput, PropertyCategory, ComparableListing } from "@/types";
 import { SAMPLE_SCENARIOS, formatTL, formatNumber } from "@/lib/constants";
 import { calculateFeasibility } from "@/lib/calculator";
 import { parseSearchLocation, getCadastreForCoordinates, getDistrictCoordinates, TURKEY_PROVINCES_AND_DISTRICTS } from "@/lib/turkeyLocations";
+import { getDistrictValuation } from "@/lib/districtValuations";
 
 const PROVINCE_NAMES = Object.keys(TURKEY_PROVINCES_AND_DISTRICTS).sort((a, b) => a.localeCompare(b, "tr"));
 import { 
@@ -350,6 +351,17 @@ export default function Home() {
   const handleCategorySwitch = (cat: PropertyCategory) => {
     const foundCat = REAL_ESTATE_CATEGORIES.find((c) => c.id === cat);
     const defaultSub = foundCat?.subCategories[0] || (cat === "konut" ? "Daire" : "Konut İmarlı Arsa");
+    const isLand = cat === "arsa" || cat === "arazi";
+    const newArea = isLand ? 1000 : 120;
+
+    const val = getDistrictValuation(parcelData.city, parcelData.district, 45000, {
+      category: cat,
+      subCategory: defaultSub,
+      neighborhood: parcelData.neighborhood,
+      ada: parcelData.ada,
+      parsel: parcelData.parsel,
+      areaM2: newArea,
+    });
 
     if (cat === "konut") {
       setParcelData((prev) => ({
@@ -368,8 +380,9 @@ export default function Home() {
         hasElevator: true,
         hasParking: true,
         hasBalcony: true,
-        monthlyRentEstimateTL: 32000,
-        askedPriceTL: 5800000,
+        estimatedUnitSaleM2PriceTL: val.pricePerM2TL,
+        monthlyRentEstimateTL: Math.round(val.pricePerM2TL * 120 * 0.0055),
+        askedPriceTL: val.pricePerM2TL * 120,
       }));
     } else if (cat === "arsa" || cat === "arazi") {
       setParcelData((prev) => ({
@@ -380,7 +393,8 @@ export default function Home() {
         areaM2: 1000, // Değeri 1000'lik dönüm olarak esas al
         zoningType: "konut",
         maxFloors: 5,
-        askedPriceTL: 9500000,
+        estimatedLandM2PriceTL: val.pricePerM2TL,
+        askedPriceTL: val.pricePerM2TL * 1000,
       }));
     } else {
       setParcelData((prev) => ({
@@ -391,7 +405,9 @@ export default function Home() {
         areaM2: 250,
         zoningType: "ticari",
         maxFloors: 4,
-        askedPriceTL: 7500000,
+        estimatedLandM2PriceTL: val.pricePerM2TL,
+        estimatedUnitSaleM2PriceTL: val.pricePerM2TL,
+        askedPriceTL: val.pricePerM2TL * 250,
       }));
     }
   };
@@ -492,12 +508,31 @@ export default function Home() {
       const data = await res.json();
 
       let unitPrice = 0;
+      const cad = newCoords ? getCadastreForCoordinates(newCoords.lat, newCoords.lng) : { ada: "", parsel: "" };
+      const preciseVal = getDistrictValuation(cleanCity, cleanDist, 45000, {
+        category: parcelData.category,
+        subCategory: parcelData.subCategory,
+        neighborhood: cleanNeigh,
+        ada: parcelData.ada || cad.ada,
+        parsel: parcelData.parsel || cad.parsel,
+        areaM2: currentArea,
+      });
+
+      const isRes = parcelData.category === "konut";
+      let landPrice = preciseVal.pricePerM2TL;
+      let unitSalePrice = preciseVal.pricePerM2TL;
+
       if (data.success && data.data) {
         const resData = data.data;
         const finalCoords = newCoords || resData.coordinates || parcelData.coordinates;
-        const cad = finalCoords ? getCadastreForCoordinates(finalCoords.lat, finalCoords.lng) : { ada: "", parsel: "" };
-
-        unitPrice = isResidential ? (resData.unitSaleM2PriceTL || 54085) : (resData.landM2PriceTL || 18500);
+        if (!isRes) {
+          landPrice = preciseVal.pricePerM2TL;
+          unitSalePrice = resData.unitSaleM2PriceTL || unitSalePrice;
+        } else {
+          unitSalePrice = preciseVal.pricePerM2TL;
+          landPrice = resData.landM2PriceTL || landPrice;
+        }
+        unitPrice = isRes ? unitSalePrice : landPrice;
 
         setParcelData((prev) => ({
           ...prev,
@@ -505,8 +540,8 @@ export default function Home() {
           ada: prev.ada || cad.ada,
           parsel: prev.parsel || cad.parsel,
           areaM2: currentArea,
-          estimatedLandM2PriceTL: resData.landM2PriceTL || prev.estimatedLandM2PriceTL,
-          estimatedUnitSaleM2PriceTL: resData.unitSaleM2PriceTL || prev.estimatedUnitSaleM2PriceTL,
+          estimatedLandM2PriceTL: landPrice,
+          estimatedUnitSaleM2PriceTL: unitSalePrice,
           contractorSharePercent: resData.contractorSharePercent ?? prev.contractorSharePercent,
           monthlyRentEstimateTL: isResidential ? (resData.estimatedMonthlyRentTL ?? prev.monthlyRentEstimateTL) : prev.monthlyRentEstimateTL,
           marketResearch: resData,
@@ -515,7 +550,13 @@ export default function Home() {
           buildingCostEstimate: resData.buildingCostEstimate || prev.buildingCostEstimate,
         }));
       } else {
-        unitPrice = isResidential ? (parcelData.estimatedUnitSaleM2PriceTL || 54085) : (parcelData.estimatedLandM2PriceTL || 18500);
+        unitPrice = isRes ? unitSalePrice : landPrice;
+        setParcelData((prev) => ({
+          ...prev,
+          areaM2: currentArea,
+          estimatedLandM2PriceTL: landPrice,
+          estimatedUnitSaleM2PriceTL: unitSalePrice,
+        }));
       }
 
       const totalVal = unitPrice * currentArea;
@@ -592,6 +633,19 @@ export default function Home() {
       const res = await fetch(url);
       const data = await res.json();
 
+      const preciseVal = getDistrictValuation(updatedCity, updatedDistrict, 45000, {
+        category: parcelData.category,
+        subCategory: parcelData.subCategory,
+        neighborhood: updatedNeigh,
+        ada: parcelData.ada || cad.ada,
+        parsel: parcelData.parsel || cad.parsel,
+        areaM2: parcelData.areaM2,
+      });
+
+      const isRes = parcelData.category === "konut";
+      const resolvedLand = !isRes ? preciseVal.pricePerM2TL : (data?.data?.landM2PriceTL || 18500);
+      const resolvedUnit = isRes ? preciseVal.pricePerM2TL : (data?.data?.unitSaleM2PriceTL || 54085);
+
       if (data.success && data.data) {
         const resData = data.data;
         setParcelData((prev) => ({
@@ -602,8 +656,8 @@ export default function Home() {
           coordinates: finalCoords,
           ada: cad.ada || prev.ada,
           parsel: cad.parsel || prev.parsel,
-          estimatedLandM2PriceTL: resData.landM2PriceTL || prev.estimatedLandM2PriceTL,
-          estimatedUnitSaleM2PriceTL: resData.unitSaleM2PriceTL || prev.estimatedUnitSaleM2PriceTL,
+          estimatedLandM2PriceTL: resolvedLand,
+          estimatedUnitSaleM2PriceTL: resolvedUnit,
           contractorSharePercent: resData.contractorSharePercent ?? prev.contractorSharePercent,
           monthlyRentEstimateTL: isResidential ? (resData.estimatedMonthlyRentTL ?? prev.monthlyRentEstimateTL) : prev.monthlyRentEstimateTL,
           marketResearch: resData,
@@ -620,6 +674,8 @@ export default function Home() {
           coordinates: finalCoords,
           ada: cad.ada || prev.ada,
           parsel: cad.parsel || prev.parsel,
+          estimatedLandM2PriceTL: resolvedLand,
+          estimatedUnitSaleM2PriceTL: resolvedUnit,
         }));
       }
     } catch (err) {
@@ -796,8 +852,18 @@ export default function Home() {
     // 2. Sol analitik paneli ve taşınmaz verilerini anında güncelle (0ms gecikme)
     setParcelData((prev) => {
       const isRes = prev.category === "konut";
-      const newUnitM2 = loc.unitPrice || prev.estimatedUnitSaleM2PriceTL || 54090;
-      const newLandM2 = isRes ? (prev.estimatedLandM2PriceTL || 15000) : newUnitM2;
+      const preciseVal = getDistrictValuation(loc.city, loc.district, loc.unitPrice || 45000, {
+        category: prev.category,
+        subCategory: prev.subCategory,
+        neighborhood: loc.neighborhood,
+        ada: (loc.ada && loc.ada.trim()) ? loc.ada : prev.ada,
+        parsel: (loc.parsel && loc.parsel.trim()) ? loc.parsel : prev.parsel,
+        areaM2: loc.areaM2 ? loc.areaM2 : prev.areaM2,
+      });
+
+      const newLandM2 = !isRes ? preciseVal.pricePerM2TL : (prev.estimatedLandM2PriceTL || 18500);
+      const newUnitM2 = isRes ? preciseVal.pricePerM2TL : (prev.estimatedUnitSaleM2PriceTL || 54085);
+
       return {
         ...prev,
         city: loc.city,
@@ -807,7 +873,7 @@ export default function Home() {
         parsel: (loc.parsel && loc.parsel.trim()) ? loc.parsel : prev.parsel,
         areaM2: loc.areaM2 ? loc.areaM2 : prev.areaM2,
         coordinates: loc.coordinates, // Tıklanan koordinat kesin olarak sabitlenir!
-        estimatedUnitSaleM2PriceTL: isRes ? newUnitM2 : prev.estimatedUnitSaleM2PriceTL,
+        estimatedUnitSaleM2PriceTL: newUnitM2,
         estimatedLandM2PriceTL: newLandM2,
         comparables: loc.comparables && loc.comparables.length > 0 ? loc.comparables : prev.comparables,
       };
@@ -820,19 +886,24 @@ export default function Home() {
       const data = await res.json();
       if (data.success && data.data) {
         const resData = data.data;
-        setParcelData((prev) => ({
-          ...prev,
-          city: loc.city,
-          district: loc.district,
-          neighborhood: loc.neighborhood,
-          coordinates: loc.coordinates, // Tıklanan koordinatı kesinlikle koru!
-          contractorSharePercent: resData.contractorSharePercent ?? prev.contractorSharePercent,
-          monthlyRentEstimateTL: parcelData.category === "konut" ? (resData.estimatedMonthlyRentTL ?? prev.monthlyRentEstimateTL) : prev.monthlyRentEstimateTL,
-          marketResearch: resData,
-          comparables: resData.comparables ?? prev.comparables,
-          tcmbOfficialData: resData.tcmbOfficialData ?? prev.tcmbOfficialData,
-          buildingCostEstimate: resData.buildingCostEstimate ?? prev.buildingCostEstimate,
-        }));
+        setParcelData((prev) => {
+          const isRes = prev.category === "konut";
+          return {
+            ...prev,
+            city: loc.city,
+            district: loc.district,
+            neighborhood: loc.neighborhood,
+            coordinates: loc.coordinates, // Tıklanan koordinatı kesinlikle koru!
+            estimatedLandM2PriceTL: !isRes ? (resData.landM2PriceTL || prev.estimatedLandM2PriceTL) : prev.estimatedLandM2PriceTL,
+            estimatedUnitSaleM2PriceTL: isRes ? (resData.unitSaleM2PriceTL || prev.estimatedUnitSaleM2PriceTL) : prev.estimatedUnitSaleM2PriceTL,
+            contractorSharePercent: resData.contractorSharePercent ?? prev.contractorSharePercent,
+            monthlyRentEstimateTL: isRes ? (resData.estimatedMonthlyRentTL ?? prev.monthlyRentEstimateTL) : prev.monthlyRentEstimateTL,
+            marketResearch: resData,
+            comparables: resData.comparables ?? prev.comparables,
+            tcmbOfficialData: resData.tcmbOfficialData ?? prev.tcmbOfficialData,
+            buildingCostEstimate: resData.buildingCostEstimate ?? prev.buildingCostEstimate,
+          };
+        });
       }
     } catch (err) {
       console.warn("Bölgesel emsal sorgu hatası:", err);
@@ -1386,14 +1457,33 @@ export default function Home() {
                       <input
                         type="text"
                         value={parcelData.neighborhood || ""}
-                        onChange={(e) => setParcelData(prev => ({ ...prev, neighborhood: e.target.value }))}
+                        onChange={(e) => {
+                          const newNeigh = e.target.value;
+                          setParcelData((prev) => {
+                            const val = getDistrictValuation(prev.city, prev.district, 45000, {
+                              category: prev.category,
+                              subCategory: prev.subCategory,
+                              neighborhood: newNeigh,
+                              ada: prev.ada,
+                              parsel: prev.parsel,
+                              areaM2: prev.areaM2,
+                            });
+                            const isRes = prev.category === "konut";
+                            return {
+                              ...prev,
+                              neighborhood: newNeigh,
+                              estimatedLandM2PriceTL: !isRes ? val.pricePerM2TL : prev.estimatedLandM2PriceTL,
+                              estimatedUnitSaleM2PriceTL: isRes ? val.pricePerM2TL : prev.estimatedUnitSaleM2PriceTL,
+                            };
+                          });
+                        }}
                         onBlur={() => handleAddressChange({ neighborhood: parcelData.neighborhood })}
                         onKeyDown={(e) => {
                           if (e.key === "Enter") {
                             handleAddressChange({ neighborhood: parcelData.neighborhood });
                           }
                         }}
-                        placeholder="Örn: Arslanca"
+                        placeholder="Örn: Cevatpaşa"
                         className="w-full bg-slate-900/95 border border-slate-700 focus:border-amber-400 rounded-lg px-2 py-1.5 text-xs font-bold text-white outline-none placeholder:text-slate-500 truncate"
                         title="Mahalle veya köy adını düzenleyip Enter'a basınız"
                       />
@@ -1419,7 +1509,26 @@ export default function Home() {
                       <input
                         type="text"
                         value={parcelData.ada || ""}
-                        onChange={(e) => setParcelData(prev => ({ ...prev, ada: e.target.value }))}
+                        onChange={(e) => {
+                          const newAda = e.target.value;
+                          setParcelData((prev) => {
+                            const val = getDistrictValuation(prev.city, prev.district, 45000, {
+                              category: prev.category,
+                              subCategory: prev.subCategory,
+                              neighborhood: prev.neighborhood,
+                              ada: newAda,
+                              parsel: prev.parsel,
+                              areaM2: prev.areaM2,
+                            });
+                            const isRes = prev.category === "konut";
+                            return {
+                              ...prev,
+                              ada: newAda,
+                              estimatedLandM2PriceTL: !isRes ? val.pricePerM2TL : prev.estimatedLandM2PriceTL,
+                              estimatedUnitSaleM2PriceTL: isRes ? val.pricePerM2TL : prev.estimatedUnitSaleM2PriceTL,
+                            };
+                          });
+                        }}
                         placeholder="1368"
                         className="w-full bg-slate-900/90 border border-slate-700 focus:border-amber-400 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-white outline-none"
                       />
@@ -1431,7 +1540,26 @@ export default function Home() {
                       <input
                         type="text"
                         value={parcelData.parsel || ""}
-                        onChange={(e) => setParcelData(prev => ({ ...prev, parsel: e.target.value }))}
+                        onChange={(e) => {
+                          const newParsel = e.target.value;
+                          setParcelData((prev) => {
+                            const val = getDistrictValuation(prev.city, prev.district, 45000, {
+                              category: prev.category,
+                              subCategory: prev.subCategory,
+                              neighborhood: prev.neighborhood,
+                              ada: prev.ada,
+                              parsel: newParsel,
+                              areaM2: prev.areaM2,
+                            });
+                            const isRes = prev.category === "konut";
+                            return {
+                              ...prev,
+                              parsel: newParsel,
+                              estimatedLandM2PriceTL: !isRes ? val.pricePerM2TL : prev.estimatedLandM2PriceTL,
+                              estimatedUnitSaleM2PriceTL: isRes ? val.pricePerM2TL : prev.estimatedUnitSaleM2PriceTL,
+                            };
+                          });
+                        }}
                         placeholder="1"
                         className="w-full bg-slate-900/90 border border-slate-700 focus:border-amber-400 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-white outline-none"
                       />
@@ -1444,7 +1572,25 @@ export default function Home() {
                         {/* 1000'lik Dönüm Seçim Butonu */}
                         <button
                           type="button"
-                          onClick={() => setParcelData(prev => ({ ...prev, areaM2: 1000 }))}
+                          onClick={() => {
+                            setParcelData((prev) => {
+                              const val = getDistrictValuation(prev.city, prev.district, 45000, {
+                                category: prev.category,
+                                subCategory: prev.subCategory,
+                                neighborhood: prev.neighborhood,
+                                ada: prev.ada,
+                                parsel: prev.parsel,
+                                areaM2: 1000,
+                              });
+                              const isRes = prev.category === "konut";
+                              return {
+                                ...prev,
+                                areaM2: 1000,
+                                estimatedLandM2PriceTL: !isRes ? val.pricePerM2TL : prev.estimatedLandM2PriceTL,
+                                estimatedUnitSaleM2PriceTL: isRes ? val.pricePerM2TL : prev.estimatedUnitSaleM2PriceTL,
+                              };
+                            });
+                          }}
                           className="text-[9px] text-amber-400 hover:text-amber-300 font-bold underline cursor-pointer"
                           title="Alan değerini 1.000 m² (1 Dönüm) olarak ayarla"
                         >
@@ -1454,7 +1600,26 @@ export default function Home() {
                       <input
                         type="number"
                         value={parcelData.areaM2 || ""}
-                        onChange={(e) => setParcelData(prev => ({ ...prev, areaM2: Number(e.target.value) || 0 }))}
+                        onChange={(e) => {
+                          const newArea = Number(e.target.value) || 0;
+                          setParcelData((prev) => {
+                            const val = getDistrictValuation(prev.city, prev.district, 45000, {
+                              category: prev.category,
+                              subCategory: prev.subCategory,
+                              neighborhood: prev.neighborhood,
+                              ada: prev.ada,
+                              parsel: prev.parsel,
+                              areaM2: newArea,
+                            });
+                            const isRes = prev.category === "konut";
+                            return {
+                              ...prev,
+                              areaM2: newArea,
+                              estimatedLandM2PriceTL: !isRes ? val.pricePerM2TL : prev.estimatedLandM2PriceTL,
+                              estimatedUnitSaleM2PriceTL: isRes ? val.pricePerM2TL : prev.estimatedUnitSaleM2PriceTL,
+                            };
+                          });
+                        }}
                         placeholder="1000"
                         className="w-full bg-slate-900/90 border border-slate-700 focus:border-amber-400 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-amber-400 outline-none"
                       />
@@ -1978,32 +2143,149 @@ export default function Home() {
                   <div className="flex items-center gap-1 text-[10px] font-bold text-slate-300">
                     <button
                       type="button"
-                      onClick={() => setValuationMode("otomatik")}
-                      className={`px-2 py-0.5 rounded cursor-pointer ${valuationMode === "otomatik" ? "bg-amber-500/30 text-amber-300 font-black border border-amber-400/40" : "text-slate-400"}`}
+                      onClick={() => {
+                        setValuationMode("otomatik");
+                        const val = getDistrictValuation(parcelData.city, parcelData.district, 45000, {
+                          category: parcelData.category,
+                          subCategory: parcelData.subCategory,
+                          neighborhood: parcelData.neighborhood,
+                          ada: parcelData.ada,
+                          parsel: parcelData.parsel,
+                          areaM2: parcelData.areaM2,
+                        });
+                        if (isResidential) setParcelData(prev => ({ ...prev, estimatedUnitSaleM2PriceTL: val.pricePerM2TL }));
+                        else setParcelData(prev => ({ ...prev, estimatedLandM2PriceTL: val.pricePerM2TL }));
+                      }}
+                      className={`px-2 py-0.5 rounded cursor-pointer transition ${valuationMode === "otomatik" ? "bg-amber-500/30 text-amber-300 font-black border border-amber-400/40" : "text-slate-400 hover:text-white"}`}
                     >
                       ● Otomatik
                     </button>
                     <button
                       type="button"
                       onClick={() => setValuationMode("manuel")}
-                      className={`px-2 py-0.5 rounded cursor-pointer ${valuationMode === "manuel" ? "bg-amber-500/30 text-amber-300 font-black border border-amber-400/40" : "text-slate-400"}`}
+                      className={`px-2 py-0.5 rounded cursor-pointer transition ${valuationMode === "manuel" ? "bg-amber-500/30 text-amber-300 font-black border border-amber-400/40" : "text-slate-400 hover:text-white"}`}
                     >
-                      ○ Manuel
+                      ✏️ Manuel
                     </button>
                   </div>
                 </div>
 
                 <div className="flex items-baseline justify-between pt-1">
-                  <div>
-                    <div className="text-2xl sm:text-3xl font-black text-white font-heading tracking-tight font-mono">
-                      {(isResidential ? (parcelData.estimatedUnitSaleM2PriceTL || 54085) : (parcelData.estimatedLandM2PriceTL || 18500)).toLocaleString("tr-TR")} ₺ <span className="text-xs font-semibold text-slate-400">/ m²</span>
-                    </div>
-                    <div className="text-[11px] text-slate-400 mt-0.5">
-                      {parcelData.district} {parcelData.neighborhood ? `• ${parcelData.neighborhood}` : ""} Bölgesel Emsal Değeri
-                    </div>
+                  <div className="flex-1">
+                    {valuationMode === "otomatik" ? (
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <div className="text-2xl sm:text-3xl font-black text-white font-heading tracking-tight font-mono">
+                            {(isResidential ? (parcelData.estimatedUnitSaleM2PriceTL || 54085) : (parcelData.estimatedLandM2PriceTL || 18500)).toLocaleString("tr-TR")} ₺ <span className="text-xs font-semibold text-slate-400">/ m²</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setValuationMode("manuel")}
+                            className="text-[10px] px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 font-bold transition cursor-pointer"
+                            title="Değeri serbestçe değiştirmek için tıklayın"
+                          >
+                            ✏️ Değiştir
+                          </button>
+                        </div>
+                        <div className="text-[11px] text-slate-400 mt-0.5">
+                          {parcelData.district} {parcelData.neighborhood ? `• ${parcelData.neighborhood}` : ""} {parcelData.category === "konut" ? "Konut" : parcelData.category === "arsa" ? "Arsa" : "Arazi"} Emsal Değeri
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            min={100}
+                            step={100}
+                            value={isResidential ? (parcelData.estimatedUnitSaleM2PriceTL || 54085) : (parcelData.estimatedLandM2PriceTL || 18500)}
+                            onChange={(e) => {
+                              const val = Math.max(0, parseInt(e.target.value) || 0);
+                              if (isResidential) {
+                                setParcelData(prev => ({ ...prev, estimatedUnitSaleM2PriceTL: val }));
+                              } else {
+                                setParcelData(prev => ({ ...prev, estimatedLandM2PriceTL: val }));
+                              }
+                            }}
+                            className="w-36 bg-slate-900 border-2 border-amber-400 rounded-xl px-2.5 py-1 text-xl sm:text-2xl font-black text-amber-300 font-mono focus:ring-2 focus:ring-amber-400/50 outline-none"
+                          />
+                          <span className="text-xs font-bold text-amber-400">₺ / m² (Manuel Giriş)</span>
+                        </div>
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const curr = isResidential ? (parcelData.estimatedUnitSaleM2PriceTL || 54085) : (parcelData.estimatedLandM2PriceTL || 18500);
+                              const nextVal = Math.round(curr * 0.90);
+                              if (isResidential) setParcelData(prev => ({ ...prev, estimatedUnitSaleM2PriceTL: nextVal }));
+                              else setParcelData(prev => ({ ...prev, estimatedLandM2PriceTL: nextVal }));
+                            }}
+                            className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-rose-300 text-[10px] font-bold border border-slate-700 cursor-pointer"
+                          >
+                            -%10
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const curr = isResidential ? (parcelData.estimatedUnitSaleM2PriceTL || 54085) : (parcelData.estimatedLandM2PriceTL || 18500);
+                              const nextVal = Math.round(curr * 0.95);
+                              if (isResidential) setParcelData(prev => ({ ...prev, estimatedUnitSaleM2PriceTL: nextVal }));
+                              else setParcelData(prev => ({ ...prev, estimatedLandM2PriceTL: nextVal }));
+                            }}
+                            className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-rose-300 text-[10px] font-bold border border-slate-700 cursor-pointer"
+                          >
+                            -%5
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const curr = isResidential ? (parcelData.estimatedUnitSaleM2PriceTL || 54085) : (parcelData.estimatedLandM2PriceTL || 18500);
+                              const nextVal = Math.round(curr * 1.05);
+                              if (isResidential) setParcelData(prev => ({ ...prev, estimatedUnitSaleM2PriceTL: nextVal }));
+                              else setParcelData(prev => ({ ...prev, estimatedLandM2PriceTL: nextVal }));
+                            }}
+                            className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-emerald-300 text-[10px] font-bold border border-slate-700 cursor-pointer"
+                          >
+                            +%5
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const curr = isResidential ? (parcelData.estimatedUnitSaleM2PriceTL || 54085) : (parcelData.estimatedLandM2PriceTL || 18500);
+                              const nextVal = Math.round(curr * 1.10);
+                              if (isResidential) setParcelData(prev => ({ ...prev, estimatedUnitSaleM2PriceTL: nextVal }));
+                              else setParcelData(prev => ({ ...prev, estimatedLandM2PriceTL: nextVal }));
+                            }}
+                            className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-emerald-300 text-[10px] font-bold border border-slate-700 cursor-pointer"
+                          >
+                            +%10
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const val = getDistrictValuation(parcelData.city, parcelData.district, 45000, {
+                                category: parcelData.category,
+                                subCategory: parcelData.subCategory,
+                                neighborhood: parcelData.neighborhood,
+                                ada: parcelData.ada,
+                                parsel: parcelData.parsel,
+                                areaM2: parcelData.areaM2,
+                              });
+                              if (isResidential) setParcelData(prev => ({ ...prev, estimatedUnitSaleM2PriceTL: val.pricePerM2TL }));
+                              else setParcelData(prev => ({ ...prev, estimatedLandM2PriceTL: val.pricePerM2TL }));
+                              setValuationMode("otomatik");
+                            }}
+                            className="px-2 py-0.5 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-[10px] font-bold border border-amber-500/40 cursor-pointer"
+                            title="Resmi piyasa ortalamasına dön"
+                          >
+                            🔄 Otomatiğe Dön
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
-                  <div className="text-right">
+                  <div className="text-right shrink-0">
                     <div className="text-[10px] font-extrabold text-amber-400 uppercase tracking-tight">
                       İİK m.115 %50 Tabanı
                     </div>

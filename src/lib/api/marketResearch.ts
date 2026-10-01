@@ -8,6 +8,7 @@ import { TURKEY_81_PROVINCES } from "./valuation";
 import { fetchTcmbHousingMetrics } from "./tcmbEvds";
 import { calculateBuildingAndArchitecturalCost } from "./moEnAzBedel";
 import { getProvinceCoordinates } from "../turkeyLocations";
+import { getDistrictValuation } from "../districtValuations";
 
 interface DistrictBenchmark {
   landM2: number;
@@ -333,19 +334,18 @@ export async function performMarketResearch(params: {
     };
   }
 
-  let neighborhoodMultiplier = 1.0;
-  if (neighborhoodRaw) {
-    const nNorm = normalizeTr(neighborhoodRaw);
-    if (nNorm.includes("sahil") || nNorm.includes("yalikavak") || nNorm.includes("moda") || nNorm.includes("marina") || nNorm.includes("merkez")) {
-      neighborhoodMultiplier = 1.12;
-    } else if (nNorm.includes("koy") || nNorm.includes("kirsal") || nNorm.includes("tarla")) {
-      neighborhoodMultiplier = 0.88;
-    }
-  }
+  const landVal = getDistrictValuation(cityRaw, districtRaw, benchmark.landM2, {
+    category: "arsa",
+    neighborhood: neighborhoodRaw,
+  });
+  const unitVal = getDistrictValuation(cityRaw, districtRaw, benchmark.unitM2, {
+    category: "konut",
+    neighborhood: neighborhoodRaw,
+  });
 
-  const baseLandM2 = Math.round(benchmark.landM2 * neighborhoodMultiplier);
-  const baseUnitM2 = Math.round(benchmark.unitM2 * neighborhoodMultiplier);
-  const baseRentM2 = Math.round(benchmark.rentM2 * neighborhoodMultiplier);
+  const baseLandM2 = landVal.pricePerM2TL;
+  const baseUnitM2 = unitVal.pricePerM2TL;
+  const baseRentM2 = Math.round(baseUnitM2 * 0.0055);
 
   const landM2MinTL = Math.round(baseLandM2 * 0.86);
   const landM2MaxTL = Math.round(baseLandM2 * 1.16);
