@@ -218,9 +218,75 @@ export function formatTL(amount: number): string {
   }).format(amount).replace("TRY", "₺");
 }
 
-export function formatNumber(amount: number): string {
-  if (isNaN(amount)) return "0";
+export function formatNumber(amount: number, maxDigits: number = 2): string {
+  if (isNaN(amount) || amount === null || amount === undefined) return "0";
   return new Intl.NumberFormat("tr-TR", {
-    maximumFractionDigits: 1,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: maxDigits,
   }).format(amount);
+}
+
+/**
+ * Alan (m²) formatlayıcı:
+ * - Binlik ayıraç olarak '.' kullanır (örn: 16.200)
+ * - Küsüratlı kısımlarda en fazla 2 basamak gösterir (örn: 16.200,46)
+ * - Tam sayılarda gereksiz ',00' eklemez (örn: 1.000)
+ */
+export function formatArea(amount: number | null | undefined, maxDigits: number = 2): string {
+  if (amount === null || amount === undefined || isNaN(amount) || amount === 0) return "0";
+  return new Intl.NumberFormat("tr-TR", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: maxDigits,
+  }).format(amount);
+}
+
+/**
+ * Kullanıcı girdisini veya API çıktısını güvenli şekilde sayıya çevirir:
+ * "16.200,46" -> 16200.46
+ * "16,20046"  -> 16200.46
+ * "16200,46"  -> 16200.46
+ * "1.000"     -> 1000
+ * "16.200"    -> 16200
+ */
+export function parseTurkishNumber(input: string | number | null | undefined): number {
+  if (typeof input === "number") return isNaN(input) ? 0 : input;
+  if (!input) return 0;
+
+  let str = String(input).trim().replace(/[^\d.,-]/g, "");
+  if (!str) return 0;
+
+  if (str.includes(".") && str.includes(",")) {
+    const lastDot = str.lastIndexOf(".");
+    const lastComma = str.lastIndexOf(",");
+    if (lastComma > lastDot) {
+      str = str.replace(/\./g, "").replace(",", ".");
+    } else {
+      str = str.replace(/,/g, "");
+    }
+  } else if (str.includes(",")) {
+    const parts = str.split(",");
+    if (parts.length === 2 && parts[0].length <= 3 && parts[1].length >= 4) {
+      const thousands = parts[0] + parts[1].slice(0, 3);
+      const decimals = parts[1].slice(3);
+      str = decimals.length > 0 ? (thousands + "." + decimals) : thousands;
+    } else {
+      str = str.replace(",", ".");
+    }
+  } else if (str.includes(".")) {
+    const parts = str.split(".");
+    if (parts.length === 2) {
+      if (parts[1].length === 3) {
+        str = parts[0] + parts[1];
+      } else if (parts[0].length <= 3 && parts[1].length >= 4) {
+        const thousands = parts[0] + parts[1].slice(0, 3);
+        const decimals = parts[1].slice(3);
+        str = decimals.length > 0 ? (thousands + "." + decimals) : thousands;
+      }
+    } else if (parts.length > 2) {
+      str = str.replace(/\./g, "");
+    }
+  }
+
+  const num = parseFloat(str);
+  return isNaN(num) ? 0 : num;
 }

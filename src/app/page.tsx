@@ -34,7 +34,7 @@ const StartValuationModal = dynamic(
   { ssr: false }
 );
 import { ParcelInput, PropertyCategory, ComparableListing } from "@/types";
-import { SAMPLE_SCENARIOS, formatTL, formatNumber } from "@/lib/constants";
+import { SAMPLE_SCENARIOS, formatTL, formatNumber, formatArea, parseTurkishNumber } from "@/lib/constants";
 import { calculateFeasibility } from "@/lib/calculator";
 import { parseSearchLocation, getCadastreForCoordinates, getDistrictCoordinates, TURKEY_PROVINCES_AND_DISTRICTS } from "@/lib/turkeyLocations";
 import { getDistrictValuation } from "@/lib/districtValuations";
@@ -113,6 +113,8 @@ export default function Home() {
   const [isAutoLocating, setIsAutoLocating] = useState<boolean>(false);
   const [locationToast, setLocationToast] = useState<string | null>(null);
   const [tkgmGlobalToast, setTkgmGlobalToast] = useState<string | null>(null);
+  const [areaInputStr, setAreaInputStr] = useState<string>("");
+  const [isEditingArea, setIsEditingArea] = useState<boolean>(false);
 
   // 📍 GPS İle Otomatik İl, İlçe, Köy Bilgisi Doldurma ve Emsal Yükleme
   const handleAutoLocateGPS = useCallback((silent: boolean = false) => {
@@ -148,7 +150,7 @@ export default function Home() {
             const finalParsel = loc.parsel || autoCad.parsel;
 
             if (loc.isOfficialCadastre && loc.ada && loc.parsel) {
-              setTkgmGlobalToast(`🏛️ TKGM Resmi Kadastro: Ada ${loc.ada} / Parsel ${loc.parsel}${loc.alanM2 ? ` • ${loc.alanM2.toLocaleString("tr-TR")} m²` : ""}${loc.nitelik ? ` (${loc.nitelik})` : ""}`);
+              setTkgmGlobalToast(`🏛️ TKGM Resmi Kadastro: Ada ${loc.ada} / Parsel ${loc.parsel}${loc.alanM2 ? ` • ${formatArea(loc.alanM2)} m²` : ""}${loc.nitelik ? ` (${loc.nitelik})` : ""}`);
               setTimeout(() => setTkgmGlobalToast(null), 5000);
             }
 
@@ -1683,6 +1685,8 @@ export default function Home() {
                         <button
                           type="button"
                           onClick={() => {
+                            setIsEditingArea(false);
+                            setAreaInputStr("1.000");
                             setParcelData((prev) => {
                               const val = getDistrictValuation(prev.city, prev.district, 45000, {
                                 category: prev.category,
@@ -1708,10 +1712,17 @@ export default function Home() {
                         </button>
                       </div>
                       <input
-                        type="number"
-                        value={parcelData.areaM2 || ""}
+                        type="text"
+                        inputMode="decimal"
+                        value={isEditingArea ? areaInputStr : (parcelData.areaM2 ? formatArea(parcelData.areaM2) : "")}
+                        onFocus={() => {
+                          setIsEditingArea(true);
+                          setAreaInputStr(parcelData.areaM2 ? formatArea(parcelData.areaM2) : "");
+                        }}
                         onChange={(e) => {
-                          const newArea = Number(e.target.value) || 0;
+                          const rawVal = e.target.value;
+                          setAreaInputStr(rawVal);
+                          const parsed = parseTurkishNumber(rawVal);
                           setParcelData((prev) => {
                             const val = getDistrictValuation(prev.city, prev.district, 45000, {
                               category: prev.category,
@@ -1719,21 +1730,32 @@ export default function Home() {
                               neighborhood: prev.neighborhood,
                               ada: prev.ada,
                               parsel: prev.parsel,
-                              areaM2: newArea,
+                              areaM2: parsed,
                             });
                             const isRes = prev.category === "konut";
                             return {
                               ...prev,
-                              areaM2: newArea,
+                              areaM2: parsed,
                               estimatedLandM2PriceTL: !isRes ? val.pricePerM2TL : prev.estimatedLandM2PriceTL,
                               estimatedUnitSaleM2PriceTL: isRes ? val.pricePerM2TL : prev.estimatedUnitSaleM2PriceTL,
                             };
                           });
                         }}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") handleShowOnMap();
+                        onBlur={() => {
+                          setIsEditingArea(false);
+                          if (parcelData.areaM2) {
+                            setAreaInputStr(formatArea(parcelData.areaM2));
+                          } else {
+                            setAreaInputStr("");
+                          }
                         }}
-                        placeholder="1000"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            setIsEditingArea(false);
+                            handleShowOnMap();
+                          }
+                        }}
+                        placeholder="1.000"
                         className="w-full bg-slate-900/90 border border-slate-700 focus:border-amber-400 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-amber-400 outline-none"
                       />
                     </div>
@@ -1810,7 +1832,7 @@ export default function Home() {
                     </div>
                   </div>
                   <div className="pl-1">
-                    <div className="text-[9px] uppercase tracking-wide text-slate-400 font-bold">Toplam Değer ({parcelData.areaM2 || 1000} m²)</div>
+                    <div className="text-[9px] uppercase tracking-wide text-slate-400 font-bold">Toplam Değer ({formatArea(parcelData.areaM2 || 1000)} m²)</div>
                     <div className="text-xs sm:text-sm font-black font-mono text-emerald-400 mt-0.5">
                       {Math.round((isResidential ? (parcelData.estimatedUnitSaleM2PriceTL || 54085) : (parcelData.estimatedLandM2PriceTL || 18500)) * (parcelData.areaM2 || 1000)).toLocaleString("tr-TR")} ₺
                     </div>
@@ -2439,7 +2461,7 @@ export default function Home() {
                     </div>
                   </div>
                   <div className="pl-1 text-right">
-                    <div className="text-[10px] uppercase font-bold text-slate-400">Seçili Parsel ({parcelData.areaM2 || 1000} m²)</div>
+                    <div className="text-[10px] uppercase font-bold text-slate-400">Seçili Parsel ({formatArea(parcelData.areaM2 || 1000)} m²)</div>
                     <div className="text-sm sm:text-base font-black text-emerald-400 font-mono mt-0.5">
                       {Math.round((isResidential ? (parcelData.estimatedUnitSaleM2PriceTL || 54085) : (parcelData.estimatedLandM2PriceTL || 18500)) * (parcelData.areaM2 || 1000)).toLocaleString("tr-TR")} ₺
                     </div>
@@ -2620,7 +2642,7 @@ export default function Home() {
                       <span className="font-bold text-slate-900">{parcelData.district} / {parcelData.neighborhood || "Merkez"} • {parcelData.ada || "48507"}/{parcelData.parsel || "1"}</span>
                     </div>
                     <div className="flex justify-between items-center py-1 border-b border-slate-100">
-                      <span className="text-slate-500">Piyasa Değeri ({parcelData.areaM2 || 110} m²):</span>
+                      <span className="text-slate-500">Piyasa Değeri ({formatArea(parcelData.areaM2 || 110)} m²):</span>
                       <span className="font-bold text-slate-900 font-mono">₺ {Math.round((isResidential ? (parcelData.estimatedUnitSaleM2PriceTL || 54085) : (parcelData.estimatedLandM2PriceTL || 18500)) * (parcelData.areaM2 || 110)).toLocaleString("tr-TR")}</span>
                     </div>
                     <div className="flex justify-between items-center py-1 border-b border-slate-100">

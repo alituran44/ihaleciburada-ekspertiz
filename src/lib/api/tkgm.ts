@@ -3,6 +3,8 @@
  * (https://public-apis-web.vercel.app/ dizinindeki ücretsiz küresel servislerle güçlendirilmiştir)
  */
 
+import { parseTurkishNumber } from "@/lib/constants";
+
 export interface TKGMParcelResult {
   success: boolean;
   source: "TKGM_MEGSIS" | "TKGM_TAKPAS" | "OPEN_GIS_NOMINATIM" | "OPEN_GIS_FALLBACK";
@@ -64,8 +66,7 @@ export async function queryTKGMByCoordinates(lat: number, lng: number): Promise<
       const data = await res.json();
       if (data && data.properties && data.properties.adaNo && data.properties.parselNo) {
         const props = data.properties;
-        const areaStr = props.alan ? String(props.alan).replace(/\./g, "").replace(",", ".") : "0";
-        const parsedArea = parseFloat(areaStr) || 0;
+        const parsedArea = props.alan ? parseTurkishNumber(props.alan) : 0;
 
         let centerCoords = { lat: pLat, lng: pLng };
         if (data.geometry && data.geometry.type === "Polygon" && Array.isArray(data.geometry.coordinates?.[0])) {

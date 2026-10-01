@@ -5,6 +5,7 @@ import L from "leaflet";
 import { ComparableListing, PropertyCategory } from "@/types";
 import { getDistrictValuation } from "@/lib/districtValuations";
 import { findFastLocationFromCoords, getCadastreForCoordinates } from "@/lib/turkeyLocations";
+import { formatArea, parseTurkishNumber } from "@/lib/constants";
 import { 
   MapPin, 
   Mountain, 
@@ -282,7 +283,7 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
             if (refNeigh) setActiveNeighborhood(refNeigh);
 
             const adaParselDesc = (refAda && refParsel) ? `Ada ${refAda} / Parsel ${refParsel}` : "Kadastro Parseli";
-            const areaDesc = refArea ? ` • ${refArea.toLocaleString("tr-TR")} m²` : "";
+            const areaDesc = refArea ? ` • ${formatArea(refArea)} m²` : "";
             const officialBadge = loc.isOfficialCadastre ? "🏛️ TKGM Onaylı" : "📍";
 
             setParcelNotice(`${officialBadge} ${refDist} / ${refCity}${refNeigh ? ` • ${refNeigh}` : ""} • ${adaParselDesc}${areaDesc} • ${resolvedPrice.toLocaleString("tr-TR")} ₺/m²`);
@@ -536,7 +537,7 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
     const targetParsel = (customParsel && customParsel.trim()) ? customParsel.trim() : (parsel && parsel.trim()) ? parsel.trim() : (locCad.parsel || "");
     const effectiveArea = customArea || areaM2;
     const targetArea = effectiveArea 
-      ? (effectiveArea % 1 === 0 ? effectiveArea.toLocaleString("tr-TR") : effectiveArea.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })) 
+      ? formatArea(effectiveArea) 
       : "1.650";
 
     const adaParselBadgeText = (targetAda && targetParsel) ? `Ada ${targetAda} / Parsel ${targetParsel}` : "Kadastro Parseli";
@@ -973,7 +974,7 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
           );
 
           const adaParselDesc = (finalAda && finalParsel) ? `Ada ${finalAda} / Parsel ${finalParsel}` : "Kadastro Parseli";
-          const areaDesc = finalArea ? ` • ${finalArea.toLocaleString("tr-TR")} m²` : "";
+          const areaDesc = finalArea ? ` • ${formatArea(finalArea)} m²` : "";
           const officialBadge = loc.isOfficialCadastre ? "🏛️ TKGM Onaylı" : "📍";
 
           setParcelNotice(`${officialBadge} ${refinedDistrict} / ${refinedCity}${refinedNeigh ? ` • ${refinedNeigh}` : ""} • ${adaParselDesc}${areaDesc} • ${resolvedPrice.toLocaleString("tr-TR")} ₺/m²`);
@@ -1046,7 +1047,7 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
       areaM2
     );
     const adaParselDesc = (activeAda && activeParsel) ? `Ada ${activeAda} / Parsel ${activeParsel}` : "Kadastro Parseli";
-    const areaDesc = areaM2 ? ` • ${areaM2.toLocaleString("tr-TR")} m²` : "";
+    const areaDesc = areaM2 ? ` • ${formatArea(areaM2)} m²` : "";
     setParcelNotice(`🏛️ ${activeDistrict} / ${city}${activeNeighborhood ? ` • ${activeNeighborhood}` : ""} • ${adaParselDesc}${areaDesc} • ${unitM2Price.toLocaleString("tr-TR")} ₺/m²`);
   }, [focusTrigger]);
 
