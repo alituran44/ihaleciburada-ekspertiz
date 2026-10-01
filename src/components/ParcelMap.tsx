@@ -57,6 +57,10 @@ interface ParcelMapProps {
     isOfficialCadastre?: boolean;
     nitelik?: string;
   }) => void;
+  isSidebarCollapsed?: boolean;
+  sidebarWidth?: number;
+  onToggleSidebar?: () => void;
+  onSetSidebarWidth?: (width: number) => void;
 }
 
 function formatShortPrice(num: number): string {
@@ -103,6 +107,10 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
   onSelectDistrict,
   onSelectNeighborhood,
   onLocationSelect,
+  isSidebarCollapsed,
+  sidebarWidth,
+  onToggleSidebar,
+  onSetSidebarWidth,
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
@@ -853,6 +861,17 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
     mapInstanceRef.current = map;
     setCurrentZoom(initialZoom);
 
+    // Container boyutu her değiştiğinde (daraltma/genişletme sırasında) Leaflet boyutunu otomatik güncelle
+    let resizeObserver: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== "undefined" && mapContainerRef.current) {
+      resizeObserver = new ResizeObserver(() => {
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.invalidateSize();
+        }
+      });
+      resizeObserver.observe(mapContainerRef.current);
+    }
+
     map.on("zoomend", () => {
       if (mapInstanceRef.current) {
         setCurrentZoom(mapInstanceRef.current.getZoom());
@@ -1022,6 +1041,9 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
     );
 
     return () => {
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
@@ -1208,6 +1230,64 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
               Kiralık ({kiralikCount})
             </button>
           </div>
+
+          {/* Harita Boyut Ayarı (Daralt / Genişlet Hızlı Butonları) */}
+          {onToggleSidebar && (
+            <div className="hidden sm:flex items-center bg-slate-800/90 rounded-lg p-0.5 border border-slate-700 text-[10px] ml-1">
+              <span className="text-[9px] font-bold text-amber-400/90 px-1 hidden md:inline">
+                Harita:
+              </span>
+              <button
+                type="button"
+                onClick={() => onSetSidebarWidth && onSetSidebarWidth(580)}
+                className={`px-2 py-0.5 rounded font-bold transition cursor-pointer ${
+                  !isSidebarCollapsed && (sidebarWidth || 440) >= 520
+                    ? "bg-amber-500 text-slate-950 font-black"
+                    : "text-slate-300 hover:text-white"
+                }`}
+                title="Paneli Genişlet, Haritayı Daralt (Panel: 580px)"
+              >
+                Dar
+              </button>
+              <button
+                type="button"
+                onClick={() => onSetSidebarWidth && onSetSidebarWidth(440)}
+                className={`px-2 py-0.5 rounded font-bold transition cursor-pointer ${
+                  !isSidebarCollapsed && (sidebarWidth || 440) >= 380 && (sidebarWidth || 440) < 520
+                    ? "bg-amber-500 text-slate-950 font-black"
+                    : "text-slate-300 hover:text-white"
+                }`}
+                title="Dengeli Standart Boyut (Panel: 440px)"
+              >
+                Dengeli
+              </button>
+              <button
+                type="button"
+                onClick={() => onSetSidebarWidth && onSetSidebarWidth(320)}
+                className={`px-2 py-0.5 rounded font-bold transition cursor-pointer ${
+                  !isSidebarCollapsed && (sidebarWidth || 440) < 380
+                    ? "bg-amber-500 text-slate-950 font-black"
+                    : "text-slate-300 hover:text-white"
+                }`}
+                title="Haritayı Genişlet, Paneli Daralt (Panel: 320px)"
+              >
+                Geniş
+              </button>
+              <button
+                type="button"
+                onClick={onToggleSidebar}
+                className={`px-2 py-0.5 rounded font-bold transition cursor-pointer flex items-center gap-1 ${
+                  isSidebarCollapsed
+                    ? "bg-amber-500 text-slate-950 font-black"
+                    : "text-slate-300 hover:text-white"
+                }`}
+                title={isSidebarCollapsed ? "Değerleme Panelini Göster" : "Haritayı Tam Ekran Yap"}
+              >
+                {isSidebarCollapsed ? <Minimize2 className="w-3 h-3" /> : <Maximize2 className="w-3 h-3" />}
+                <span>{isSidebarCollapsed ? "Paneli Aç" : "Tam Ekran"}</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
