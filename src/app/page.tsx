@@ -37,7 +37,9 @@ const StartValuationModal = dynamic(
 import { ParcelInput, PropertyCategory, ComparableListing } from "@/types";
 import { SAMPLE_SCENARIOS, formatTL, formatNumber } from "@/lib/constants";
 import { calculateFeasibility } from "@/lib/calculator";
-import { parseSearchLocation, getCadastreForCoordinates, getDistrictCoordinates } from "@/lib/turkeyLocations";
+import { parseSearchLocation, getCadastreForCoordinates, getDistrictCoordinates, TURKEY_PROVINCES_AND_DISTRICTS } from "@/lib/turkeyLocations";
+
+const PROVINCE_NAMES = Object.keys(TURKEY_PROVINCES_AND_DISTRICTS).sort((a, b) => a.localeCompare(b, "tr"));
 import { 
   Building, 
   FileText,
@@ -361,13 +363,99 @@ export default function Home() {
         title: cat === "arazi" ? "Tarla & Arazi Portföyü" : cat === "ticari" ? "Ticari Mülk Portföyü" : "İmarlı Arsa Portföyü",
         areaM2: cat === "arazi" ? 2500 : cat === "ticari" ? 200 : 1000,
         zoningType: cat === "ticari" ? "ticari" : "konut",
-        kaks: 1.5,
-        taks: 0.35,
         maxFloors: 5,
         askedPriceTL: 9500000,
       });
     }
   };
+
+  // Seçili ile ait ilçe listesi (Türkiye Resmi NVİ Veritabanı)
+  const districtNames = useMemo(() => {
+    const currentProv = TURKEY_PROVINCES_AND_DISTRICTS[parcelData.city];
+    if (currentProv && currentProv.districts) {
+      return currentProv.districts.slice().sort((a, b) => a.localeCompare(b, "tr"));
+    }
+    const foundKey = Object.keys(TURKEY_PROVINCES_AND_DISTRICTS).find(
+      (k) => k.toLowerCase() === (parcelData.city || "").toLowerCase()
+    );
+    if (foundKey && TURKEY_PROVINCES_AND_DISTRICTS[foundKey]?.districts) {
+      return TURKEY_PROVINCES_AND_DISTRICTS[foundKey].districts.slice().sort((a, b) => a.localeCompare(b, "tr"));
+    }
+    return ["Merkez"];
+  }, [parcelData.city]);
+
+  // Hızlı Adres Değişikliği (İl, İlçe, Mahalle) ve Harita / Emsal Senkronizasyonu
+  const handleAddressChange = useCallback(async (fields: { city?: string; district?: string; neighborhood?: string }) => {
+    const updatedCity = fields.city !== undefined ? fields.city : parcelData.city;
+    const updatedDistrict = fields.district !== undefined ? fields.district : parcelData.district;
+    const updatedNeigh = fields.neighborhood !== undefined ? fields.neighborhood : parcelData.neighborhood;
+
+    setParcelData((prev) => ({
+      ...prev,
+      city: updatedCity,
+      district: updatedDistrict,
+      neighborhood: updatedNeigh,
+    }));
+
+    const query = `${updatedNeigh ? updatedNeigh + ", " : ""}${updatedDistrict}, ${updatedCity}`;
+    setSearchQuery(query);
+
+    try {
+      let newCoords = getDistrictCoordinates(updatedCity, updatedDistrict);
+      if (updatedNeigh && updatedNeigh.trim()) {
+        try {
+          const locRes = await fetch(`/api/location/search?q=${encodeURIComponent(`${updatedNeigh.trim()}, ${updatedDistrict}, ${updatedCity}`)}`);
+          const locData = await locRes.json();
+          if (locData.success && locData.results && locData.results.length > 0) {
+            const best = locData.results[0];
+            if (best.lat && best.lng) {
+              newCoords = { lat: Number(best.lat), lng: Number(best.lng) };
+            }
+          }
+        } catch (e) {}
+      }
+
+      const finalCoords = newCoords || parcelData.coordinates || { lat: 39.9208, lng: 32.8541 };
+      const cad = getCadastreForCoordinates(finalCoords.lat, finalCoords.lng);
+
+      const url = `/api/emsal?il=${encodeURIComponent(updatedCity)}&ilce=${encodeURIComponent(updatedDistrict)}&mahalle=${encodeURIComponent(updatedNeigh || "")}&kategori=${parcelData.category}${finalCoords ? `&lat=${finalCoords.lat}&lng=${finalCoords.lng}` : ""}`;
+      const res = await fetch(url);
+      const data = await res.json();
+
+      if (data.success && data.data) {
+        const resData = data.data;
+        setParcelData((prev) => ({
+          ...prev,
+          city: updatedCity,
+          district: updatedDistrict,
+          neighborhood: updatedNeigh,
+          coordinates: finalCoords,
+          ada: cad.ada || prev.ada,
+          parsel: cad.parsel || prev.parsel,
+          estimatedLandM2PriceTL: resData.landM2PriceTL || prev.estimatedLandM2PriceTL,
+          estimatedUnitSaleM2PriceTL: resData.unitSaleM2PriceTL || prev.estimatedUnitSaleM2PriceTL,
+          contractorSharePercent: resData.contractorSharePercent ?? prev.contractorSharePercent,
+          monthlyRentEstimateTL: isResidential ? (resData.estimatedMonthlyRentTL ?? prev.monthlyRentEstimateTL) : prev.monthlyRentEstimateTL,
+          marketResearch: resData,
+          comparables: resData.comparables || prev.comparables,
+          tcmbOfficialData: resData.tcmbOfficialData || prev.tcmbOfficialData,
+          buildingCostEstimate: resData.buildingCostEstimate || prev.buildingCostEstimate,
+        }));
+      } else {
+        setParcelData((prev) => ({
+          ...prev,
+          city: updatedCity,
+          district: updatedDistrict,
+          neighborhood: updatedNeigh,
+          coordinates: finalCoords,
+          ada: cad.ada || prev.ada,
+          parsel: cad.parsel || prev.parsel,
+        }));
+      }
+    } catch (err) {
+      console.warn("Adres güncelleme emsal sorgu hatası:", err);
+    }
+  }, [parcelData.city, parcelData.district, parcelData.neighborhood, parcelData.category, parcelData.coordinates, isResidential]);
 
   // Konum Autocomplete Seçildiğinde Çalışır
   const handleSelectLocation = async (item: any) => {
@@ -996,67 +1084,161 @@ export default function Home() {
 
               {/* RESMİ KADASTRO & AKILLI DEĞERLEME HIZLI GİRİŞ KARTI */}
               <div className="bg-gradient-to-br from-slate-900 via-[#0B1E3B] to-slate-950 text-white p-3.5 rounded-2xl border border-slate-800 shadow-md space-y-3">
-                <div className="flex items-center justify-between">
+                {/* Kart Başlığı & Kategori Seçimi */}
+                <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
                   <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                    <div className="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
                       <Sparkles className="w-4 h-4" />
                     </div>
                     <div>
                       <h3 className="text-xs font-black text-white font-heading uppercase tracking-wide">
                         Kadastro & Akıllı Değerleme
                       </h3>
-                      <p className="text-[10px] text-slate-300">
-                        {parcelData.city} / {parcelData.district} / {parcelData.neighborhood || "Merkez"}
+                      <p className="text-[10px] text-amber-400 font-medium flex items-center gap-1">
+                        <MapPin className="w-3 h-3 text-amber-400 shrink-0" />
+                        <span>Resmi Tapu & Kadastro Doğrulama</span>
                       </p>
                     </div>
                   </div>
                   <button
                     type="button"
                     onClick={() => handleCategorySwitch(isResidential ? "arsa" : "konut")}
-                    className="px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-black hover:bg-amber-500/30 transition cursor-pointer flex items-center gap-1"
+                    className="px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-black hover:bg-amber-500/30 transition cursor-pointer flex items-center gap-1 shrink-0"
                   >
                     <span>{isResidential ? "🏠 Konut & Daire" : "📐 Arsa & Arazi"}</span>
                     <ChevronDown className="w-3 h-3 text-amber-400" />
                   </button>
                 </div>
 
-                {/* Ada, Parsel, Alan Girişleri */}
-                <div className="grid grid-cols-3 gap-2">
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-300 uppercase block mb-1">
-                      Ada No
+                {/* 1. ADRES BİLGİLERİ (İL, İLÇE, MAHALLE / KÖY) */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-bold text-slate-300 uppercase flex items-center gap-1 tracking-wide">
+                      <MapPin className="w-3 h-3 text-amber-400" />
+                      <span>Adres & Konum</span>
                     </label>
-                    <input
-                      type="text"
-                      value={parcelData.ada || ""}
-                      onChange={(e) => setParcelData(prev => ({ ...prev, ada: e.target.value }))}
-                      placeholder="48507"
-                      className="w-full bg-slate-900/90 border border-slate-700 focus:border-amber-400 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-white outline-none"
-                    />
+                    <span className="text-[9px] text-slate-400 font-medium">81 İl • 973 İlçe</span>
                   </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-300 uppercase block mb-1">
-                      Parsel No
-                    </label>
-                    <input
-                      type="text"
-                      value={parcelData.parsel || ""}
-                      onChange={(e) => setParcelData(prev => ({ ...prev, parsel: e.target.value }))}
-                      placeholder="1"
-                      className="w-full bg-slate-900/90 border border-slate-700 focus:border-amber-400 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-white outline-none"
-                    />
+
+                  <div className="grid grid-cols-3 gap-2">
+                    {/* İL */}
+                    <div>
+                      <label className="text-[9px] font-bold text-slate-300 uppercase block mb-0.5">
+                        İl
+                      </label>
+                      <select
+                        value={parcelData.city || "Çanakkale"}
+                        onChange={(e) => {
+                          const newCity = e.target.value;
+                          const defaultDistrict = TURKEY_PROVINCES_AND_DISTRICTS[newCity]?.districts?.[0] || "Merkez";
+                          handleAddressChange({ city: newCity, district: defaultDistrict });
+                        }}
+                        className="w-full bg-slate-900/95 border border-slate-700 focus:border-amber-400 rounded-lg px-2 py-1.5 text-xs font-bold text-white outline-none cursor-pointer truncate"
+                      >
+                        {!PROVINCE_NAMES.includes(parcelData.city) && parcelData.city && (
+                          <option value={parcelData.city}>{parcelData.city}</option>
+                        )}
+                        {PROVINCE_NAMES.map((p) => (
+                          <option key={p} value={p} className="bg-slate-900 text-white">
+                            {p}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* İLÇE */}
+                    <div>
+                      <label className="text-[9px] font-bold text-slate-300 uppercase block mb-0.5">
+                        İlçe
+                      </label>
+                      <select
+                        value={parcelData.district || "Merkez"}
+                        onChange={(e) => {
+                          handleAddressChange({ district: e.target.value });
+                        }}
+                        className="w-full bg-slate-900/95 border border-slate-700 focus:border-amber-400 rounded-lg px-2 py-1.5 text-xs font-bold text-white outline-none cursor-pointer truncate"
+                      >
+                        {!districtNames.includes(parcelData.district) && parcelData.district && (
+                          <option value={parcelData.district}>{parcelData.district}</option>
+                        )}
+                        {districtNames.map((d) => (
+                          <option key={d} value={d} className="bg-slate-900 text-white">
+                            {d}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* MAHALLE / KÖY */}
+                    <div>
+                      <label className="text-[9px] font-bold text-slate-300 uppercase block mb-0.5">
+                        Mahalle / Köy
+                      </label>
+                      <input
+                        type="text"
+                        value={parcelData.neighborhood || ""}
+                        onChange={(e) => setParcelData(prev => ({ ...prev, neighborhood: e.target.value }))}
+                        onBlur={() => handleAddressChange({ neighborhood: parcelData.neighborhood })}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            handleAddressChange({ neighborhood: parcelData.neighborhood });
+                          }
+                        }}
+                        placeholder="Örn: Arslanca"
+                        className="w-full bg-slate-900/95 border border-slate-700 focus:border-amber-400 rounded-lg px-2 py-1.5 text-xs font-bold text-white outline-none placeholder:text-slate-500 truncate"
+                        title="Mahalle veya köy adını düzenleyip Enter'a basınız"
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-300 uppercase block mb-1">
-                      Alan (m²)
+                </div>
+
+                {/* 2. RESMİ KADASTRO (ADA, PARSEL, ALAN M²) */}
+                <div className="space-y-1.5 pt-1 border-t border-slate-800/80">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-bold text-slate-300 uppercase flex items-center gap-1 tracking-wide">
+                      <Layers className="w-3 h-3 text-amber-400" />
+                      <span>Kadastro & Parsel</span>
                     </label>
-                    <input
-                      type="number"
-                      value={parcelData.areaM2 || ""}
-                      onChange={(e) => setParcelData(prev => ({ ...prev, areaM2: Number(e.target.value) || 0 }))}
-                      placeholder="120"
-                      className="w-full bg-slate-900/90 border border-slate-700 focus:border-amber-400 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-amber-400 outline-none"
-                    />
+                    <span className="text-[9px] text-slate-400 font-medium">Ada / Parsel / m²</span>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className="text-[9px] font-bold text-slate-300 uppercase block mb-0.5">
+                        Ada No
+                      </label>
+                      <input
+                        type="text"
+                        value={parcelData.ada || ""}
+                        onChange={(e) => setParcelData(prev => ({ ...prev, ada: e.target.value }))}
+                        placeholder="1368"
+                        className="w-full bg-slate-900/90 border border-slate-700 focus:border-amber-400 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-white outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[9px] font-bold text-slate-300 uppercase block mb-0.5">
+                        Parsel No
+                      </label>
+                      <input
+                        type="text"
+                        value={parcelData.parsel || ""}
+                        onChange={(e) => setParcelData(prev => ({ ...prev, parsel: e.target.value }))}
+                        placeholder="1"
+                        className="w-full bg-slate-900/90 border border-slate-700 focus:border-amber-400 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-white outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[9px] font-bold text-slate-300 uppercase block mb-0.5">
+                        Alan (m²)
+                      </label>
+                      <input
+                        type="number"
+                        value={parcelData.areaM2 || ""}
+                        onChange={(e) => setParcelData(prev => ({ ...prev, areaM2: Number(e.target.value) || 0 }))}
+                        placeholder="120"
+                        className="w-full bg-slate-900/90 border border-slate-700 focus:border-amber-400 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-amber-400 outline-none"
+                      />
+                    </div>
                   </div>
                 </div>
 
