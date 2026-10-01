@@ -37,6 +37,7 @@ interface ParcelMapProps {
   isEndeksaSplitView?: boolean;
   searchRadius?: number;
   focusedCompId?: string | null;
+  focusTrigger?: number;
   onSelectComparable?: (comp: ComparableListing) => void;
   onLocationFound?: (coords: { lat: number; lng: number }) => void;
   onSelectDistrict?: (districtName: string) => void;
@@ -95,6 +96,7 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
   isEndeksaSplitView = false,
   searchRadius = 1000,
   focusedCompId,
+  focusTrigger,
   onSelectComparable,
   onLocationFound,
   onSelectDistrict,
@@ -1028,6 +1030,27 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
   // =========================================================================
   // KOORDİNAT VE DEĞER DEĞİŞİMİNDE ÇİZİMİ GÜNCELLE
   // =========================================================================
+  // 1. Dışarıdan "Haritada Göster" butonu tetiklendiğinde doğrudan odakla ve zoom yap
+  useEffect(() => {
+    if (!mapInstanceRef.current || !focusTrigger) return;
+    mapInstanceRef.current.flyTo([lat, lng], 17, { duration: 1.2 });
+    drawParcelHoneycomb(
+      lat,
+      lng,
+      unitM2Price,
+      city,
+      activeDistrict,
+      activeNeighborhood || undefined,
+      activeAda,
+      activeParsel,
+      areaM2
+    );
+    const adaParselDesc = (activeAda && activeParsel) ? `Ada ${activeAda} / Parsel ${activeParsel}` : "Kadastro Parseli";
+    const areaDesc = areaM2 ? ` • ${areaM2.toLocaleString("tr-TR")} m²` : "";
+    setParcelNotice(`🏛️ ${activeDistrict} / ${city}${activeNeighborhood ? ` • ${activeNeighborhood}` : ""} • ${adaParselDesc}${areaDesc} • ${unitM2Price.toLocaleString("tr-TR")} ₺/m²`);
+  }, [focusTrigger]);
+
+  // 2. Koordinat veya ada/parsel değiştiğinde haritayı ve bal peteğini güncelle
   useEffect(() => {
     if (!mapInstanceRef.current) return;
     if (isInternalClickRef.current) return;
@@ -1037,7 +1060,9 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
     const dist = Math.hypot(center.lat - lat, center.lng - lng);
 
     if (dist > 0.0003) {
-      map.flyTo([lat, lng], 15, { duration: 1.0 });
+      map.flyTo([lat, lng], 17, { duration: 1.0 });
+    } else if (map.getZoom() < 16) {
+      map.flyTo([lat, lng], 17, { duration: 0.8 });
     }
 
     drawParcelHoneycomb(

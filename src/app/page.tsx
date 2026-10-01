@@ -85,7 +85,8 @@ import {
   UploadCloud,
   Trash2,
   Eye,
-  X
+  X,
+  Navigation
 } from "lucide-react";
 
 export default function Home() {
@@ -577,6 +578,109 @@ export default function Home() {
       setTimeout(() => setValuationNotice(null), 4000);
     } finally {
       setIsValuating(false);
+    }
+  };
+
+  // 🗺️ Kullanıcı Bilgileri Girdikten Sonra Haritada Göster Fonksiyonu
+  const [isLocatingMap, setIsLocatingMap] = useState<boolean>(false);
+  const [mapFocusTrigger, setMapFocusTrigger] = useState<number>(0);
+
+  const handleShowOnMap = async () => {
+    setIsLocatingMap(true);
+    setValuationNotice(null);
+
+    try {
+      const cleanCity = (parcelData.city || "Çanakkale").trim();
+      const cleanDist = (parcelData.district || "Merkez").trim();
+      const cleanNeigh = (parcelData.neighborhood || "").trim();
+      const cleanAda = (parcelData.ada || "").trim();
+      const cleanParsel = (parcelData.parsel || "").trim();
+      const currentArea = parcelData.areaM2 || (parcelData.category === "arsa" || parcelData.category === "arazi" ? 1000 : 120);
+
+      // 1. Koordinat tespiti (Önce Mahalle + İlçe + İl ile detaylı geocoding)
+      let resolvedCoords: { lat: number; lng: number } | null = null;
+
+      if (cleanNeigh) {
+        try {
+          const locRes = await fetch(`/api/location/search?q=${encodeURIComponent(`${cleanNeigh}, ${cleanDist}, ${cleanCity}`)}`);
+          const locData = await locRes.json();
+          if (locData.success && locData.results && locData.results.length > 0) {
+            const best = locData.results[0];
+            if (best.lat && best.lng) {
+              resolvedCoords = { lat: Number(best.lat), lng: Number(best.lng) };
+            }
+          }
+        } catch (e) {
+          console.warn("Mahalle arama hatası:", e);
+        }
+      }
+
+      // Eğer mahalleyle bulunamadıysa İlçe + İl ile ara
+      if (!resolvedCoords) {
+        try {
+          const locRes = await fetch(`/api/location/search?q=${encodeURIComponent(`${cleanDist}, ${cleanCity}`)}`);
+          const locData = await locRes.json();
+          if (locData.success && locData.results && locData.results.length > 0) {
+            const best = locData.results[0];
+            if (best.lat && best.lng) {
+              resolvedCoords = { lat: Number(best.lat), lng: Number(best.lng) };
+            }
+          }
+        } catch (e) {}
+      }
+
+      // Fallback: Yerel ilçe koordinat tablosu veya mevcut koordinatlar
+      if (!resolvedCoords) {
+        resolvedCoords = getDistrictCoordinates(cleanCity, cleanDist) || parcelData.coordinates || { lat: 39.9208, lng: 32.8541 };
+      }
+
+      // 2. Güncel ada/parsel ve konuma göre dinamik değerleme hesapla
+      const preciseVal = getDistrictValuation(cleanCity, cleanDist, 45000, {
+        category: parcelData.category,
+        subCategory: parcelData.subCategory,
+        neighborhood: cleanNeigh || undefined,
+        ada: cleanAda,
+        parsel: cleanParsel,
+        areaM2: currentArea,
+      });
+
+      const isRes = parcelData.category === "konut";
+      const resolvedLand = !isRes ? preciseVal.pricePerM2TL : parcelData.estimatedLandM2PriceTL;
+      const resolvedUnit = isRes ? preciseVal.pricePerM2TL : parcelData.estimatedUnitSaleM2PriceTL;
+
+      // 3. State güncelle
+      setParcelData((prev) => ({
+        ...prev,
+        city: cleanCity,
+        district: cleanDist,
+        neighborhood: cleanNeigh,
+        ada: cleanAda,
+        parsel: cleanParsel,
+        areaM2: currentArea,
+        coordinates: resolvedCoords!,
+        estimatedLandM2PriceTL: resolvedLand,
+        estimatedUnitSaleM2PriceTL: resolvedUnit,
+      }));
+
+      // 4. Harita odaklama tetikleyicisini artır
+      setMapFocusTrigger((prev) => prev + 1);
+
+      // 5. Bilgilendirme bildirimi
+      const adaParselLabel = (cleanAda && cleanParsel) ? `Ada ${cleanAda} / Parsel ${cleanParsel}` : "Kadastro Konumu";
+      setValuationNotice(`🗺️ ${cleanDist} / ${cleanCity}${cleanNeigh ? ` • ${cleanNeigh}` : ""} • ${adaParselLabel} haritada odaklandı!`);
+      setTimeout(() => setValuationNotice(null), 6000);
+
+      // 6. Sayfayı harita konteynerine yumuşak kaydır (özellikle mobil veya dikey kaydırma için)
+      setTimeout(() => {
+        const mapContainer = document.getElementById("main-parcel-map-container") || document.querySelector(".leaflet-container");
+        if (mapContainer) {
+          mapContainer.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }, 150);
+    } catch (err) {
+      console.error("Haritada gösterme hatası:", err);
+    } finally {
+      setIsLocatingMap(false);
     }
   };
 
@@ -1501,7 +1605,7 @@ export default function Home() {
                     <span className="text-[9px] text-slate-400 font-medium">Ada / Parsel / m²</span>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-3 gap-2">
                     <div>
                       <label className="text-[9px] font-bold text-slate-300 uppercase block mb-0.5">
                         Ada No
@@ -1528,6 +1632,9 @@ export default function Home() {
                               estimatedUnitSaleM2PriceTL: isRes ? val.pricePerM2TL : prev.estimatedUnitSaleM2PriceTL,
                             };
                           });
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleShowOnMap();
                         }}
                         placeholder="1368"
                         className="w-full bg-slate-900/90 border border-slate-700 focus:border-amber-400 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-white outline-none"
@@ -1559,6 +1666,9 @@ export default function Home() {
                               estimatedUnitSaleM2PriceTL: isRes ? val.pricePerM2TL : prev.estimatedUnitSaleM2PriceTL,
                             };
                           });
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleShowOnMap();
                         }}
                         placeholder="1"
                         className="w-full bg-slate-900/90 border border-slate-700 focus:border-amber-400 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-white outline-none"
@@ -1620,6 +1730,9 @@ export default function Home() {
                             };
                           });
                         }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleShowOnMap();
+                        }}
                         placeholder="1000"
                         className="w-full bg-slate-900/90 border border-slate-700 focus:border-amber-400 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-amber-400 outline-none"
                       />
@@ -1627,36 +1740,58 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* 5. BUTONLAR: TKGM Parsel Sorgu & ⚡ Değerleme (Canlı Hesaplayıcı) */}
-                <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-800">
+                {/* 5. BUTONLAR: 🗺️ Haritada Göster + 🏛️ TKGM Parsel Sorgu & ⚡ Değerleme */}
+                <div className="space-y-2 pt-1 border-t border-slate-800">
+                  {/* Birincil Eylem: Haritada Göster & Odakla */}
                   <button
                     type="button"
-                    onClick={handleOpenTkgmGlobal}
-                    className="py-2.5 px-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/30 font-bold text-[11px] transition flex items-center justify-center gap-1 cursor-pointer active:scale-95"
-                    title="Resmi TKGM Kadastro Parsel Sorgu sayfasını aç"
-                  >
-                    <ExternalLink className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                    <span className="truncate">🏛️ TKGM Sorgu</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleRunValuation}
-                    disabled={isValuating}
-                    className={`py-2.5 px-2.5 rounded-xl font-black text-[11px] transition flex items-center justify-center gap-1.5 cursor-pointer shadow-md active:scale-95 ${
-                      isValuating
-                        ? "bg-amber-600/70 text-slate-900 cursor-wait"
-                        : "bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 text-slate-950 hover:brightness-105"
+                    onClick={handleShowOnMap}
+                    disabled={isLocatingMap}
+                    className={`w-full py-2.5 px-3 rounded-xl font-black text-xs transition flex items-center justify-center gap-2 cursor-pointer shadow-md active:scale-[0.98] border ${
+                      isLocatingMap
+                        ? "bg-emerald-700/60 text-emerald-200 border-emerald-500/40 cursor-wait"
+                        : "bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-500 hover:brightness-110 text-slate-950 border-emerald-400/60 shadow-emerald-500/20"
                     }`}
-                    title="Bu konum ve ada/parsel için anlık akıllı değerleme hesapla"
+                    title="Girilen il, ilçe, mahalle ve ada/parseli harita üzerinde odakla ve göster"
                   >
-                    {isValuating ? (
+                    {isLocatingMap ? (
                       <Loader2 className="w-4 h-4 animate-spin text-slate-950" />
                     ) : (
-                      <Sparkles className="w-4 h-4 text-slate-950 shrink-0" />
+                      <Navigation className="w-4 h-4 text-slate-950 fill-slate-950" />
                     )}
-                    <span>{isValuating ? "Hesaplanıyor..." : "⚡ Değerleme"}</span>
+                    <span>{isLocatingMap ? "Haritaya Gidiliyor..." : "🗺️ Haritada Göster & Odakla"}</span>
                   </button>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={handleOpenTkgmGlobal}
+                      className="py-2.5 px-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/30 font-bold text-[11px] transition flex items-center justify-center gap-1 cursor-pointer active:scale-95"
+                      title="Resmi TKGM Kadastro Parsel Sorgu sayfasını aç"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                      <span className="truncate">🏛️ TKGM Sorgu</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleRunValuation}
+                      disabled={isValuating}
+                      className={`py-2.5 px-2.5 rounded-xl font-black text-[11px] transition flex items-center justify-center gap-1.5 cursor-pointer shadow-md active:scale-95 ${
+                        isValuating
+                          ? "bg-amber-600/70 text-slate-900 cursor-wait"
+                          : "bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 text-slate-950 hover:brightness-105"
+                      }`}
+                      title="Bu konum ve ada/parsel için anlık akıllı değerleme hesapla"
+                    >
+                      {isValuating ? (
+                        <Loader2 className="w-4 h-4 animate-spin text-slate-950" />
+                      ) : (
+                        <Sparkles className="w-4 h-4 text-slate-950 shrink-0" />
+                      )}
+                      <span>{isValuating ? "Hesaplanıyor..." : "⚡ Değerleme"}</span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* CANLI DEĞERLEME BİLDİRİMİ */}
@@ -2607,7 +2742,9 @@ export default function Home() {
             </div>
 
             {/* HARİTA PANELİ (Geniş Tapusor & GIS Uydu Haritası) */}
-            <div className={`w-full lg:flex-1 lg:h-[calc(100vh-64px)] relative z-0 isolate bg-slate-100 flex flex-col ${
+            <div 
+              id="main-parcel-map-container"
+              className={`w-full lg:flex-1 lg:h-[calc(100vh-64px)] relative z-0 isolate bg-slate-100 flex flex-col ${
               layoutMapPosition === "left"
                 ? "lg:order-1 border-r border-slate-200"
                 : "lg:order-2"
@@ -2619,6 +2756,7 @@ export default function Home() {
                 ada={parcelData.ada}
                 parsel={parcelData.parsel}
                 coordinates={parcelData.coordinates}
+                focusTrigger={mapFocusTrigger}
                 elevationMeters={parcelData.elevationMeters}
                 comparables={parcelData.comparables}
                 category={parcelData.category === "konut" ? "konut" : "arsa"}
