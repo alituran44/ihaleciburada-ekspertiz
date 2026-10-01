@@ -96,6 +96,7 @@ export default function Home() {
   const [shareModalOpen, setShareModalOpen] = useState<boolean>(false);
   const [showElectronicReportModal, setShowElectronicReportModal] = useState<boolean>(false);
   const [showReportSelectionModal, setShowReportSelectionModal] = useState<boolean>(false);
+  const [selectedReportType, setSelectedReportType] = useState<ReportPackageType>("elit");
   const [showStartValuationModal, setShowStartValuationModal] = useState<boolean>(false);
   const [startValuationInitialMode, setStartValuationInitialMode] = useState<"expertiz" | "emlak_bul" | "ilan_ver">("expertiz");
   const [subTab, setSubTab] = useState<"deger" | "trend" | "rayic" | "best_use">("deger");
@@ -1307,12 +1308,12 @@ export default function Home() {
               <span>{layoutMapPosition === "left" ? "Harita Solda" : "Harita Sağda"}</span>
             </button>
 
-            {/* 3. Ekspertiz Raporu Sekmesi (Lansmana Özel Ücretsiz) */}
+            {/* 3. Ekspertiz Raporu Sekmesi (Lansmana Özel Ücretsiz - Fotoğraf 2) */}
             <button
               type="button"
-              onClick={() => setShowElectronicReportModal(true)}
+              onClick={() => setShowReportSelectionModal(true)}
               className="py-1 px-2.5 transition relative cursor-pointer font-heading font-extrabold whitespace-nowrap shrink-0 flex items-center gap-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-950 rounded-full border border-emerald-300 shadow-2xs active:scale-95"
-              title="13 Sayfalık Resmi Detaylı Elektronik Ekspertiz Raporunu Aç ve PDF İndir"
+              title="Resmi Detaylı E-Ekspertiz ve Değerleme Rapor Paketlerini İncele ve Seç (Lansmana Özel Ücretsiz)"
             >
               <FileText className="w-3.5 h-3.5 text-emerald-600" />
               <span>Ekspertiz Raporu</span>
@@ -1391,7 +1392,7 @@ export default function Home() {
             calc={calculation}
             onBack={() => setActiveTab("endeks")}
             onOpenShareModal={() => setShareModalOpen(true)}
-            onOpenDetailedReport={() => setShowElectronicReportModal(true)}
+            onOpenDetailedReport={() => setShowReportSelectionModal(true)}
           />
         </main>
       ) : (
@@ -2440,7 +2441,7 @@ export default function Home() {
                   <div className="grid grid-cols-2 gap-3 pt-2">
                     <button
                       type="button"
-                      onClick={() => setShowElectronicReportModal(true)}
+                      onClick={() => setShowReportSelectionModal(true)}
                       className="py-3 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-sm flex items-center justify-center gap-2 transition cursor-pointer"
                     >
                       <Printer className="w-4 h-4 text-emerald-400" />
@@ -2465,7 +2466,7 @@ export default function Home() {
                   <FeasibilityPreview
                     input={parcelData}
                     calc={calculation}
-                    onViewReport={() => setShowElectronicReportModal(true)}
+                    onViewReport={() => setShowReportSelectionModal(true)}
                   />
                 </div>
               )}
@@ -2557,7 +2558,8 @@ export default function Home() {
       <ReportSelectionModal
         isOpen={showReportSelectionModal}
         onClose={() => setShowReportSelectionModal(false)}
-        onOpenReportPreview={() => {
+        onOpenReportPreview={(pkg) => {
+          setSelectedReportType(pkg);
           setShowReportSelectionModal(false);
           setShowElectronicReportModal(true);
         }}
@@ -2571,10 +2573,15 @@ export default function Home() {
         nitelik={parcelData.category === "konut" ? "Betonarme Mesken ve Müştemilatı" : "Bağ & Tarla Vasfında İmar Parseli"}
       />
 
-      {/* 13 Sayfalık Resmi Elektronik Ekspertiz Raporu Modalı */}
+      {/* Resmi Elektronik Ekspertiz Raporu Modalı (Emsal 8sf / Arsa 20sf / Elit 13sf) */}
       <ElectronicReportModal
         isOpen={showElectronicReportModal}
         onClose={() => setShowElectronicReportModal(false)}
+        reportType={selectedReportType}
+        onSwitchReportType={() => {
+          setShowElectronicReportModal(false);
+          setShowReportSelectionModal(true);
+        }}
         propertyTitle={`${parcelData.city} / ${parcelData.district} / ${parcelData.neighborhood || "Merkez"}`}
         category={parcelData.category === "konut" ? "konut" : "arsa"}
         locationText={`${parcelData.neighborhood || "Merkez"}, ${parcelData.district}, ${parcelData.city}`}

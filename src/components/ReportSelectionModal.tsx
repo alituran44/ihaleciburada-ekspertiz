@@ -15,6 +15,7 @@ import {
   Sparkles,
   Coins
 } from "lucide-react";
+import { formatArea } from "@/lib/constants";
 
 export type ReportPackageType = "emsal" | "konut" | "elit";
 
@@ -45,7 +46,7 @@ export const ReportSelectionModal: React.FC<ReportSelectionModalProps> = ({
   category = "konut",
   nitelik = "Betonarme Mesken ve Müştemilatı",
 }) => {
-  const [currentStep, setCurrentStep] = useState<number>(1);
+  const [currentStep, setCurrentStep] = useState<number>(5);
   const [selectedTier, setSelectedTier] = useState<ReportPackageType>("elit");
   const [zoomLevel, setZoomLevel] = useState<number>(100);
 
@@ -139,7 +140,7 @@ export const ReportSelectionModal: React.FC<ReportSelectionModalProps> = ({
                   {parsel || "1"} Parsel
                 </span>
                 <span>/</span>
-                <span className="text-slate-300">{areaM2 || 110} m²</span>
+                <span className="text-slate-300">{formatArea(areaM2)} m²</span>
                 <span>/</span>
                 <span className="text-slate-400 truncate max-w-[200px]">{nitelik}</span>
               </div>

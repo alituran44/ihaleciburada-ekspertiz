@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   FileText, 
   X, 
@@ -10,15 +10,19 @@ import {
   Download,
   Loader2,
   CheckCircle2,
-  ChevronDown
+  ChevronDown,
+  Sliders
 } from "lucide-react";
 import { ValuationFormData } from "./valuation/types";
 import { ReportPagesContent } from "./ReportPagesContent";
 import { ComparableListing } from "@/types";
+import { ReportPackageType } from "./ReportSelectionModal";
 
 interface ElectronicReportModalProps {
   isOpen: boolean;
   onClose: () => void;
+  reportType?: ReportPackageType;
+  onSwitchReportType?: () => void;
   formData?: Partial<ValuationFormData>;
   propertyTitle?: string;
   category?: "konut" | "arsa" | "arazi";
@@ -32,6 +36,8 @@ interface ElectronicReportModalProps {
 export const ElectronicReportModal: React.FC<ElectronicReportModalProps> = ({
   isOpen,
   onClose,
+  reportType = "elit",
+  onSwitchReportType,
   formData,
   propertyTitle,
   category = "konut",
@@ -41,15 +47,54 @@ export const ElectronicReportModal: React.FC<ElectronicReportModalProps> = ({
   areaM2,
   comparables,
 }) => {
+  const totalPages = reportType === "emsal" ? 8 : reportType === "konut" ? 20 : 13;
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState<boolean>(false);
   const [pdfProgress, setPdfProgress] = useState<{ current: number; total: number; stage: string }>({
     current: 0,
-    total: 13,
+    total: totalPages,
     stage: "",
   });
   const [showPdfOptions, setShowPdfOptions] = useState<boolean>(false);
-  const totalPages = 13;
+
+  useEffect(() => {
+    if (isOpen) {
+      setCurrentPage(1);
+    }
+  }, [isOpen, reportType]);
+
+  const reportPackageMeta = {
+    emsal: {
+      title: "İhaleciBurada Emsal Değerleme Raporu",
+      badge: "Emsal & Piyasa Analizi",
+      badgeClass: "bg-blue-500/20 text-blue-300 border-blue-500/30",
+      pagesDesc: "8 Sayfa • A4 Renkli • Dijital Mühürlü",
+      bannerText: "Lansmana Özel: 8 Sayfalık Emsal & Piyasa Değerleme Raporunuz Ücretsiz Olarak Hazırlandı.",
+      pdfFullName: "8 Sayfa Emsal Raporu",
+      pdfDesc: "Bölgesel Emsal, Satılık & Kiralık Analizi (.pdf)",
+      fileNamePrefix: "Emsal_Degerleme_Raporu",
+    },
+    konut: {
+      title: "İhaleciBurada Arsa / Konut Detaylı Teknik Değerleme Raporu",
+      badge: "Detaylı Teknik • 20 Sayfa",
+      badgeClass: "bg-indigo-500/20 text-indigo-300 border-indigo-500/30",
+      pagesDesc: "20 Sayfa • A4 Renkli • Kadastro & İmar Onaylı",
+      bannerText: "Lansmana Özel: 20 Sayfalık Kapsamlı Teknik Değerleme Raporunuz Ücretsiz Olarak Hazırlandı.",
+      pdfFullName: "20 Sayfa Detaylı Teknik Rapor",
+      pdfDesc: "Kadastro, İmar, KAKS/TAKS, Jeoloji & Fizibilite (.pdf)",
+      fileNamePrefix: "Arsa_Teknik_Degerleme_Raporu",
+    },
+    elit: {
+      title: "İhaleciBurada Elit İhale & SPK Raporu",
+      badge: "SPK & İİK m.115 Uyumlu",
+      badgeClass: "bg-amber-500/20 text-amber-300 border-amber-500/30",
+      pagesDesc: "13 Sayfa • A4 Renkli • SPK & İcra Tescilli",
+      bannerText: "Lansmana Özel: 13 Sayfalık Resmi Detaylı Raporunuz Ücretsiz Olarak Hazırlandı.",
+      pdfFullName: "13 Sayfa Elit İhale Raporu",
+      pdfDesc: "Resmi SPK/BDDK & İcra Arbitrajı (.pdf)",
+      fileNamePrefix: "Elit_Ihale_SPK_Raporu",
+    },
+  }[reportType || "elit"];
 
   if (!isOpen) return null;
 
@@ -116,12 +161,14 @@ export const ElectronicReportModal: React.FC<ElectronicReportModalProps> = ({
     formData,
     uploadedPhotos: formData?.uploadedPhotos,
     comparables,
+    reportType,
+    totalPages,
   };
 
   const handlePrint = () => {
     if (typeof window !== "undefined") {
       const originalTitle = document.title;
-      document.title = `IhaleciBurada_Ekspertiz_Raporu_${city}_${ada}_${parsel}`;
+      document.title = `IhaleciBurada_${reportPackageMeta.fileNamePrefix}_${city}_${ada}_${parsel}`;
       window.print();
       setTimeout(() => {
         document.title = originalTitle;
@@ -182,7 +229,7 @@ export const ElectronicReportModal: React.FC<ElectronicReportModalProps> = ({
         stage: "Dosya kaydediliyor...",
       });
 
-      const fileName = `IhaleciBurada_Ekspertiz_Raporu_${city}_${ada}_${parsel}.pdf`;
+      const fileName = `IhaleciBurada_${reportPackageMeta.fileNamePrefix}_${city}_${ada}_${parsel}.pdf`;
       pdf.save(fileName);
 
       setTimeout(() => {
@@ -308,10 +355,10 @@ export const ElectronicReportModal: React.FC<ElectronicReportModalProps> = ({
                 <FileText className="w-4 h-4" />
               </div>
               <div>
-                <div className="text-xs sm:text-sm font-black tracking-tight flex items-center gap-2">
-                  <span>İhaleciBurada Lisanslı Elektronik Ekspertiz Raporu</span>
-                  <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-mono border border-amber-500/30">
-                    SPK & İİK m.115 Uyumlu
+                <div className="text-xs sm:text-sm font-black tracking-tight flex items-center gap-2 flex-wrap">
+                  <span>{reportPackageMeta.title}</span>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono border ${reportPackageMeta.badgeClass}`}>
+                    {reportPackageMeta.badge}
                   </span>
                   <span className="px-2 py-0.5 rounded-full bg-emerald-500/25 text-emerald-300 text-[10px] font-black border border-emerald-500/40">
                     ÜCRETSİZ
@@ -324,6 +371,19 @@ export const ElectronicReportModal: React.FC<ElectronicReportModalProps> = ({
             </div>
 
             <div className="flex items-center gap-2">
+              {/* Rapor Türünü Değiştir Butonu */}
+              {onSwitchReportType && (
+                <button
+                  type="button"
+                  onClick={onSwitchReportType}
+                  className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 hover:text-amber-200 border border-slate-700 text-xs font-bold transition cursor-pointer"
+                  title="Farklı Bir Rapor Paketi Seç (Emsal / Arsa Değerleme / Elit İhale)"
+                >
+                  <Sliders className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Rapor Türünü Değiştir</span>
+                </button>
+              )}
+
               {/* Sayfa Değiştirici */}
               <div className="hidden sm:flex items-center gap-1 bg-slate-800 rounded-lg p-1 mr-2 border border-slate-700">
                 <button
@@ -371,11 +431,11 @@ export const ElectronicReportModal: React.FC<ElectronicReportModalProps> = ({
                       className="w-full text-left p-2.5 rounded-lg hover:bg-slate-800 text-white font-bold flex items-center gap-2.5 transition cursor-pointer"
                     >
                       <div className="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-500/30 text-amber-400 flex items-center justify-center font-black text-xs shrink-0">
-                        13
+                        {totalPages}
                       </div>
                       <div>
-                        <div className="text-slate-100 font-bold">13 Sayfa Tam Rapor</div>
-                        <div className="text-[10px] text-slate-400 font-normal">Resmi SPK/BDDK Ekspertiz (.pdf)</div>
+                        <div className="text-slate-100 font-bold">{reportPackageMeta.pdfFullName}</div>
+                        <div className="text-[10px] text-slate-400 font-normal">{reportPackageMeta.pdfDesc}</div>
                       </div>
                     </button>
 
@@ -422,12 +482,23 @@ export const ElectronicReportModal: React.FC<ElectronicReportModalProps> = ({
             <div className="flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
               <span className="font-semibold text-emerald-200">
-                Lansmana Özel: 13 Sayfalık Resmi Detaylı Raporunuz Ücretsiz Olarak Hazırlandı.
+                {reportPackageMeta.bannerText}
               </span>
             </div>
-            <span className="text-[11px] font-mono text-emerald-300/80 hidden sm:inline">
-              13 Sayfa • A4 Renkli • Dijital Mühürlü
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-mono text-emerald-300/80 hidden sm:inline">
+                {reportPackageMeta.pagesDesc}
+              </span>
+              {onSwitchReportType && (
+                <button
+                  type="button"
+                  onClick={onSwitchReportType}
+                  className="md:hidden text-amber-300 hover:text-amber-200 font-bold underline text-[11px] cursor-pointer"
+                >
+                  Türü Değiştir
+                </button>
+              )}
+            </div>
           </div>
 
           {/* SAYFA SEKMELERİ ÇUBUĞU */}
@@ -440,13 +511,24 @@ export const ElectronicReportModal: React.FC<ElectronicReportModalProps> = ({
               { p: 5, title: "5. Değer Projeksiyonu" },
               { p: 6, title: "6. Bekleyen Emsaller" },
               { p: 7, title: "7. Yeni Emsaller" },
-              { p: 8, title: "8. Emsal Sıralaması" },
-              { p: 9, title: "9. Demografi" },
-              { p: 10, title: "10. Tüketim & Konum" },
-              { p: 11, title: "11. Satılık & Kiralık" },
-              { p: 12, title: "12. Arazi Haritaları" },
-              { p: 13, title: "13. Seçim Analizi" },
-            ].map((item) => (
+              { p: 8, title: reportType === "emsal" ? "8. Sonuç & Onay" : "8. Emsal Sıralaması" },
+              ...(totalPages >= 13 ? [
+                { p: 9, title: "9. Demografi" },
+                { p: 10, title: "10. Tüketim & Konum" },
+                { p: 11, title: "11. Satılık & Kiralık" },
+                { p: 12, title: "12. Arazi Haritaları" },
+                { p: 13, title: "13. Seçim Analizi" },
+              ] : []),
+              ...(totalPages >= 20 ? [
+                { p: 14, title: "14. Kadastro & Takyidat" },
+                { p: 15, title: "15. İmar & Yapılaşma" },
+                { p: 16, title: "16. Topoğrafya & Altyapı" },
+                { p: 17, title: "17. Gelir & Fizibilite" },
+                { p: 18, title: "18. Deprem & Jeoloji" },
+                { p: 19, title: "19. UDES & SPK Standartları" },
+                { p: 20, title: "20. Nihai Sertifikasyon" },
+              ] : []),
+            ].slice(0, totalPages).map((item) => (
               <button
                 key={item.p}
                 type="button"
@@ -523,10 +605,10 @@ export const ElectronicReportModal: React.FC<ElectronicReportModalProps> = ({
 
                 <div className="space-y-1">
                   <h3 className="text-base font-black tracking-tight text-white font-heading">
-                    E-Ekspertiz Raporu PDF&apos;e Dönüştürülüyor
+                    {reportPackageMeta.title} PDF&apos;e Dönüştürülüyor
                   </h3>
                   <p className="text-xs text-slate-400">
-                    SPK ve BDDK standartlarında 13 sayfa yüksek çözünürlüklü A4 dokümanı derleniyor.
+                    {totalPages} sayfalık yüksek çözünürlüklü A4 dokümanı derleniyor.
                   </p>
                 </div>
 
@@ -577,7 +659,7 @@ export const ElectronicReportModal: React.FC<ElectronicReportModalProps> = ({
                 className="hidden sm:flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-bold transition cursor-pointer disabled:opacity-50 shadow-2xs"
               >
                 <Download className="w-3.5 h-3.5 text-emerald-600" />
-                <span>13 Sayfa PDF İndir</span>
+                <span>{totalPages} Sayfa PDF İndir</span>
               </button>
               <div className="text-xs font-bold text-slate-500">
                 Sayfa <span className="text-[#E11D48] font-black">{currentPage}</span> / {totalPages}
