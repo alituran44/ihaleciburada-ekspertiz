@@ -2441,15 +2441,6 @@ export default function Home() {
                       </div>
                     )}
                   </div>
-
-                  <div className="text-right shrink-0">
-                    <div className="text-[10px] font-extrabold text-amber-400 uppercase tracking-tight">
-                      İİK m.115 %50 Tabanı
-                    </div>
-                    <div className="text-xs font-black text-emerald-400 font-mono">
-                      {Math.round((isResidential ? (parcelData.estimatedUnitSaleM2PriceTL || 54085) * (parcelData.areaM2 || 100) : (parcelData.estimatedLandM2PriceTL || 18500) * (parcelData.areaM2 || 100)) * 0.5).toLocaleString("tr-TR")} ₺
-                    </div>
-                  </div>
                 </div>
 
                 {/* 1.000 m² (1 Dönüm) Esas Değeri & Seçili Parsel Değeri */}
