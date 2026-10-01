@@ -1227,8 +1227,6 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
             <span>{category === "konut" ? "Konut & Daire" : "İmarlı Arsa"}</span>
             <span>•</span>
             <span className="text-emerald-700 font-mono font-extrabold">{(unitM2Price || 54085).toLocaleString("tr-TR")} ₺/m²</span>
-            <span>•</span>
-            <span className="text-amber-800 font-mono font-bold">İcra Tabanı: {Math.round((unitM2Price || 54085) * 0.5).toLocaleString("tr-TR")} ₺/m²</span>
           </div>
         </div>
 
