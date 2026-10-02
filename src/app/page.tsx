@@ -91,8 +91,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Maximize2,
-  Minimize2,
-  GripVertical
+  Minimize2
 } from "lucide-react";
 
 export default function Home() {
@@ -111,7 +110,6 @@ export default function Home() {
   // Harita & Panel Boyutlandırma & Ayarlama Durumu (Genişlet / Daralt)
   const [sidebarWidth, setSidebarWidth] = useState<number>(460);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
-  const [isResizing, setIsResizing] = useState<boolean>(false);
   const [focusedCompId, setFocusedCompId] = useState<string | null>(null);
   const [listingFilter, setListingFilter] = useState<"all" | "satilik" | "kiralik">("all");
   const [isEmsalOpen, setIsEmsalOpen] = useState<boolean>(true);
@@ -199,76 +197,6 @@ export default function Home() {
       { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
     );
   }, [parcelData.category]);
-
-  // Sürükle-Bırak ile Harita & Panel Boyutlandırma (Ayarlı Ayırıcı)
-  const handleMouseDownResize = (e: React.MouseEvent) => {
-    e.preventDefault();
-    setIsResizing(true);
-  };
-
-  const handleTouchStartResize = () => {
-    setIsResizing(true);
-  };
-
-  useEffect(() => {
-    if (!isResizing) return;
-
-    const handleMouseMove = (e: MouseEvent) => {
-      let newWidth = sidebarWidth;
-      if (layoutMapPosition === "right") {
-        // Panel solda, harita sağda
-        newWidth = e.clientX;
-      } else {
-        // Harita solda, panel sağda
-        newWidth = window.innerWidth - e.clientX;
-      }
-
-      const clampedWidth = Math.max(280, Math.min(newWidth, Math.min(750, window.innerWidth * 0.72)));
-      setSidebarWidth(clampedWidth);
-      if (isSidebarCollapsed) {
-        setIsSidebarCollapsed(false);
-      }
-      window.dispatchEvent(new Event("resize"));
-    };
-
-    const handleTouchMove = (e: TouchEvent) => {
-      if (e.touches.length === 0) return;
-      const touch = e.touches[0];
-      let newWidth = sidebarWidth;
-      if (layoutMapPosition === "right") {
-        newWidth = touch.clientX;
-      } else {
-        newWidth = window.innerWidth - touch.clientX;
-      }
-      const clampedWidth = Math.max(280, Math.min(newWidth, Math.min(750, window.innerWidth * 0.72)));
-      setSidebarWidth(clampedWidth);
-      if (isSidebarCollapsed) {
-        setIsSidebarCollapsed(false);
-      }
-      window.dispatchEvent(new Event("resize"));
-    };
-
-    const handleMouseUp = () => {
-      setIsResizing(false);
-      window.dispatchEvent(new Event("resize"));
-    };
-
-    document.body.style.userSelect = "none";
-    document.body.style.cursor = "col-resize";
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
-    window.addEventListener("touchmove", handleTouchMove);
-    window.addEventListener("touchend", handleMouseUp);
-
-    return () => {
-      document.body.style.userSelect = "";
-      document.body.style.cursor = "";
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-      window.removeEventListener("touchmove", handleTouchMove);
-      window.removeEventListener("touchend", handleMouseUp);
-    };
-  }, [isResizing, layoutMapPosition, isSidebarCollapsed, sidebarWidth]);
 
   // 🏛️ Resmi TKGM Parsel Sorgu Entegrasyonu
   const handleOpenTkgmGlobal = () => {
@@ -1581,12 +1509,10 @@ export default function Home() {
               className={`${
                 isSidebarCollapsed 
                   ? "hidden" 
-                  : "w-full shrink-0 lg:h-[calc(100vh-64px)] overflow-y-auto p-3 sm:p-5 space-y-4 bg-white relative z-10"
-              } ${
-                isResizing ? "select-none pointer-events-none" : "transition-[flex-basis,width] duration-150"
+                  : "w-full shrink-0 lg:h-[calc(100vh-64px)] overflow-y-auto p-3 sm:p-5 space-y-4 bg-white relative z-10 transition-[flex-basis,width] duration-150"
               } ${
                 layoutMapPosition === "left" 
-                  ? "lg:order-3 border-l border-slate-200" 
+                  ? "lg:order-2 border-l border-slate-200" 
                   : "lg:order-1 border-r border-slate-200"
               }`}
             >
@@ -2702,57 +2628,13 @@ export default function Home() {
               </div>
             </div>
 
-            {/* AYARLANABİLİR HARİTA & PANEL AYIRICI TUTAMAÇ (DRAGGABLE RESIZER BAR) */}
-            {!isSidebarCollapsed && (
-              <div
-                onMouseDown={handleMouseDownResize}
-                onTouchStart={handleTouchStartResize}
-                className={`hidden lg:flex items-center justify-center relative select-none cursor-col-resize z-20 group lg:order-2 shrink-0 ${
-                  isResizing 
-                    ? "bg-amber-500 w-2.5 shadow-md ring-2 ring-amber-400" 
-                    : "bg-slate-200 hover:bg-amber-400 w-2 hover:w-2.5 border-x border-slate-300 hover:border-amber-400 transition-colors"
-                }`}
-                title="Sürükleyerek Haritayı Daraltın veya Genişletin (Çift Tık: 440px Sıfırla)"
-                onDoubleClick={() => {
-                  setSidebarWidth(440);
-                  setIsSidebarCollapsed(false);
-                  setTimeout(() => window.dispatchEvent(new Event("resize")), 50);
-                }}
-              >
-                {/* Ortadaki Yüzen Tutamaç Butonu & Ok Simgesi */}
-                <div className="absolute top-1/2 -translate-y-1/2 z-30 flex flex-col items-center">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setIsSidebarCollapsed(true);
-                      setTimeout(() => window.dispatchEvent(new Event("resize")), 50);
-                    }}
-                    className="w-5 h-12 rounded-full bg-[#0B1E3B] hover:bg-slate-900 text-amber-400 border border-amber-500/50 shadow-md flex flex-col items-center justify-center gap-1 transition hover:scale-110 active:scale-95 cursor-pointer"
-                    title={
-                      layoutMapPosition === "left"
-                        ? "Paneli Gizle (Haritayı Tam Ekran Yap)"
-                        : "Paneli Gizle (Haritayı Tam Ekran Yap)"
-                    }
-                  >
-                    <GripVertical className="w-2.5 h-2.5 text-amber-400/70" />
-                    {layoutMapPosition === "left" ? (
-                      <ChevronRight className="w-3 h-3 text-amber-400" />
-                    ) : (
-                      <ChevronLeft className="w-3 h-3 text-amber-400" />
-                    )}
-                  </button>
-                </div>
-              </div>
-            )}
-
             {/* HARİTA PANELİ (Geniş Tapusor & GIS Uydu Haritası) */}
             <div 
               id="main-parcel-map-container"
               className={`w-full lg:flex-1 lg:h-[calc(100vh-64px)] relative z-0 isolate bg-slate-100 flex flex-col ${
               layoutMapPosition === "left"
                 ? "lg:order-1 border-r border-slate-200"
-                : "lg:order-3"
+                : "lg:order-2"
             }`}>
               {/* Paneli Yeniden Aç Floating Butonu (Harita Tam Ekranken) */}
               {isSidebarCollapsed && (
