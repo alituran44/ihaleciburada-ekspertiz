@@ -105,7 +105,7 @@ export default function Home() {
   const [searchRadius, setSearchRadius] = useState<number>(1000);
   const [layoutMapPosition, setLayoutMapPosition] = useState<"left" | "right">("right");
   // Harita & Panel Boyutlandırma & Ayarlama Durumu (Genişlet / Daralt)
-  const [sidebarWidth, setSidebarWidth] = useState<number>(540);
+  const [sidebarWidth, setSidebarWidth] = useState<number>(620);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
   const [focusedCompId, setFocusedCompId] = useState<string | null>(null);
   const [listingFilter, setListingFilter] = useState<"all" | "satilik" | "kiralik">("all");
@@ -1477,7 +1477,7 @@ export default function Home() {
               className={`${
                 isSidebarCollapsed 
                   ? "hidden" 
-                  : "w-full lg:w-[540px] shrink-0 lg:h-[calc(100vh-64px)] overflow-y-auto p-3 sm:p-5 space-y-4 bg-white relative z-10 transition-[flex-basis,width] duration-150"
+                  : "w-full lg:w-[620px] shrink-0 lg:h-[calc(100vh-64px)] overflow-y-auto p-3 sm:p-5 space-y-4 bg-white relative z-10 transition-[flex-basis,width] duration-150"
               } ${
                 layoutMapPosition === "left" 
                   ? "lg:order-2 border-l border-slate-200" 
@@ -1605,7 +1605,7 @@ export default function Home() {
                             <IconComp className="w-3.5 h-3.5" />
                           </div>
                           <div className="min-w-0">
-                            <div className="text-[11px] font-bold truncate leading-tight">
+                            <div className="text-[11px] font-bold leading-tight">
                               {cat.name}
                             </div>
                             <div className="text-[8.5px] text-slate-400">
@@ -1722,7 +1722,7 @@ export default function Home() {
                             key={lot.id}
                             type="button"
                             onClick={() => setParcelData(prev => ({ ...prev, listingOwnerType: lot.id as any }))}
-                            className={`py-1 px-1 rounded-lg text-[9px] font-bold transition cursor-pointer text-center border truncate ${
+                            className={`py-1 px-1.5 rounded-lg text-[9.5px] font-bold transition cursor-pointer text-center border truncate ${
                               isActive
                                 ? "bg-emerald-500/30 border-emerald-400 text-emerald-300 font-black"
                                 : "bg-slate-900/90 border-slate-800 text-slate-400 hover:text-white"
