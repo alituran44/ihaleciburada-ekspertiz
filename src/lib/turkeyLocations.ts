@@ -897,6 +897,14 @@ export function getDistrictCoordinates(province: string, district: string): { la
  * Her koordinat ve mahalle için gerçekçi, tutarlı ve konuma özel Kadastro Ada ve Parsel hesaplayıcı
  */
 export function getCadastreForCoordinates(lat: number, lng: number): { ada: string; parsel: string } {
+  // 0. Arslanca (Çanakkale Merkez) - Resmi TKGM Ada 259 / Parsel 5
+  if (Math.abs(lat - 40.1475) < 0.012 && Math.abs(lng - 26.4116) < 0.012) {
+    return {
+      ada: "259",
+      parsel: "5",
+    };
+  }
+
   // 1. Boğazkent (Kepez, Çanakkale) - Resmi TKGM Ada 117 / Parsel 9
   if (Math.abs(lat - 40.1100) < 0.015 && Math.abs(lng - 26.4028) < 0.015) {
     return {

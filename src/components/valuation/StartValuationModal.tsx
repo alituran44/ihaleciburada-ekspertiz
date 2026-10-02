@@ -21,8 +21,6 @@ import {
   Radio,
   PlusCircle,
   Tag,
-  Phone,
-  User,
   Check,
   Crosshair,
   ExternalLink,
@@ -40,7 +38,7 @@ import {
 } from "@/lib/taxonomy";
 
 export interface StartValuationPayload {
-  mode: "expertiz" | "emlak_bul" | "ilan_ver";
+  mode: "expertiz" | "emlak_bul";
   transactionType: "satilik" | "kiralik" | "kat_karsiligi" | "devren_satilik" | "devren_kiralik";
   mainCategory: "konut" | "arsa" | "ticari" | "bina" | "turizm" | "ozel_amacli";
   subCategory: string;
@@ -61,18 +59,13 @@ export interface StartValuationPayload {
   tapuNiteligi: string;
   coordinates?: { lat: number; lng: number };
   serhStatus?: "tapudan_sorulacak" | "temiz" | "ipotek_var" | "haciz_serh_var";
-  // İlan Ver Modu Alanları
-  listingPriceTL?: number;
-  contactName?: string;
-  contactPhone?: string;
-  listingTitle?: string;
 }
 
 interface StartValuationModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (payload: StartValuationPayload) => void;
-  initialMode?: "expertiz" | "emlak_bul" | "ilan_ver";
+  initialMode?: "expertiz" | "emlak_bul";
   initialCity?: string;
   initialDistrict?: string;
   initialNeighborhood?: string;
@@ -95,8 +88,8 @@ export const StartValuationModal: React.FC<StartValuationModalProps> = ({
   initialAreaM2 = 135,
   initialCategory = "arsa",
 }) => {
-  // 1. Mod Seçimi (EXPERTİZ vs EMLAK BUL vs İLAN VER)
-  const [activeMode, setActiveMode] = useState<"expertiz" | "emlak_bul" | "ilan_ver">(initialMode);
+  // 1. Mod Seçimi (EXPERTİZ vs EMLAK BUL)
+  const [activeMode, setActiveMode] = useState<"expertiz" | "emlak_bul">(initialMode === "emlak_bul" ? "emlak_bul" : "expertiz");
 
   // 2. İşlem Türü (Satılık, Kiralık, Kat Karşılığı, Devren Satılık, Devren Kiralık)
   const [transactionType, setTransactionType] = useState<"satilik" | "kiralik" | "kat_karsiligi" | "devren_satilik" | "devren_kiralik">("satilik");
@@ -169,13 +162,6 @@ export const StartValuationModal: React.FC<StartValuationModalProps> = ({
     lat: 40.0985,
     lng: 26.3980,
   });
-
-  // 7. İlan Ver Modu Özel Alanları (İhaleciBurada Ali Turan Hesabı)
-  const [listingPriceTL, setListingPriceTL] = useState<number>(9425000);
-  const [contactName, setContactName] = useState<string>("Ali Turan");
-  const [contactPhone, setContactPhone] = useState<string>("0532 000 00 00");
-  const [listingTitle, setListingTitle] = useState<string>("");
-  const [isListingPublishedSuccess, setIsListingPublishedSuccess] = useState<boolean>(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAutoLocating, setIsAutoLocating] = useState<boolean>(false);
@@ -547,41 +533,7 @@ export const StartValuationModal: React.FC<StartValuationModalProps> = ({
       tapuNiteligi: tapuNiteligi || (subCategory === "tarla" ? "Tarla" : "İmarlı Arsa"),
       coordinates: targetCoords,
       serhStatus: serhStatus,
-      listingPriceTL: activeMode === "ilan_ver" ? listingPriceTL : undefined,
-      contactName: activeMode === "ilan_ver" ? contactName : undefined,
-      contactPhone: activeMode === "ilan_ver" ? contactPhone : undefined,
-      listingTitle: activeMode === "ilan_ver" ? listingTitle : undefined,
     };
-
-    // İlan Ver Moduysa Kaydet ve Bildir
-    if (activeMode === "ilan_ver") {
-      try {
-        await fetch("/api/crowdsource", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            ada: ada.trim() || "117",
-            parsel: parsel.trim() || "9",
-            city: cleanCity,
-            district: cleanDistrict,
-            neighborhood: cleanNeigh,
-            reportedPrice: listingPriceTL,
-            userNote: `${contactName} (${contactPhone}) - ${listingTitle || "Kullanıcı İlanı"}`,
-          }),
-        });
-      } catch (err) {
-        console.warn("İlan kaydetme API hatası:", err);
-      }
-
-      onSubmit(payload);
-      setIsListingPublishedSuccess(true);
-      setTimeout(() => {
-        setIsListingPublishedSuccess(false);
-        setIsSubmitting(false);
-        onClose();
-      }, 1500);
-      return;
-    }
 
     setIsSubmitting(false);
     onSubmit(payload);
@@ -610,8 +562,8 @@ export const StartValuationModal: React.FC<StartValuationModalProps> = ({
             <span>Hasan Hüseyin Yıldırım Kadastro Standardı (173401031)</span>
           </div>
 
-          {/* 3'LÜ MOD SEKMELERİ */}
-          <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-900/90 rounded-xl border border-slate-700/80 mb-2">
+          {/* 2'Lİ MOD SEKMELERİ (EXPERTİZ vs EMLAK BUL) */}
+          <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-900/90 rounded-xl border border-slate-700/80 mb-2">
             <button
               type="button"
               onClick={() => setActiveMode("expertiz")}
@@ -637,123 +589,17 @@ export const StartValuationModal: React.FC<StartValuationModalProps> = ({
               <Search className="w-3.5 h-3.5" />
               <span className="truncate">EMLAK BUL</span>
             </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveMode("ilan_ver")}
-              className={`py-2 px-2 rounded-lg text-xs font-black tracking-wide flex items-center justify-center gap-1.5 transition cursor-pointer ${
-                activeMode === "ilan_ver"
-                  ? "bg-linear-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/20"
-                  : "text-slate-400 hover:text-white hover:bg-slate-800/60"
-              }`}
-            >
-              <PlusCircle className="w-3.5 h-3.5" />
-              <span className="truncate">İLAN VER</span>
-            </button>
           </div>
 
           <p className="text-[11px] text-slate-300 font-medium">
             {activeMode === "expertiz" 
-              ? "Taşınmazın ada, parsel, konum ve nitelik bilgilerini girerek 13 sayfalık resmi SPK/BDDK ekspertiz değerlemesini başlatın."
-              : activeMode === "emlak_bul"
-              ? "Belirlediğiniz ada/parsel veya harita radar yarıçapı içindeki satılık/kiralık ilan ve emsalleri listeleyin."
-              : "Taşınmazınızı İhaleciBurada platformunda ilan olarak yayınlayın ve portföyünüze ekleyin."}
+              ? "Taşınmazın ada, parsel, konum ve nitelik bilgilerini girerek resmi SPK/BDDK ekspertiz değerlemesini başlatın."
+              : "Belirlediğiniz ada/parsel veya harita radar yarıçapı içindeki satılık/kiralık ilan ve emsalleri listeleyin."}
           </p>
         </div>
 
         {/* FORM GÖVDESİ */}
         <form onSubmit={handleFormSubmit} className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 font-sans">
-          
-          {/* İLAN VER MODU ÖZEL ALANLARI */}
-          {activeMode === "ilan_ver" && (
-            <div className="bg-blue-50/70 p-3.5 rounded-xl border border-blue-200 space-y-2.5 animate-in fade-in duration-150">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-xs font-black text-blue-900 uppercase">
-                  <Tag className="w-4 h-4 text-blue-600" />
-                  <span>İlan Yayın Bilgileri</span>
-                </div>
-                <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-black border border-blue-300">
-                  İhaleciBurada Portföyü
-                </span>
-              </div>
-
-              {/* İhaleciBurada Bağlı Hesap Rozeti */}
-              <div className="flex items-center justify-between p-2.5 rounded-xl bg-white border border-blue-200 shadow-2xs">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-full bg-[#0B1E3B] text-amber-400 border border-amber-500/40 flex items-center justify-center text-xs font-black shrink-0">
-                    AT
-                  </div>
-                  <div>
-                    <div className="text-xs font-extrabold text-slate-900 flex items-center gap-1.5">
-                      <span>Yayıncı Hesap: <strong>Ali Turan</strong></span>
-                      <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 border border-amber-300 font-bold">Pro Profil</span>
-                    </div>
-                    <div className="text-[10.5px] text-slate-500">İlanınız doğrudan İhaleciBurada kurumsal hesabınızdan yayınlanacaktır</div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1 text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-200 shrink-0">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                  <span>Bağlı Hesap</span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                <div>
-                  <label className="block text-[10px] font-extrabold text-slate-700 uppercase mb-1">
-                    Talep Edilen Satış Fiyatı (₺) <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    value={listingPriceTL}
-                    onChange={(e) => setListingPriceTL(Number(e.target.value))}
-                    required
-                    className="w-full px-2.5 py-1.5 bg-white border border-blue-300 rounded-lg text-xs font-mono font-black text-blue-950 outline-none focus:border-blue-600"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-extrabold text-slate-700 uppercase mb-1">
-                    İletişim Ad Soyad <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={contactName}
-                    onChange={(e) => setContactName(e.target.value)}
-                    required
-                    placeholder="Ali Turan"
-                    className="w-full px-2.5 py-1.5 bg-white border border-blue-300 rounded-lg text-xs font-bold text-slate-900 outline-none focus:border-blue-600"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-extrabold text-slate-700 uppercase mb-1">
-                    İletişim Telefonu <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={contactPhone}
-                    onChange={(e) => setContactPhone(e.target.value)}
-                    required
-                    placeholder="05XX XXX XX XX"
-                    className="w-full px-2.5 py-1.5 bg-white border border-blue-300 rounded-lg text-xs font-mono font-bold text-slate-900 outline-none focus:border-blue-600"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-extrabold text-slate-700 uppercase mb-1">
-                  İlan Başlığı / Açıklaması
-                </label>
-                <input
-                  type="text"
-                  value={listingTitle}
-                  onChange={(e) => setListingTitle(e.target.value)}
-                  placeholder="Örn: Kepez Merkezde Deniz Manzaralı 135 m² İmarlı Arsa Fırsatı"
-                  className="w-full px-2.5 py-1.5 bg-white border border-blue-300 rounded-lg text-xs font-medium text-slate-900 outline-none focus:border-blue-600"
-                />
-              </div>
-            </div>
-          )}
 
           {/* 1. İŞLEM TÜRÜ (SATILIK, KİRALIK, KAT KARŞILIĞI VB.) */}
           <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
@@ -1348,14 +1194,6 @@ export const StartValuationModal: React.FC<StartValuationModalProps> = ({
             </button>
           </div>
 
-          {/* BAŞARI BİLDİRİMİ */}
-          {isListingPublishedSuccess && (
-            <div className="p-3 bg-emerald-50 border border-emerald-300 rounded-xl flex items-center gap-2 text-emerald-800 text-xs font-bold animate-in zoom-in-95">
-              <Check className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>✓ İlanınız İhaleciBurada hesabınızdan (Ali Turan) başarıyla yayınlandı ve haritada listelendi!</span>
-            </div>
-          )}
-
           {/* BUTONLAR */}
           <div className="pt-3 border-t border-slate-200 flex items-center justify-between gap-2.5">
             <button
@@ -1370,9 +1208,7 @@ export const StartValuationModal: React.FC<StartValuationModalProps> = ({
               type="submit"
               disabled={isSubmitting}
               className={`px-5 py-2.5 rounded-xl text-white font-black text-xs shadow-md transition cursor-pointer flex items-center gap-2 active:scale-95 ${
-                activeMode === "ilan_ver"
-                  ? "bg-linear-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 shadow-blue-700/20"
-                  : activeMode === "emlak_bul" || mapAction === "ilanlari_bul"
+                activeMode === "emlak_bul" || mapAction === "ilanlari_bul"
                   ? "bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 shadow-emerald-700/20"
                   : "bg-linear-to-r from-[#0B1E3B] via-[#0F284E] to-amber-600 hover:from-[#0B1E3B] hover:to-amber-500 shadow-slate-900/30"
               }`}
@@ -1381,11 +1217,6 @@ export const StartValuationModal: React.FC<StartValuationModalProps> = ({
                 <>
                   <Loader2 className="w-4 h-4 animate-spin text-amber-200" />
                   <span>İşleniyor...</span>
-                </>
-              ) : activeMode === "ilan_ver" ? (
-                <>
-                  <PlusCircle className="w-4 h-4" />
-                  <span>İhaleciBurada Hesabından İlanı Yayınla</span>
                 </>
               ) : activeMode === "emlak_bul" || mapAction === "ilanlari_bul" ? (
                 <>

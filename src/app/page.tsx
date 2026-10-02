@@ -103,13 +103,13 @@ export default function Home() {
   const [showReportSelectionModal, setShowReportSelectionModal] = useState<boolean>(false);
   const [selectedReportType, setSelectedReportType] = useState<ReportPackageType>("elit");
   const [showStartValuationModal, setShowStartValuationModal] = useState<boolean>(false);
-  const [startValuationInitialMode, setStartValuationInitialMode] = useState<"expertiz" | "emlak_bul" | "ilan_ver">("expertiz");
+  const [startValuationInitialMode, setStartValuationInitialMode] = useState<"expertiz" | "emlak_bul">("expertiz");
   const [subTab, setSubTab] = useState<"deger" | "trend" | "rayic" | "best_use">("deger");
   const [valuationMode, setValuationMode] = useState<"otomatik" | "manuel">("otomatik");
   const [searchRadius, setSearchRadius] = useState<number>(1000);
-  const [layoutMapPosition, setLayoutMapPosition] = useState<"left" | "right">("left");
+  const [layoutMapPosition, setLayoutMapPosition] = useState<"left" | "right">("right");
   // Harita & Panel Boyutlandırma & Ayarlama Durumu (Genişlet / Daralt)
-  const [sidebarWidth, setSidebarWidth] = useState<number>(440);
+  const [sidebarWidth, setSidebarWidth] = useState<number>(460);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
   const [isResizing, setIsResizing] = useState<boolean>(false);
   const [focusedCompId, setFocusedCompId] = useState<string | null>(null);
@@ -199,11 +199,6 @@ export default function Home() {
       { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
     );
   }, [parcelData.category]);
-
-  // Sayfa açıldığında doğrudan kullanıcının bulunduğu konuma göre başlat
-  useEffect(() => {
-    handleAutoLocateGPS(true);
-  }, [handleAutoLocateGPS]);
 
   // Sürükle-Bırak ile Harita & Panel Boyutlandırma (Ayarlı Ayırıcı)
   const handleMouseDownResize = (e: React.MouseEvent) => {
@@ -317,33 +312,6 @@ export default function Home() {
 
     setActiveTab("endeks");
 
-    // İlan ver moduysa anlık olarak yerel listeye ve harita emsal havuzuna ekle (İhaleciBurada Hesabı)
-    if (payload.mode === "ilan_ver" && payload.listingPriceTL) {
-      const isRental = payload.transactionType === "kiralik" || payload.transactionType === "devren_kiralik";
-      const newCustomListing: ComparableListing = {
-        id: `user-listing-${Date.now()}`,
-        title: payload.listingTitle || `${payload.neighborhood || payload.district} • İhaleciBurada Portföy İlanı`,
-        category: cat,
-        type: (isRental ? "kiralik" : "satilik") as "satilik" | "kiralik",
-        areaM2: payload.areaM2,
-        pricePerM2TL: Math.round(payload.listingPriceTL / (payload.areaM2 || 1)),
-        priceTL: payload.listingPriceTL,
-        distanceMeters: 20,
-        coordinates: newCoords || parcelData.coordinates || { lat: 40.0985, lng: 26.3980 },
-        source: "İhaleciBurada (Ali Turan)",
-        roomCount: isRes ? "3+1" : undefined,
-        zoningType: isRes ? undefined : payload.tapuNiteligi,
-        date: "Bugün",
-      };
-      setParcelData((prev) => ({
-        ...prev,
-        comparables: [newCustomListing, ...(prev.comparables || [])],
-      }));
-      setFocusedCompId(newCustomListing.id);
-      setLocationToast("🎉 İlanınız İhaleciBurada hesabınızdan (Ali Turan) başarıyla yayınlandı ve haritada listelendi!");
-      setTimeout(() => setLocationToast(null), 6000);
-    }
-
     // Arka planda girilen il, ilçe ve köy/mahalle için anlık emsal ve piyasa verisini güncelle
     try {
       const url = `/api/emsal?il=${encodeURIComponent(payload.city)}&ilce=${encodeURIComponent(payload.district)}&mahalle=${encodeURIComponent(payload.neighborhood)}&kategori=${cat}${newCoords ? `&lat=${newCoords.lat}&lng=${newCoords.lng}` : ""}`;
@@ -424,6 +392,40 @@ export default function Home() {
 
   const isResidential = parcelData.category === "konut";
   const isLand = parcelData.category === "arsa" || parcelData.category === "arazi";
+
+  // İhaleciBurada platformunda doğrudan "İhale Aç / İlan Ver" sayfasına yönlendirme (Bilgileri dolu aç)
+  const handleRedirectIhaleciBuradaIhaleAc = () => {
+    const isRes = parcelData.category === "konut";
+    const estVal =
+      calculation?.fairMarketValueTL ||
+      Math.round(
+        (isRes
+          ? parcelData.estimatedUnitSaleM2PriceTL || 43000
+          : parcelData.estimatedLandM2PriceTL || 18500) * (parcelData.areaM2 || 138.35)
+      );
+
+    const title = `${parcelData.city || "Çanakkale"} ${parcelData.district || "Merkez"} ${parcelData.neighborhood || "Arslanca"} ${
+      parcelData.ada ? `${parcelData.ada} Ada / ` : ""
+    }${parcelData.parsel ? `${parcelData.parsel} Parsel ` : ""}${
+      isRes ? "Konut & Daire" : "Arsa"
+    }`;
+
+    const params = new URLSearchParams({
+      il: parcelData.city || "Çanakkale",
+      ilce: parcelData.district || "Merkez",
+      mahalle: parcelData.neighborhood || "Arslanca",
+      ada: parcelData.ada || "259",
+      parsel: parcelData.parsel || "5",
+      alan: String(parcelData.areaM2 || "138.35"),
+      fiyat: String(estVal || "5949050"),
+      kategori: parcelData.category || "konut",
+      baslik: title.trim(),
+      kaynak: "ekspertiz",
+    });
+
+    const targetUrl = `https://ihaleciburada.com/panel/ihale-olustur?${params.toString()}`;
+    window.open(targetUrl, "_blank", "noopener,noreferrer");
+  };
 
   const handleCategorySwitch = (cat: PropertyCategory) => {
     const foundCat = REAL_ESTATE_CATEGORIES.find((c) => c.id === cat);
@@ -1488,6 +1490,18 @@ export default function Home() {
             >
               <ExternalLink className="w-3 h-3 text-amber-400" />
               <span>TKGM</span>
+            </button>
+
+            {/* 4.5 Doğrudan İhaleciBurada'da İhale Aç / İlan Ver Butonu */}
+            <button
+              type="button"
+              onClick={handleRedirectIhaleciBuradaIhaleAc}
+              className="hidden sm:flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white px-2.5 py-1 rounded-full text-xs font-black transition cursor-pointer active:scale-95 shrink-0 shadow-2xs"
+              title="Bu taşınmaz bilgileriyle doğrudan İhaleciBurada'da İhale Aç / İlan Ver"
+            >
+              <PlusCircle className="w-3.5 h-3.5 text-amber-300" />
+              <span>+ İhale Aç</span>
+              <ExternalLink className="w-3 h-3 text-blue-200" />
             </button>
 
 
@@ -2670,7 +2684,7 @@ export default function Home() {
                   Kendi İlanınızı veya Portföyünüzü Ekleyin
                 </div>
                 <p className="text-[11px] text-blue-800 leading-relaxed">
-                  Bu bölgedeki gayrimenkulünüzü veya ihale portföyünüzü ekleyin; <strong>İhaleciBurada</strong> hesabınızdan haritada ve değerleme havuzunda anında listelensin.
+                  Bu taşınmazın bilgileriyle (Ada, Parsel, m², Değer) doğrudan <strong>İhaleciBurada</strong> üzerinde ihale açın ve ilanınızı anında yayınlayın.
                 </p>
                 <div className="flex items-center justify-center gap-1.5 text-[10.5px] text-blue-900 font-bold bg-white/90 py-1 px-3 rounded-full border border-blue-200/80 max-w-fit mx-auto shadow-2xs">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -2678,14 +2692,12 @@ export default function Home() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => {
-                    setStartValuationInitialMode("ilan_ver");
-                    setShowStartValuationModal(true);
-                  }}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black shadow-xs transition flex items-center justify-center gap-1.5 mx-auto cursor-pointer active:scale-95"
+                  onClick={handleRedirectIhaleciBuradaIhaleAc}
+                  className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black shadow-xs transition flex items-center justify-center gap-1.5 mx-auto cursor-pointer active:scale-95"
                 >
-                  <PlusCircle className="w-4 h-4" />
-                  <span>İhaleciBurada Hesabından İlan Ver / Portföy Ekle</span>
+                  <PlusCircle className="w-4 h-4 text-amber-300" />
+                  <span>İhaleciBurada Hesabından İlan Ver / İhale Aç</span>
+                  <ExternalLink className="w-3.5 h-3.5 text-blue-200 ml-0.5" />
                 </button>
               </div>
             </div>
