@@ -67,7 +67,6 @@ import {
   DollarSign,
   Share2,
   Printer,
-  SlidersHorizontal,
   Flame,
   Loader2,
   Trees,
@@ -89,9 +88,7 @@ import {
   X,
   Navigation,
   ChevronLeft,
-  ChevronRight,
-  Maximize2,
-  Minimize2
+  ChevronRight
 } from "lucide-react";
 
 export default function Home() {
@@ -108,7 +105,7 @@ export default function Home() {
   const [searchRadius, setSearchRadius] = useState<number>(1000);
   const [layoutMapPosition, setLayoutMapPosition] = useState<"left" | "right">("right");
   // Harita & Panel Boyutlandırma & Ayarlama Durumu (Genişlet / Daralt)
-  const [sidebarWidth, setSidebarWidth] = useState<number>(460);
+  const [sidebarWidth, setSidebarWidth] = useState<number>(540);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
   const [focusedCompId, setFocusedCompId] = useState<string | null>(null);
   const [listingFilter, setListingFilter] = useState<"all" | "satilik" | "kiralik">("all");
@@ -1366,35 +1363,6 @@ export default function Home() {
               İhale & Pey Analizi
             </button>
 
-            {/* 2.5 Harita Solda / Sağda Düzen Değiştirici */}
-            <button
-              type="button"
-              onClick={() => setLayoutMapPosition(prev => prev === "left" ? "right" : "left")}
-              className="flex items-center gap-1.5 py-1 px-2.5 rounded-full border border-slate-300 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition shadow-2xs active:scale-95 cursor-pointer shrink-0"
-              title="Harita ve Değerleme Paneli Konumunu Değiştir (Solda / Sağda)"
-            >
-              <SlidersHorizontal className="w-3 h-3 text-amber-600" />
-              <span>{layoutMapPosition === "left" ? "Harita Solda" : "Harita Sağda"}</span>
-            </button>
-
-            {/* 2.6 Tam Ekran Harita / Paneli Gizle Toggle Butonu */}
-            <button
-              type="button"
-              onClick={() => {
-                setIsSidebarCollapsed(prev => !prev);
-                setTimeout(() => window.dispatchEvent(new Event("resize")), 50);
-              }}
-              className={`flex items-center gap-1.5 py-1 px-2.5 rounded-full border text-xs font-bold transition shadow-2xs active:scale-95 cursor-pointer shrink-0 ${
-                isSidebarCollapsed
-                  ? "bg-amber-500 text-slate-950 border-amber-400 font-black"
-                  : "border-slate-300 bg-slate-100 hover:bg-slate-200 text-slate-800"
-              }`}
-              title={isSidebarCollapsed ? "Değerleme Panelini Göster" : "Haritayı Tam Ekran Genişlet (Paneli Gizle)"}
-            >
-              {isSidebarCollapsed ? <Minimize2 className="w-3 h-3" /> : <Maximize2 className="w-3 h-3 text-amber-600" />}
-              <span>{isSidebarCollapsed ? "Paneli Aç" : "Tam Ekran"}</span>
-            </button>
-
             {/* 3. Ekspertiz Raporu Sekmesi (Lansmana Özel Ücretsiz - Fotoğraf 2) */}
             <button
               type="button"
@@ -1501,7 +1469,7 @@ export default function Home() {
             {/* DEĞERLEME & ANALİZ PANELİ */}
             <div 
               style={{
-                flexBasis: !isSidebarCollapsed && typeof window !== "undefined" && window.innerWidth >= 1024 ? `${sidebarWidth}px` : undefined,
+                flexBasis: !isSidebarCollapsed ? `${sidebarWidth}px` : undefined,
                 width: isSidebarCollapsed ? "0px" : undefined,
                 maxWidth: isSidebarCollapsed ? "0px" : undefined,
                 minWidth: isSidebarCollapsed ? "0px" : undefined,
@@ -1509,7 +1477,7 @@ export default function Home() {
               className={`${
                 isSidebarCollapsed 
                   ? "hidden" 
-                  : "w-full shrink-0 lg:h-[calc(100vh-64px)] overflow-y-auto p-3 sm:p-5 space-y-4 bg-white relative z-10 transition-[flex-basis,width] duration-150"
+                  : "w-full lg:w-[540px] shrink-0 lg:h-[calc(100vh-64px)] overflow-y-auto p-3 sm:p-5 space-y-4 bg-white relative z-10 transition-[flex-basis,width] duration-150"
               } ${
                 layoutMapPosition === "left" 
                   ? "lg:order-2 border-l border-slate-200" 
