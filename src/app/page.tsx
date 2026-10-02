@@ -2141,13 +2141,13 @@ export default function Home() {
                   <div className="border-r border-slate-800 pr-1">
                     <div className="text-[9px] uppercase tracking-wide text-amber-300 font-bold">Birim m² Fiyatı</div>
                     <div className="text-xs sm:text-sm font-black font-mono text-amber-400 mt-0.5">
-                      {(isResidential ? (parcelData.estimatedUnitSaleM2PriceTL || 54085) : (parcelData.estimatedLandM2PriceTL || 18500)).toLocaleString("tr-TR")} ₺/m²
+                      {(isResidential ? (parcelData.estimatedUnitSaleM2PriceTL || 43000) : (parcelData.estimatedLandM2PriceTL || 18500)).toLocaleString("tr-TR")} ₺/m²
                     </div>
                   </div>
                   <div className="pl-1">
-                    <div className="text-[9px] uppercase tracking-wide text-slate-400 font-bold">Toplam Değer ({formatArea(parcelData.areaM2 || 478.15)} m²)</div>
+                    <div className="text-[9px] uppercase tracking-wide text-slate-400 font-bold">Toplam Değer ({formatArea(parcelData.areaM2 || 138.35)} m²)</div>
                     <div className="text-xs sm:text-sm font-black font-mono text-emerald-400 mt-0.5">
-                      {Math.round((isResidential ? (parcelData.estimatedUnitSaleM2PriceTL || 54085) : (parcelData.estimatedLandM2PriceTL || 18500)) * (parcelData.areaM2 || 478.15)).toLocaleString("tr-TR")} ₺
+                      {Math.round((isResidential ? (parcelData.estimatedUnitSaleM2PriceTL || 43000) : (parcelData.estimatedLandM2PriceTL || 18500)) * (parcelData.areaM2 || 138.35)).toLocaleString("tr-TR")} ₺
                     </div>
                   </div>
                 </div>
@@ -2793,7 +2793,7 @@ export default function Home() {
                 areaM2={parcelData.areaM2}
                 unitM2Price={
                   isResidential 
-                    ? (parcelData.estimatedUnitSaleM2PriceTL || 54085) 
+                    ? (parcelData.estimatedUnitSaleM2PriceTL || 43000) 
                     : (parcelData.estimatedLandM2PriceTL || 18500)
                 }
                 isEndeksaSplitView={true}

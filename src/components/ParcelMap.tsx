@@ -130,7 +130,7 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
   const [activeNeighborhood, setActiveNeighborhood] = useState<string | null>(neighborhood || null);
 
   // Floating Controls
-  const [currentZoom, setCurrentZoom] = useState<number>(15);
+  const [currentZoom, setCurrentZoom] = useState<number>(17);
   const [isLocked, setIsLocked] = useState<boolean>(false);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [showLayerMenu, setShowLayerMenu] = useState<boolean>(false);
@@ -836,7 +836,7 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
     if (!mapContainerRef.current) return;
     if (mapInstanceRef.current) return;
 
-    const initialZoom = 15;
+    const initialZoom = 17;
 
     const map = L.map(mapContainerRef.current, {
       center: [lat, lng],
