@@ -1332,36 +1332,6 @@ export default function Home() {
 
           {/* Sağ Kısım: İhaleciBurada Üst Menü & Kullanıcı Rozeti */}
           <div className="flex items-center gap-1.5 sm:gap-3 text-xs font-bold shrink-0">
-            
-            {/* 1. Değerleme Sekmesi */}
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab("endeks");
-              }}
-              className={`py-1.5 px-2 transition relative cursor-pointer font-heading font-extrabold whitespace-nowrap shrink-0 ${
-                activeTab === "endeks"
-                  ? "text-blue-600 after:absolute after:bottom-[-16px] after:left-0 after:right-0 after:h-[2.5px] after:bg-blue-600 after:rounded-full"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              <span className="hidden sm:inline">Akıllı </span>Değerleme
-            </button>
-
-            {/* 2. İhale & Pey Analizi Sekmesi */}
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab("ihale");
-              }}
-              className={`py-1.5 px-2 transition relative cursor-pointer font-heading font-extrabold whitespace-nowrap shrink-0 ${
-                activeTab === "ihale"
-                  ? "text-blue-600 after:absolute after:bottom-[-16px] after:left-0 after:right-0 after:h-[2.5px] after:bg-blue-600 after:rounded-full"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              İhale & Pey Analizi
-            </button>
 
             {/* 3. Ekspertiz Raporu Sekmesi (Lansmana Özel Ücretsiz - Fotoğraf 2) */}
             <button
