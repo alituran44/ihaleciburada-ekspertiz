@@ -20,7 +20,16 @@ import {
   Crosshair, 
   Filter, 
   Sparkles,
-  ShieldCheck
+  ShieldCheck,
+  Ruler,
+  Shapes,
+  Navigation,
+  Share2,
+  Copy,
+  Check,
+  RotateCcw,
+  X,
+  Sliders
 } from "lucide-react";
 
 interface ParcelMapProps {
@@ -86,6 +95,32 @@ function offsetCoord(lat: number, lng: number, meters: number, bearingDeg: numbe
   };
 }
 
+function formatDistance(meters: number): string {
+  if (!meters) return "0 m";
+  if (meters >= 1000) {
+    return `${(meters / 1000).toFixed(2)} km (${Math.round(meters)} m)`;
+  }
+  return `${Math.round(meters)} m`;
+}
+
+function computePolygonArea(pts: L.LatLng[]): number {
+  if (!pts || pts.length < 3) return 0;
+  const rad = Math.PI / 180;
+  const meanLat = (pts.reduce((acc, p) => acc + p.lat, 0) / pts.length) * rad;
+  const R = 6378137;
+  const projected = pts.map((p) => ({
+    x: p.lng * rad * R * Math.cos(meanLat),
+    y: p.lat * rad * R,
+  }));
+  let area = 0;
+  for (let i = 0; i < projected.length; i++) {
+    const j = (i + 1) % projected.length;
+    area += projected[i].x * projected[j].y;
+    area -= projected[j].x * projected[i].y;
+  }
+  return Math.abs(area) / 2;
+}
+
 export const ParcelMap: React.FC<ParcelMapProps> = ({
   city,
   district,
@@ -136,6 +171,314 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
   const [showLayerMenu, setShowLayerMenu] = useState<boolean>(false);
   const [parcelNotice, setParcelNotice] = useState<string | null>(null);
   const [mapLayerType, setMapLayerType] = useState<"satellite" | "streets">("satellite");
+
+  // Saha ve Ölçüm Araçları (Mesafe Cetveli & Alan Ölçer)
+  const [activeTool, setActiveTool] = useState<"none" | "ruler" | "area">("none");
+  const activeToolRef = useRef<"none" | "ruler" | "area">("none");
+  const measurementLayerGroupRef = useRef<L.LayerGroup | null>(null);
+  const [rulerPoints, setRulerPoints] = useState<L.LatLng[]>([]);
+  const [areaPoints, setAreaPoints] = useState<L.LatLng[]>([]);
+  const [rulerDistance, setRulerDistance] = useState<number>(0);
+  const [areaM2Value, setAreaM2Value] = useState<number>(0);
+  const [copySuccess, setCopySuccess] = useState<boolean>(false);
+
+  // WMS / Tematik İmar ve Çevre Katmanları (ÇŞİDB & MTA)
+  const [thematicLayers, setThematicLayers] = useState<{
+    eplan: boolean;
+    fay: boolean;
+    sit: boolean;
+    kiyi: boolean;
+  }>({
+    eplan: false,
+    fay: false,
+    sit: false,
+    kiyi: false,
+  });
+  const [thematicOpacity, setThematicOpacity] = useState<number>(0.75);
+  const thematicLayersRef = useRef<{ [key: string]: L.TileLayer.WMS }>({});
+
+  const handleRulerClickRef = useRef<(latlng: L.LatLng) => void>(() => {});
+  const handleAreaClickRef = useRef<(latlng: L.LatLng) => void>(() => {});
+
+  // Ölçüm Modu Cursor & Ref Senkronizasyonu
+  useEffect(() => {
+    activeToolRef.current = activeTool;
+    if (mapContainerRef.current) {
+      if (activeTool !== "none") {
+        mapContainerRef.current.style.cursor = "crosshair";
+      } else {
+        mapContainerRef.current.style.cursor = "";
+      }
+    }
+  }, [activeTool]);
+
+  // ESC Tuşu ile Ölçümden Çıkış
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && activeToolRef.current !== "none") {
+        closeMeasurement();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  // WMS Tematik Katmanlar Senkronizasyonu (e-Plan, Fay, Sit, Kıyı)
+  useEffect(() => {
+    if (!mapInstanceRef.current) return;
+    const map = mapInstanceRef.current;
+
+    const wmsConfigs: { [key: string]: { url: string; layers: string; attribution: string } } = {
+      eplan: {
+        url: "https://tucbs-public-api3.csb.gov.tr/trk_cbsgm_eplanvector_wms",
+        layers: "eplanvector",
+        attribution: "© ÇŞİDB e-Plan İmar Planı",
+      },
+      fay: {
+        url: "https://yerbilimleri.mta.gov.tr/wms",
+        layers: "diri_fay",
+        attribution: "© MTA Diri Fay Haritası",
+      },
+      sit: {
+        url: "https://tucbs-public-api3.csb.gov.tr/trk_csb_tabiat_wms",
+        layers: "sit_alanlari",
+        attribution: "© ÇŞİDB Doğal Sit",
+      },
+      kiyi: {
+        url: "https://tucbs-public-api3.csb.gov.tr/trk_csb_mpgm_kiyikenar_wms",
+        layers: "kiyi_kenar_cizgisi",
+        attribution: "© ÇŞİDB Kıyı Kenar",
+      },
+    };
+
+    Object.entries(thematicLayers).forEach(([key, isEnabled]) => {
+      const existingLayer = thematicLayersRef.current[key];
+      if (isEnabled) {
+        if (!existingLayer && wmsConfigs[key]) {
+          try {
+            const cfg = wmsConfigs[key];
+            const newWms = L.tileLayer.wms(cfg.url, {
+              layers: cfg.layers,
+              format: "image/png",
+              transparent: true,
+              opacity: thematicOpacity,
+              maxZoom: 21,
+              attribution: cfg.attribution,
+            }).addTo(map);
+            thematicLayersRef.current[key] = newWms;
+          } catch (err) {
+            console.error("WMS katmanı yüklenemedi:", err);
+          }
+        } else if (existingLayer) {
+          existingLayer.setOpacity(thematicOpacity);
+        }
+      } else {
+        if (existingLayer) {
+          map.removeLayer(existingLayer);
+          delete thematicLayersRef.current[key];
+        }
+      }
+    });
+  }, [thematicLayers, thematicOpacity]);
+
+  // Cetvel ve Alan Çizim Fonksiyonları
+  const renderRuler = (pts: L.LatLng[]) => {
+    if (!measurementLayerGroupRef.current) return;
+    measurementLayerGroupRef.current.clearLayers();
+
+    if (pts.length === 0) {
+      setRulerDistance(0);
+      return;
+    }
+
+    if (pts.length > 1) {
+      L.polyline(pts, {
+        color: "#F59E0B",
+        weight: 3.5,
+        dashArray: "6, 6",
+        opacity: 0.95,
+      }).addTo(measurementLayerGroupRef.current);
+    }
+
+    let totalDist = 0;
+    pts.forEach((pt, idx) => {
+      if (idx > 0) {
+        totalDist += pts[idx - 1].distanceTo(pt);
+      }
+
+      L.circleMarker(pt, {
+        radius: idx === 0 ? 6 : 5,
+        color: "#FFFFFF",
+        fillColor: idx === 0 ? "#10B981" : "#F59E0B",
+        fillOpacity: 1,
+        weight: 2,
+      }).addTo(measurementLayerGroupRef.current!);
+
+      const label = idx === 0 ? "Başlangıç" : `${Math.round(totalDist)} m`;
+      const markerBadge = L.divIcon({
+        className: "leaflet-ruler-badge",
+        html: `
+          <div style="transform: translate(8px, -18px); pointer-events: none;">
+            <div style="background: rgba(15, 23, 42, 0.92); color: ${idx === 0 ? '#34D399' : '#FDE047'}; font-weight: 800; font-size: 10px; padding: 2px 6px; border-radius: 6px; border: 1px solid rgba(245, 158, 11, 0.5); white-space: nowrap; font-family: monospace; box-shadow: 0 2px 6px rgba(0,0,0,0.35);">
+              ${label}
+            </div>
+          </div>
+        `,
+        iconSize: [0, 0],
+      });
+      L.marker(pt, { icon: markerBadge }).addTo(measurementLayerGroupRef.current!);
+    });
+
+    setRulerDistance(totalDist);
+  };
+
+  const renderArea = (pts: L.LatLng[]) => {
+    if (!measurementLayerGroupRef.current) return;
+    measurementLayerGroupRef.current.clearLayers();
+
+    if (pts.length === 0) {
+      setAreaM2Value(0);
+      return;
+    }
+
+    if (pts.length === 2) {
+      L.polyline(pts, {
+        color: "#3B82F6",
+        weight: 2.5,
+        dashArray: "4, 4",
+        opacity: 0.9,
+      }).addTo(measurementLayerGroupRef.current);
+    } else if (pts.length >= 3) {
+      L.polygon(pts, {
+        color: "#2563EB",
+        weight: 2.5,
+        dashArray: "4, 4",
+        fillColor: "#3B82F6",
+        fillOpacity: 0.28,
+      }).addTo(measurementLayerGroupRef.current);
+    }
+
+    pts.forEach((pt) => {
+      L.circleMarker(pt, {
+        radius: 5,
+        color: "#FFFFFF",
+        fillColor: "#2563EB",
+        fillOpacity: 1,
+        weight: 2,
+      }).addTo(measurementLayerGroupRef.current!);
+    });
+
+    if (pts.length >= 3) {
+      const area = computePolygonArea(pts);
+      setAreaM2Value(area);
+
+      const centerLat = pts.reduce((a, b) => a + b.lat, 0) / pts.length;
+      const centerLng = pts.reduce((a, b) => a + b.lng, 0) / pts.length;
+      const donum = (area / 1000).toFixed(2);
+
+      const centerBadge = L.divIcon({
+        className: "leaflet-area-badge",
+        html: `
+          <div style="transform: translate(-50%, -50%); pointer-events: none;">
+            <div style="background: rgba(15, 34, 61, 0.95); color: #93C5FD; font-weight: 800; font-size: 11px; padding: 4px 8px; border-radius: 8px; border: 1.5px solid #3B82F6; white-space: nowrap; font-family: monospace; box-shadow: 0 4px 12px rgba(0,0,0,0.35); text-align: center;">
+              <div style="color: #FFFFFF; font-weight: 900; font-size: 12px;">📐 ${Math.round(area).toLocaleString("tr-TR")} m²</div>
+              <div style="color: #60A5FA; font-size: 10px;">${donum} Dönüm</div>
+            </div>
+          </div>
+        `,
+        iconSize: [0, 0],
+      });
+      L.marker([centerLat, centerLng], { icon: centerBadge }).addTo(measurementLayerGroupRef.current!);
+    } else {
+      setAreaM2Value(0);
+    }
+  };
+
+  handleRulerClickRef.current = (latlng: L.LatLng) => {
+    setRulerPoints((prev) => {
+      const next = [...prev, latlng];
+      renderRuler(next);
+      return next;
+    });
+  };
+
+  handleAreaClickRef.current = (latlng: L.LatLng) => {
+    setAreaPoints((prev) => {
+      const next = [...prev, latlng];
+      renderArea(next);
+      return next;
+    });
+  };
+
+  const resetMeasurement = () => {
+    if (measurementLayerGroupRef.current) {
+      measurementLayerGroupRef.current.clearLayers();
+    }
+    setRulerPoints([]);
+    setRulerDistance(0);
+    setAreaPoints([]);
+    setAreaM2Value(0);
+  };
+
+  const closeMeasurement = () => {
+    resetMeasurement();
+    setActiveTool("none");
+    activeToolRef.current = "none";
+  };
+
+  const toggleRuler = () => {
+    if (activeTool === "ruler") {
+      closeMeasurement();
+    } else {
+      resetMeasurement();
+      setActiveTool("ruler");
+      activeToolRef.current = "ruler";
+      setParcelNotice("📏 Mesafe Ölçer Aktif: Haritada başlangıç ve varış noktalarına tıklayın.");
+    }
+  };
+
+  const toggleArea = () => {
+    if (activeTool === "area") {
+      closeMeasurement();
+    } else {
+      resetMeasurement();
+      setActiveTool("area");
+      activeToolRef.current = "area";
+      setParcelNotice("📐 Alan Ölçer Aktif: Parsel veya arazinin köşe noktalarına sırayla tıklayın (en az 3 nokta).");
+    }
+  };
+
+  const handleGetDirections = () => {
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
+  const handleShareWhatsApp = () => {
+    const currentTotal = (unitM2Price || 54085) * (areaM2 || 135);
+    const text = 
+`🏛️ *İhaleciBurada Gayrimenkul & Parsel Bilgisi*
+📍 *Konum:* ${city} / ${activeDistrict} ${activeNeighborhood ? `• ${activeNeighborhood}` : ""}
+📋 *Ada / Parsel:* ${activeAda} / ${activeParsel}
+📐 *Yüzölçümü:* ${formatArea(areaM2)} m²
+🏢 *Nitelik:* ${category === "konut" ? "Konut & Daire" : "İmarlı Arsa"}
+💰 *Bölge Rayici:* ${(unitM2Price || 54085).toLocaleString("tr-TR")} ₺/m²
+🏷️ *Tahmini Değer:* ${currentTotal.toLocaleString("tr-TR")} ₺
+🗺️ *Google Haritalar:* https://www.google.com/maps?q=${lat.toFixed(6)},${lng.toFixed(6)}
+🌐 *Analiz Linki:* ${typeof window !== "undefined" ? window.location.href : ""}`;
+
+    const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+    window.open(waUrl, "_blank", "noopener,noreferrer");
+  };
+
+  const handleCopyKunye = () => {
+    const text = `${city} / ${activeDistrict} ${activeNeighborhood ? `• ${activeNeighborhood}` : ""} | Ada: ${activeAda}, Parsel: ${activeParsel} | GPS: ${lat.toFixed(6)}, ${lng.toFixed(6)} | ${formatArea(areaM2)} m² | ${(unitM2Price || 54085).toLocaleString("tr-TR")} ₺/m²`;
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+      setCopySuccess(true);
+      setParcelNotice(`📋 Künye ve GPS koordinatları panoya kopyalandı!`);
+      setTimeout(() => setCopySuccess(false), 2500);
+    }
+  };
 
   const handleSwitchLayer = (type: "satellite" | "streets") => {
     setMapLayerType(type);
@@ -880,6 +1223,7 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
 
     // Katman Gruplarını Haritaya Ekle
     parcelLayerGroupRef.current = L.layerGroup().addTo(map);
+    measurementLayerGroupRef.current = L.layerGroup().addTo(map);
 
     // Tile Katmanı (Varsayılan Uydu Hibrit veya Sokak)
     const initialTileUrl = mapLayerType === "satellite"
@@ -895,6 +1239,16 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
     // TÜRKİYE GENELİ CANLI HARİTA TIKLAMA DİNLEYİCİSİ (0ms HIZ + TAPUSOR BAL PETEĞİ)
     // =====================================================================
     map.on("click", async (e: L.LeafletMouseEvent) => {
+      // ÖLÇÜM MODU AKTİFSE NORMAL TIKLAMAYI VE ADA/PARSEL SORGUSUNU KES
+      if (activeToolRef.current === "ruler") {
+        handleRulerClickRef.current(e.latlng);
+        return;
+      }
+      if (activeToolRef.current === "area") {
+        handleAreaClickRef.current(e.latlng);
+        return;
+      }
+
       isInternalClickRef.current = true;
       const clickLat = Number(e.latlng.lat.toFixed(6));
       const clickLng = Number(e.latlng.lng.toFixed(6));
@@ -1044,6 +1398,16 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
       if (resizeObserver) {
         resizeObserver.disconnect();
       }
+      if (measurementLayerGroupRef.current) {
+        measurementLayerGroupRef.current.clearLayers();
+        measurementLayerGroupRef.current = null;
+      }
+      Object.values(thematicLayersRef.current).forEach((layer) => {
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.removeLayer(layer);
+        }
+      });
+      thematicLayersRef.current = {};
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
@@ -1231,6 +1595,72 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
             </button>
           </div>
 
+          {/* SAHA VE ÖLÇÜM ARAÇLARI (PARSELSORGU STANDARDI) */}
+          <div className="flex items-center bg-slate-800/90 rounded-lg p-0.5 border border-slate-700 text-[10px]">
+            {/* Mesafe (Cetvel) */}
+            <button
+              type="button"
+              onClick={toggleRuler}
+              className={`px-2 py-1 rounded font-bold transition cursor-pointer flex items-center gap-1 ${
+                activeTool === "ruler" 
+                  ? "bg-amber-500 text-slate-950 font-black shadow-xs ring-1 ring-amber-300" 
+                  : "text-slate-300 hover:text-white hover:bg-slate-700/60"
+              }`}
+              title="Haritada İki veya Daha Fazla Nokta Arasında Canlı Mesafe Ölçümü Yap (Cetvel)"
+            >
+              <Ruler className="w-3.5 h-3.5 text-amber-400" />
+              <span className="hidden sm:inline">Mesafe</span>
+            </button>
+
+            {/* Alan Ölçer (Poligon) */}
+            <button
+              type="button"
+              onClick={toggleArea}
+              className={`px-2 py-1 rounded font-bold transition cursor-pointer flex items-center gap-1 ${
+                activeTool === "area" 
+                  ? "bg-blue-600 text-white font-black shadow-xs ring-1 ring-blue-300" 
+                  : "text-slate-300 hover:text-white hover:bg-slate-700/60"
+              }`}
+              title="Haritada Parsel/Arazi Sınırlarını Çizerek Alan & Dönüm Hesapla (Poligon)"
+            >
+              <Shapes className="w-3.5 h-3.5 text-blue-400" />
+              <span className="hidden sm:inline">Alan</span>
+            </button>
+
+            {/* Google Haritalar Yol Tarifi */}
+            <button
+              type="button"
+              onClick={handleGetDirections}
+              className="px-2 py-1 rounded font-bold text-slate-300 hover:text-white hover:bg-slate-700/60 transition cursor-pointer flex items-center gap-1"
+              title="Google Haritalar ile Yol Tarifi / Navigasyon Başlat"
+            >
+              <Navigation className="w-3.5 h-3.5 text-blue-400" />
+              <span className="hidden md:inline">Yol Tarifi</span>
+            </button>
+
+            {/* WhatsApp Paylaş */}
+            <button
+              type="button"
+              onClick={handleShareWhatsApp}
+              className="px-2 py-1 rounded font-bold text-emerald-400 hover:text-emerald-300 hover:bg-emerald-950/40 transition cursor-pointer flex items-center gap-1"
+              title="Parsel ve Değerleme Özetini WhatsApp İle Paylaş"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+              <span className="hidden md:inline">WhatsApp</span>
+            </button>
+
+            {/* Künye & GPS Kopyala */}
+            <button
+              type="button"
+              onClick={handleCopyKunye}
+              className="px-2 py-1 rounded font-bold text-slate-300 hover:text-white hover:bg-slate-700/60 transition cursor-pointer flex items-center gap-1"
+              title="Ada, Parsel ve GPS Koordinatlarını Panoya Kopyala"
+            >
+              {copySuccess ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-slate-400" />}
+              <span className="hidden lg:inline">{copySuccess ? "Kopyalandı" : "Kopyala"}</span>
+            </button>
+          </div>
+
           {/* Harita Boyut Ayarı (Daralt / Genişlet Hızlı Butonları) */}
           {onToggleSidebar && (
             <div className="hidden sm:flex items-center bg-slate-800/90 rounded-lg p-0.5 border border-slate-700 text-[10px] ml-1">
@@ -1295,6 +1725,69 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
       <div className="relative flex-1 w-full min-h-[480px]">
         <div ref={mapContainerRef} className="w-full h-full" />
 
+        {/* AKTİF ÖLÇÜM MODU YÜZEN BİLGİ VE KONTROL PANELİ (MESAFE VEYA ALAN ÖLÇER) */}
+        {activeTool !== "none" && (
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[500] max-w-[95%] sm:max-w-md w-auto bg-slate-900/95 backdrop-blur-md text-white border border-amber-500/50 rounded-xl px-3.5 py-2 shadow-2xl flex items-center justify-between gap-3 text-xs pointer-events-auto animate-in slide-in-from-top-2">
+            <div className="flex items-center gap-2">
+              {activeTool === "ruler" ? (
+                <>
+                  <div className="w-7 h-7 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+                    <Ruler className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Mesafe Ölçümü</div>
+                    <div className="font-mono text-amber-300 font-black text-sm">
+                      {rulerPoints.length < 2 ? "Haritadan nokta seçin" : formatDistance(rulerDistance)}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="w-7 h-7 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
+                    <Shapes className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Poligon Alan Hesabı</div>
+                    <div className="font-mono text-blue-300 font-black text-sm flex items-center gap-1.5">
+                      {areaPoints.length < 3 ? (
+                        <span className="text-slate-300 text-xs">
+                          {areaPoints.length === 0 ? "Köşe noktalarını tıklayın" : `${areaPoints.length} nokta seçildi (en az 3)`}
+                        </span>
+                      ) : (
+                        <>
+                          <span>{formatArea(areaM2Value)} m²</span>
+                          <span className="text-[10.5px] text-slate-400 font-normal">({(areaM2Value / 1000).toFixed(2)} Dönüm)</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="flex items-center gap-1.5 border-l border-slate-700/80 pl-2.5 shrink-0">
+              <button
+                type="button"
+                onClick={resetMeasurement}
+                className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg text-[10.5px] font-bold transition flex items-center gap-1 cursor-pointer"
+                title="Çizilen noktaları sıfırla"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span className="hidden sm:inline">Sıfırla</span>
+              </button>
+              <button
+                type="button"
+                onClick={closeMeasurement}
+                className="px-2 py-1 bg-rose-600/90 hover:bg-rose-600 text-white rounded-lg text-[10.5px] font-bold transition flex items-center gap-1 cursor-pointer"
+                title="Ölçüm modundan çık (Esc)"
+              >
+                <X className="w-3 h-3" />
+                <span>Kapat</span>
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* SOL ÜST YÜZEN TAPUSOR PARSEL VE FİYAT BİLGİ KARTI (GÖRSEL 1789501075638 BİREBİR) */}
         <div className="absolute top-3 left-3 z-[450] bg-white/95 backdrop-blur-md border border-slate-300 rounded-xl shadow-xl px-3.5 py-2.5 max-w-md select-none text-slate-900 pointer-events-auto">
           <div className="flex items-center gap-1.5 font-extrabold text-xs sm:text-sm">
@@ -1321,73 +1814,200 @@ export const ParcelMap: React.FC<ParcelMapProps> = ({
 
         {/* SAĞ KENAR DİKEY YÜZEN ARAÇ ÇUBUĞU (TAPUSOR DİZAYNI) */}
         <div className="absolute top-4 right-3 z-[450] flex flex-col items-center gap-1.5 select-none pointer-events-auto">
-          {/* Katman Göstergesi: Uydu & Sokak Haritası */}
+          {/* Katman Göstergesi: Uydu & Sokak Haritası & İmar */}
           <div className="relative">
             <button
               type="button"
               onClick={() => setShowLayerMenu(!showLayerMenu)}
               className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shadow-lg border transition cursor-pointer ${
-                showLayerMenu ? "bg-[#0B1E3B] text-amber-400 border-amber-500/40" : "bg-white hover:bg-slate-50 text-slate-700 border-slate-200"
+                showLayerMenu || Object.values(thematicLayers).some(Boolean)
+                  ? "bg-[#0B1E3B] text-amber-400 border-amber-500/60 ring-2 ring-amber-400/40" 
+                  : "bg-white hover:bg-slate-50 text-slate-700 border-slate-200"
               }`}
-              title={mapLayerType === "satellite" ? "Aktif Katman: Uydu Görünümü" : "Aktif Katman: Sokak Haritası"}
+              title="Katmanlar & İmar Planları Menüsü"
             >
               <Layers className="w-4 h-4" />
             </button>
 
             {showLayerMenu && (
-              <div className="absolute right-12 top-0 bg-slate-900 text-white border border-slate-700 rounded-xl shadow-2xl p-2.5 w-52 space-y-2 z-50 text-xs font-bold animate-in fade-in zoom-in-95 duration-150">
-                <div className="text-[10px] text-slate-400 px-1 uppercase tracking-wider font-mono">
-                  Harita Katmanı Seçimi
+              <div className="absolute right-12 top-0 bg-slate-900/95 backdrop-blur-md text-white border border-slate-700 rounded-xl shadow-2xl p-3 w-64 sm:w-72 space-y-3 z-50 text-xs font-bold animate-in fade-in zoom-in-95 duration-150 max-h-[85vh] overflow-y-auto">
+                {/* 1. BÖLÜM: TEMEL HARİTA ALTLIĞI */}
+                <div>
+                  <div className="text-[10px] text-slate-400 px-1 uppercase tracking-wider font-mono mb-1.5 flex items-center justify-between">
+                    <span>Harita Altlığı</span>
+                    <span className="text-[9px] text-amber-400 font-bold">1 Seçili</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleSwitchLayer("satellite")}
+                      className={`text-left p-2 rounded-lg font-bold flex flex-col gap-0.5 transition cursor-pointer border ${
+                        mapLayerType === "satellite"
+                          ? "bg-amber-500 text-slate-950 border-amber-400 shadow-xs"
+                          : "bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700"
+                      }`}
+                    >
+                      <span className="text-xs flex items-center justify-between">
+                        <span>🛰️ Uydu</span>
+                        {mapLayerType === "satellite" && <span className="text-[10px] font-black">✓</span>}
+                      </span>
+                      <span className={`text-[9px] ${mapLayerType === "satellite" ? "text-slate-900 font-semibold" : "text-slate-400"}`}>
+                        Google Hibrit
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleSwitchLayer("streets")}
+                      className={`text-left p-2 rounded-lg font-bold flex flex-col gap-0.5 transition cursor-pointer border ${
+                        mapLayerType === "streets"
+                          ? "bg-amber-500 text-slate-950 border-amber-400 shadow-xs"
+                          : "bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700"
+                      }`}
+                    >
+                      <span className="text-xs flex items-center justify-between">
+                        <span>🛣️ Sokak</span>
+                        {mapLayerType === "streets" && <span className="text-[10px] font-black">✓</span>}
+                      </span>
+                      <span className={`text-[9px] ${mapLayerType === "streets" ? "text-slate-900 font-semibold" : "text-slate-400"}`}>
+                        Yol & Kadastro
+                      </span>
+                    </button>
+                  </div>
                 </div>
 
-                {/* 1. UYDU GÖRÜNÜMÜ */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleSwitchLayer("satellite");
-                    setShowLayerMenu(false);
-                  }}
-                  className={`w-full text-left px-2.5 py-2 rounded-lg font-black flex items-center justify-between transition cursor-pointer ${
-                    mapLayerType === "satellite"
-                      ? "bg-amber-500 text-slate-950 shadow-xs"
-                      : "bg-slate-800 text-slate-200 hover:bg-slate-700"
-                  }`}
-                >
-                  <span className="flex items-center gap-2">
-                    <span>🛰️</span>
-                    <span>Uydu Görünümü</span>
-                  </span>
-                  {mapLayerType === "satellite" && <span className="text-[11px] font-black">✓</span>}
-                </button>
-                <div className="text-[9px] text-slate-400 px-1 leading-tight -mt-1">
-                  Gerçek arazi, binalar ve Google hibrit uydu görüntüsü.
+                {/* 2. BÖLÜM: RESMİ İMAR & ÇEVRE KATMANLARI (ÇŞİDB & MTA WMS) */}
+                <div className="border-t border-slate-800 pt-2.5">
+                  <div className="text-[10px] text-slate-400 px-1 uppercase tracking-wider font-mono mb-2 flex items-center justify-between">
+                    <span>İmar & Çevre Katmanları</span>
+                    <span className="text-[9px] text-emerald-400 font-bold">WMS Canlı</span>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    {/* e-Plan İmar Planı */}
+                    <label className="flex items-center justify-between p-2 rounded-lg bg-slate-800/80 hover:bg-slate-800 cursor-pointer border border-slate-700/60 transition">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm">🏗️</span>
+                        <div>
+                          <div className="text-xs text-white font-extrabold">e-Plan İmar Planları</div>
+                          <div className="text-[9px] text-slate-400 font-normal">1/1000 Uygulama & 1/5000 Nazım (ÇŞİDB)</div>
+                        </div>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={thematicLayers.eplan}
+                        onChange={(e) => setThematicLayers((prev) => ({ ...prev, eplan: e.target.checked }))}
+                        className="w-4 h-4 rounded accent-amber-500 cursor-pointer"
+                      />
+                    </label>
+
+                    {/* MTA Diri Fay Hatları */}
+                    <label className="flex items-center justify-between p-2 rounded-lg bg-slate-800/80 hover:bg-slate-800 cursor-pointer border border-slate-700/60 transition">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm">⚡</span>
+                        <div>
+                          <div className="text-xs text-white font-extrabold">MTA Diri Fay Hatları</div>
+                          <div className="text-[9px] text-slate-400 font-normal">Deprem risk hatları ve fay kırıkları</div>
+                        </div>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={thematicLayers.fay}
+                        onChange={(e) => setThematicLayers((prev) => ({ ...prev, fay: e.target.checked }))}
+                        className="w-4 h-4 rounded accent-amber-500 cursor-pointer"
+                      />
+                    </label>
+
+                    {/* Doğal Sit & Koruma Alanları */}
+                    <label className="flex items-center justify-between p-2 rounded-lg bg-slate-800/80 hover:bg-slate-800 cursor-pointer border border-slate-700/60 transition">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm">🌲</span>
+                        <div>
+                          <div className="text-xs text-white font-extrabold">Doğal Sit & Koruma</div>
+                          <div className="text-[9px] text-slate-400 font-normal">1., 2., 3. Derece Sit & Milli Park</div>
+                        </div>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={thematicLayers.sit}
+                        onChange={(e) => setThematicLayers((prev) => ({ ...prev, sit: e.target.checked }))}
+                        className="w-4 h-4 rounded accent-amber-500 cursor-pointer"
+                      />
+                    </label>
+
+                    {/* Kıyı Kenar Çizgisi */}
+                    <label className="flex items-center justify-between p-2 rounded-lg bg-slate-800/80 hover:bg-slate-800 cursor-pointer border border-slate-700/60 transition">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm">🌊</span>
+                        <div>
+                          <div className="text-xs text-white font-extrabold">Kıyı Kenar Çizgisi</div>
+                          <div className="text-[9px] text-slate-400 font-normal">Sahil koruma ve kıyı şeridi bandı</div>
+                        </div>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={thematicLayers.kiyi}
+                        onChange={(e) => setThematicLayers((prev) => ({ ...prev, kiyi: e.target.checked }))}
+                        className="w-4 h-4 rounded accent-amber-500 cursor-pointer"
+                      />
+                    </label>
+                  </div>
                 </div>
 
-                {/* 2. SOKAK HARİTASI */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleSwitchLayer("streets");
-                    setShowLayerMenu(false);
-                  }}
-                  className={`w-full text-left px-2.5 py-2 rounded-lg font-black flex items-center justify-between transition cursor-pointer ${
-                    mapLayerType === "streets"
-                      ? "bg-amber-500 text-slate-950 shadow-xs"
-                      : "bg-slate-800 text-slate-200 hover:bg-slate-700"
-                  }`}
-                >
-                  <span className="flex items-center gap-2">
-                    <span>🛣️</span>
-                    <span>Sokak Haritası</span>
-                  </span>
-                  {mapLayerType === "streets" && <span className="text-[11px] font-black">✓</span>}
-                </button>
-                <div className="text-[9px] text-slate-400 px-1 leading-tight -mt-1">
-                  Tüm sokak, cadde ve resmi kadastro yolları nettir.
+                {/* 3. BÖLÜM: KATMAN OPAKLIĞI (ŞEFFAFLIK SLIDER) */}
+                <div className="border-t border-slate-800 pt-2.5">
+                  <div className="flex items-center justify-between text-[10px] text-slate-400 px-1 uppercase tracking-wider font-mono mb-1.5">
+                    <span className="flex items-center gap-1">
+                      <Sliders className="w-3 h-3 text-amber-400" />
+                      İmar Katmanı Opaklığı
+                    </span>
+                    <span className="font-mono text-amber-400 font-bold">%{Math.round(thematicOpacity * 100)}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0.2"
+                    max="1"
+                    step="0.05"
+                    value={thematicOpacity}
+                    onChange={(e) => setThematicOpacity(parseFloat(e.target.value))}
+                    className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                  />
+                  <div className="flex items-center justify-between text-[9px] text-slate-500 px-1 mt-1">
+                    <span>%20 Saydam</span>
+                    <span>%100 Net</span>
+                  </div>
                 </div>
               </div>
             )}
           </div>
+
+          {/* Cetvel (Mesafe Ölçümü) Hızlı Butonu */}
+          <button
+            type="button"
+            onClick={toggleRuler}
+            className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shadow-lg border transition cursor-pointer active:scale-95 ${
+              activeTool === "ruler"
+                ? "bg-amber-500 text-slate-950 border-amber-600 ring-2 ring-amber-300"
+                : "bg-white hover:bg-slate-50 text-slate-700 border-slate-200"
+            }`}
+            title="Harita Üzerinde Canlı Mesafe Ölçümü (Cetvel)"
+          >
+            <Ruler className="w-4 h-4" />
+          </button>
+
+          {/* Alan Ölçer (Poligon & Dönüm) Hızlı Butonu */}
+          <button
+            type="button"
+            onClick={toggleArea}
+            className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shadow-lg border transition cursor-pointer active:scale-95 ${
+              activeTool === "area"
+                ? "bg-blue-600 text-white border-blue-700 ring-2 ring-blue-300"
+                : "bg-white hover:bg-slate-50 text-slate-700 border-slate-200"
+            }`}
+            title="Harita Üzerinde Parsel Alanı ve Dönüm Hesabı"
+          >
+            <Shapes className="w-4 h-4" />
+          </button>
 
           {/* Filtre Değiştirici */}
           <button
